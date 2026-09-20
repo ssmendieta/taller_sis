@@ -1,0 +1,52 @@
+﻿# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Builds
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Env
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Nest / Vite
+nest-cli.json
+.vite/
+
+# Docker
+.docker/
+
+# Misc
+tmp/
+temp/

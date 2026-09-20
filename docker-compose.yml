@@ -1,0 +1,67 @@
+﻿version: "3.8"
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: taller_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_AUTH_DATABASE:-taller_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    profiles: ["db"]
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "${GATEWAY_PORT:-3000}:3000"
+    environment:
+      - PORT=${GATEWAY_PORT:-3000}
+      - NODE_ENV=${NODE_ENV:-development}
+    profiles: ["full"]
+
+  auth-service:
+    build: ./services/auth-service
+    container_name: auth-service
+    ports:
+      - "${AUTH_SERVICE_PORT:-3001}:3001"
+    environment:
+      - PORT=${AUTH_SERVICE_PORT:-3001}
+      - NODE_ENV=${NODE_ENV:-development}
+    profiles: ["full"]
+
+  produccion-service:
+    build: ./services/produccion-service
+    container_name: produccion-service
+    ports:
+      - "${PRODUCCION_SERVICE_PORT:-3002}:3002"
+    environment:
+      - PORT=${PRODUCCION_SERVICE_PORT:-3002}
+      - NODE_ENV=${NODE_ENV:-development}
+    profiles: ["full"]
+
+  logistica-service:
+    build: ./services/logistica-service
+    container_name: logistica-service
+    ports:
+      - "${LOGISTICA_SERVICE_PORT:-3003}:3003"
+    environment:
+      - PORT=${LOGISTICA_SERVICE_PORT:-3003}
+      - NODE_ENV=${NODE_ENV:-development}
+    profiles: ["full"]
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      - VITE_API_GATEWAY_URL=http://localhost:${GATEWAY_PORT:-3000}
+    profiles: ["full"]
+
+volumes:
+  pgdata:
