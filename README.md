@@ -22,180 +22,162 @@ API Gateway (NestJS :3000)  -> ConfigModule + http-proxy-middleware
 └──────────────┴─────────────────────┴──────────────────┘
          ↓ 1 instancia PostgreSQL 15 taller_postgres:5432 (pgdata)
 ```
-Todo HTTP/REST. Cada MS solo ve su DB, sin FK entre DBs. `responsable_usuario_id` es BIGINT externo.
+Todo HTTP/REST. Cada MS solo ve su DB, sin FK entre DBs.
 
 ## 3. Estructura de Carpetas
 ```
 /
 ├── frontend/  (Vite+React :5173)
-│   └── src/{components/SystemStatus.jsx, pages/{Home,Login,Produccion,Logistica,SystemStatusPage}.jsx,
-│            layouts/MainLayout.jsx, routes/AppRoutes.jsx, services/{api.js,system.service.js}, styles/}
-├── api-gateway/ :3000
-│   └── src/{main.ts, app.module.ts, proxy/proxy.module.ts, health/}
-├── services/
-│   ├── auth-service/ :3001 -> auth_db (migrations 1710000000000*, 1710000000001*)
-│   │   └── src/database/{data-source.ts, database.module.ts, migrations/}
-│   ├── produccion-service/ :3002 -> produccion_db (migration 1710000000002* + 2 vistas, health/database)
-│   └── logistica-service/ :3003 -> logistica_db (vacía)
-├── database/
-│   ├── init/01-create-dbs.sql  (crea 3 DBs en 1 instancia)
-│   ├── auth/.gitkeep, produccion/.gitkeep, logistica/.gitkeep
-├── docs/GIT.md, docs/ARCHITECTURE.md
-├── scripts/install-all.ps1, scripts/test-e2e.ps1
-├── docker-compose.yml (postgres + 4 servicios + frontend, healthcheck)
-├── .env.example (POSTGRES_* y VITE_API_URL sin secretos)
+├── api-gateway/ :3000 (proxy /api/*)
+├── services/auth-service/ :3001 -> auth_db
+├── services/produccion-service/ :3002 -> produccion_db (health/database)
+├── services/logistica-service/ :3003 -> logistica_db (vacía)
+├── database/init/01-create-dbs.sql
+├── docker-compose.yml
+├── .env.example
 └── README.md
 ```
 
-## 4. Instalación
+## 4. Inicio desde 0 con Docker (5 pasos - copiar y pegar)
+
+**Paso 0 - Instalar Docker (solo si nunca usaste Docker):**
+- Windows/macOS: instalar Docker Desktop desde https://www.docker.com/products/docker-desktop/ , abrirlo y esperar a que diga "Engine running".
+- Linux: `sudo apt update && sudo apt install docker.io docker-compose-plugin && sudo systemctl enable --now docker`
+- Verificar: `docker --version` y `docker compose version` deben mostrar versión sin error. `docker ps` debe mostrar tabla vacía (sin contenedores).
+
+**Paso 1 - Clonar y preparar env:**
 ```powershell
-git clone <repo> && cd "proyecto taller"
-Copy-Item .env.example .env  # o cp .env.example .env en bash
-.\scripts\install-all.ps1
-# equivale a: npm install --prefix frontend; --prefix api-gateway; --prefix services/auth-service etc.
-# o manual:
-# cd frontend && npm install
-# cd ../api-gateway && npm install
-# cd ../services/auth-service && npm install; cd ../produccion-service && npm install; cd ../logistica-service && npm install
+git clone https://github.com/ssmendieta/taller_sis.git
+cd taller_sis
+Copy-Item .env.example .env   # en Git Bash/Linux: cp .env.example .env
+```
+
+**Paso 2 - Instalar dependencias:**
+```powershell
+.\scripts\install-all.ps1   # en Linux/macOS: bash scripts/install-all.ps1
+# Si falla, instalar manual: cd frontend && npm install; cd ../api-gateway && npm install; cd ../services/auth-service && npm install; etc.
+```
+
+**Paso 3 - Levantar PostgreSQL (1 instancia con 3 DBs):**
+```powershell
+docker compose --profile db up -d
+docker ps                 # debe aparecer taller_postgres Up (healthy) unos segundos después
+docker logs taller_postgres --tail 20  # debe decir "database system is ready to accept connections"
+docker exec taller_postgres psql -U postgres -c "\l"  # debe listar auth_db, produccion_db, logistica_db
+# Si no aparecen, esperar 5s y repetir. Si persiste error, ver sección 14.
+```
+
+**Paso 4 - Crear tablas con migraciones:**
+```powershell
+cd services/auth-service; npm run migration:run; cd ../..
+cd services/produccion-service; npm run migration:run; cd ../..
+# Verificar:
+docker exec taller_postgres psql -U postgres -d auth_db -c "\dt"              # debe mostrar roles, permisos, usuarios, etc.
+docker exec taller_postgres psql -U postgres -d produccion_db -c "\dt; \dv"  # debe mostrar 6 tablas + 2 vistas
+docker exec taller_postgres psql -U postgres -d logistica_db -c "\dt"         # debe estar vacío (correcto)
+```
+
+**Paso 5 - Levantar todo y probar:**
+```powershell
+# Opción A - local (4 terminales separadas, recomendado para ver logs):
+# Terminal 1: cd services/auth-service; npm run start:dev       # :3001
+# Terminal 2: cd services/produccion-service; npm run start:dev # :3002
+# Terminal 3: cd services/logistica-service; npm run start:dev  # :3003
+# Terminal 4: cd api-gateway; npm run start:dev                  # :3000
+# Terminal 5: cd frontend; npm run dev                           # :5173
+
+# Opción B - todo con Docker (1 comando):
+docker compose --profile full up -d --build
+docker ps  # deben aparecer 5 contenedores Up
+
+# Probar (en cualquier opción):
+curl http://localhost:3000/health
+curl http://localhost:3000/api/auth/health
+curl http://localhost:3000/api/produccion/health
+curl http://localhost:3000/api/produccion/health/database  # debe dar database:connected
+# Frontend: abrir http://localhost:5173/estado -> debe mostrar Gateway: OK, Producción: OK, Base de datos: OK
+.\scripts\test-e2e.ps1  # prueba automatizada de todo el flujo
 ```
 
 ## 5. Variables de Entorno
-Ver `.env.example` (sin secretos reales). Requeridas para levantar sin Docker:
+Ver `.env.example` (sin secretos). Principales:
 ```
-GATEWAY_PORT=3000
-AUTH_SERVICE_PORT=3001
-PRODUCCION_SERVICE_PORT=3002
-LOGISTICA_SERVICE_PORT=3003
-FRONTEND_PORT=5173
-NODE_ENV=development
-AUTH_SERVICE_URL=http://localhost:3001
-PRODUCCION_SERVICE_URL=http://localhost:3002
-LOGISTICA_SERVICE_URL=http://localhost:3003
-VITE_API_URL=http://localhost:3000 # frontend SOLO conoce gateway
-DB_HOST=localhost          # fuera de docker; dentro docker es "postgres"
-DB_PORT=5432
-DB_USERNAME=postgres_user
-DB_PASSWORD=postgres_password_example
-DB_AUTH_DATABASE=auth_db
-DB_PRODUCCION_DATABASE=produccion_db
-DB_LOGISTICA_DATABASE=logistica_db
-POSTGRES_HOST=localhost    # alias compat Fase 3
-POSTGRES_PORT=5432
-POSTGRES_USER=postgres_user
-POSTGRES_PASSWORD=postgres_password_example
-POSTGRES_DB=auth_db
-AUTH_DB=auth_db
-PRODUCCION_DB=produccion_db
-LOGISTICA_DB=logistica_db
-SKIP_DB=false              # true solo para probar health sin PG
+GATEWAY_PORT=3000, AUTH_SERVICE_PORT=3001, PRODUCCION_SERVICE_PORT=3002, LOGISTICA_SERVICE_PORT=3003, FRONTEND_PORT=5173
+AUTH_SERVICE_URL=http://localhost:3001, PRODUCCION_SERVICE_URL=http://localhost:3002, LOGISTICA_SERVICE_URL=http://localhost:3003
+VITE_API_URL=http://localhost:3000  # frontend SOLO conoce gateway
+DB_HOST=localhost (fuera de docker) / postgres (dentro de docker), DB_PORT=5432, DB_USERNAME, DB_PASSWORD
+DB_AUTH_DATABASE=auth_db, DB_PRODUCCION_DATABASE=produccion_db, DB_LOGISTICA_DATABASE=logistica_db
+SKIP_DB=false  # true solo para probar sin PG (database:skipped)
 ```
-No versionar `.env`. Cambiar `DB_*` en `.env` si usas credenciales reales.
+No versionar `.env`.
 
 ## 6. PostgreSQL
-- 1 instancia `postgres:15-alpine` `taller_postgres` (`docker-compose.yml:3`) con `healthcheck pg_isready`.
-- Volumen `pgdata:/var/lib/postgresql/data` persiste datos. `docker compose down -v` lo borra.
-- Dentro de docker los MS usan `DB_HOST=postgres` (DNS docker), fuera usan `localhost`.
+- 1 instancia `postgres:15-alpine` `taller_postgres` con `healthcheck pg_isready` (`docker-compose.yml:3`).
+- Volumen `pgdata` persiste datos. `docker compose down -v` lo borra (obliga a rehacer Paso 3 y 4).
+- Dentro de docker los MS usan `DB_HOST=postgres`, fuera usan `localhost` (configurado automáticamente).
 
 ## 7. Creación de Bases
-Automática al primer `up` via `database/init/01-create-dbs.sql` montado en `/docker-entrypoint-initdb.d:ro` (`docker-compose.yml:15`):
-```sql
-SELECT 'CREATE DATABASE produccion_db' WHERE NOT EXISTS ... \gexec
-SELECT 'CREATE DATABASE logistica_db' WHERE NOT EXISTS ... \gexec
-SELECT 'CREATE DATABASE auth_db' WHERE NOT EXISTS ... \gexec
-```
-Verificar tras `docker compose --profile db up -d`:
-```powershell
-docker exec taller_postgres psql -U postgres -c "\l" | findstr auth_db
-```
+Automática al primer `up` via `database/init/01-create-dbs.sql` (`/docker-entrypoint-initdb.d`). Solo corre si `pgdata` está vacío. No crear DBs manual con pgAdmin.
 
 ## 8. Migraciones
-TypeORM por MS, `synchronize:false`, `migrations:[migrations/*{.ts,.js}]` en `services/*/src/database/data-source.ts`.
-
-- `auth-service`: `1710000000000-AuthSchema` (roles, permisos, rol_permiso, usuarios, auditoria + índices) y `1710000000001-AuthSeed` (4 roles, 13 permisos)
-- `produccion-service`: `1710000000002-ProduccionSchema` (materiales, recetas, receta_material, ordenes_produccion, historial_estado_orden, avances_produccion + vistas `vw_orden_materiales_requeridos`, `vw_orden_avance`)
-- `logistica-service`: sin migraciones (vacía).
-
-Comandos:
+TypeORM `synchronize:false` en `services/*/src/database/data-source.ts`.
+- `auth-service`: `1710000000000-AuthSchema` + `1710000000001-AuthSeed`
+- `produccion-service`: `1710000000002-ProduccionSchema`
+- `logistica-service`: sin migraciones.
 ```powershell
-cd services/auth-service; npm run migration:run      # o npx typeorm migration:run -d src/database/data-source.ts
+cd services/auth-service; npm run migration:run
 cd ../produccion-service; npm run migration:run
-npm run migration:revert  # revertir última
-docker exec taller_postgres psql -U postgres -d auth_db -c "\dt"
-docker exec taller_postgres psql -U postgres -d produccion_db -c "\dt; \dv"
-docker exec taller_postgres psql -U postgres -d logistica_db -c "\dt" # vacío
+npm run migration:revert  # revertir
 ```
 
-## 9. Ejecución de Servicios (MS)
+## 9. Ejecución de Servicios (si no usas Docker full)
 ```powershell
-# Con PostgreSQL corriendo
-cd services/auth-service; npm run start:dev       # :3001 -> auth_db
-cd services/produccion-service; npm run start:dev # :3002 -> produccion_db (incluye GET /health/database)
-cd services/logistica-service; npm run start:dev  # :3003 -> logistica_db
-# build prod: npm run build && npm run start:prod
-# sin PG para probar health sin DB: $env:SKIP_DB="true"; npm run start:dev
+cd services/auth-service; npm run start:dev       # :3001
+cd services/produccion-service; npm run start:dev # :3002 incluye /health/database
+cd services/logistica-service; npm run start:dev  # :3003
+# sin PG: $env:SKIP_DB="true"; npm run start:dev
 ```
 
 ## 10. Ejecución del Gateway
 ```powershell
-cd api-gateway; npm run start:dev # :3000
-# env inyectados por docker-compose o .env: AUTH_SERVICE_URL etc.
-# via Docker: docker compose --profile full up -d --build
+cd api-gateway; npm run start:dev # :3000 proxea /api/auth|produccion|logistica -> :3001|3002|3003
 ```
-Gateway expone `GET /health` y proxea:
-- `GET /api/auth/* -> auth-service:3001/*`
-- `GET /api/produccion/* -> produccion-service:3002/*`
-- `GET /api/logistica/* -> logistica-service:3003/*`
-Implementado en `api-gateway/src/proxy/proxy.module.ts` con `http-proxy-middleware` y `ConfigModule`.
 
 ## 11. Ejecución de React
 ```powershell
-cd frontend; npm run dev      # :5173, VITE_API_URL=http://localhost:3000
-# build: npm run build; npm run preview -- --host 0.0.0.0 --port 5173
-# Docker: docker compose --profile full up -d (frontend Dockerfile hace npm run preview)
+cd frontend; npm run dev      # :5173
+# o preview: npm run build; npm run preview -- --host 0.0.0.0 --port 5173
 ```
-Rutas: `/`, `/login`, `/produccion`, `/logistica`, `/estado` (SystemStatus). `MainLayout.jsx` navbar con `isActive`.
+Rutas: `/`, `/login`, `/produccion`, `/logistica`, `/estado` (SystemStatus).
 
 ## 12. Puertos
 | Componente | Puerto | URL |
 |---|---|---|
 | Frontend | 5173 | http://localhost:5173 |
-| API Gateway | 3000 | http://localhost:3000/health, /api/*/health |
-| Auth Service | 3001 | http://localhost:3001/health |
-| Producción Service | 3002 | http://localhost:3002/health, /health/database |
-| Logística Service | 3003 | http://localhost:3003/health |
-| PostgreSQL | 5432 | postgres://localhost:5432 (taller_postgres) |
-
-Todos configurables via `.env.example`.
+| API Gateway | 3000 | http://localhost:3000/health |
+| Auth | 3001 | http://localhost:3001/health |
+| Producción | 3002 | http://localhost:3002/health/database |
+| Logística | 3003 | http://localhost:3003/health |
+| PostgreSQL | 5432 | postgres://localhost:5432 |
 
 ## 13. Health Checks
 ```powershell
-# directos
 curl http://localhost:3000/health
-curl http://localhost:3001/health
-curl http://localhost:3002/health
-curl http://localhost:3002/health/database # consulta real SELECT 1 a produccion_db -> {service:"produccion-service", database:"connected", status:"ok"}
-curl http://localhost:3003/health
-# via gateway (Fase 2+3)
 curl http://localhost:3000/api/auth/health
 curl http://localhost:3000/api/produccion/health
-curl http://localhost:3000/api/logistica/health
-curl http://localhost:3000/api/produccion/health/database # Gateway -> Producción -> PostgreSQL
-# frontend
-# http://localhost:5173/estado muestra Gateway: OK, Producción: OK, Base de datos: OK (SystemStatus.jsx)
+curl http://localhost:3000/api/produccion/health/database # Gateway -> Producción -> PG
+# http://localhost:5173/estado muestra estado completo
 ```
-Flujo verificado: `Frontend (SystemStatus.jsx) → Gateway (proxy) → Producción (DataSource.query SELECT 1) → PostgreSQL produccion_db → ... → Frontend`.
 
 ## 14. Solución de Problemas Frecuentes
-- `ECONNREFUSED 5432` o `getaddrinfo ENOTFOUND postgres`: fuera de docker usar `DB_HOST=localhost` en `.env`, dentro usar `postgres`. Verificar `docker ps` y `docker logs taller_postgres`.
-- `database "auth_db" does not exist`: ejecutar `docker compose --profile db up -d` y esperar healthcheck `pg_isready` (10s). No crear DBs manual con pgAdmin, usar `01-create-dbs.sql`.
-- `relation does not exist` tras migrar: ejecutar `npm run migration:run` en cada servicio. Verificar `\dt` en cada DB. `logistica_db` debe quedar vacía intencionalmente.
-- `port already in use` 3000-3003/5173/5432: cambiar `GATEWAY_PORT` etc. en `.env` o `netstat -ano | findstr :3000` y matar proceso.
-- `SKIP_DB=true` muestra `database:"skipped"` en `/health/database` — es para probar sin PG. Con PG debe ser `connected`; si sale `disconnected` revisar credenciales `DB_USERNAME/PASSWORD`.
-- `http-proxy 504` en `/api/*`: verificar `AUTH_SERVICE_URL` etc. apunten a `http://auth-service:3001` dentro de docker o `http://localhost:3001` fuera. Revisar `api-gateway/src/proxy/proxy.module.ts` logs `proxy -> auth: ...`.
-- `vite: VITE_API_URL not defined`: definir `VITE_API_URL=http://localhost:3000` en `.env` y reiniciar `npm run dev` (Vite solo lee env al iniciar).
-- `docker compose down -v` borra `pgdata` — migraciones se deben re-ejecutar.
-- `npm run build` falla con `TS2345 createProxyMiddleware`: ya fixeado con `as any` en `proxy.module.ts`.
-- `frontend build` 166kB OK, `api-gateway` y `services` builds OK con `nest build`.
+- `docker: command not found` → Docker no instalado, ver Paso 0.
+- `docker ps` no muestra `taller_postgres` → ejecutar `docker compose --profile db up -d` y esperar 10s.
+- `ECONNREFUSED 5432` → `docker ps` debe mostrar Up; si no, `docker logs taller_postgres`. Fuera de docker `DB_HOST=localhost`, dentro `postgres`.
+- `database does not exist` → esperar healthcheck, no usar pgAdmin.
+- `relation does not exist` → falta `npm run migration:run`.
+- `port already in use` → cambiar puerto en `.env` o `netstat -ano | findstr :3000`.
+- `SKIP_DB` muestra `skipped` → normal sin PG, con PG debe ser `connected`.
+- `docker compose down -v` borra todo → rehacer Paso 3 y 4.
 
 ---
-HU ABC-158 completada: Fase 1 (estructura), Fase 2 (PG + migraciones + gateway), Fase 3 (env consolidado, docker healthcheck, README 14 puntos, /health/database real, gateway proxy, frontend SystemStatus, pruebas e2e).
+HU ABC-158 completada Fase 1-3. Inicio desde 0 = 5 pasos arriba.
