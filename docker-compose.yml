@@ -7,11 +7,12 @@ services:
     environment:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_AUTH_DATABASE:-taller_db}
+      POSTGRES_DB: ${DB_AUTH_DATABASE:-auth_db}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
     profiles: ["db"]
 
   api-gateway:
@@ -22,6 +23,11 @@ services:
     environment:
       - PORT=${GATEWAY_PORT:-3000}
       - NODE_ENV=${NODE_ENV:-development}
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - PRODUCCION_SERVICE_URL=http://produccion-service:3002
+      - LOGISTICA_SERVICE_URL=http://logistica-service:3003
+    depends_on:
+      - postgres
     profiles: ["full"]
 
   auth-service:
@@ -32,6 +38,13 @@ services:
     environment:
       - PORT=${AUTH_SERVICE_PORT:-3001}
       - NODE_ENV=${NODE_ENV:-development}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_DATABASE=${DB_AUTH_DATABASE:-auth_db}
+    depends_on:
+      - postgres
     profiles: ["full"]
 
   produccion-service:
@@ -42,6 +55,13 @@ services:
     environment:
       - PORT=${PRODUCCION_SERVICE_PORT:-3002}
       - NODE_ENV=${NODE_ENV:-development}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_DATABASE=${DB_PRODUCCION_DATABASE:-produccion_db}
+    depends_on:
+      - postgres
     profiles: ["full"]
 
   logistica-service:
@@ -52,6 +72,13 @@ services:
     environment:
       - PORT=${LOGISTICA_SERVICE_PORT:-3003}
       - NODE_ENV=${NODE_ENV:-development}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_DATABASE=${DB_LOGISTICA_DATABASE:-logistica_db}
+    depends_on:
+      - postgres
     profiles: ["full"]
 
   frontend:
@@ -60,7 +87,7 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     environment:
-      - VITE_API_GATEWAY_URL=http://localhost:${GATEWAY_PORT:-3000}
+      - VITE_API_URL=http://localhost:${GATEWAY_PORT:-3000}
     profiles: ["full"]
 
 volumes:
