@@ -38,9 +38,9 @@ Todo HTTP/REST. Cada MS solo ve su DB, sin FK entre DBs.
 └── README.md
 ```
 
-## 4. Inicio desde 0 con Docker (5 pasos - copiar y pegar)
+## 4. Inicio desde 0 
 
-**Paso 0 - Instalar **
+**Paso 0 - Instalar Docker**
 - Windows/macOS: instalar Docker Desktop desde https://www.docker.com/products/docker-desktop/ , abrirlo y esperar a que diga "Engine running".
 - Linux: `sudo apt update && sudo apt install docker.io docker-compose-plugin && sudo systemctl enable --now docker`
 - Verificar: `docker --version` y `docker compose version` deben mostrar versión sin error. `docker ps` debe mostrar tabla vacía (sin contenedores).
