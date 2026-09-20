@@ -1,0 +1,6 @@
+.layout { min-height: 100vh; display: flex; flex-direction: column; }
+.navbar { display: flex; gap: 16px; padding: 12px 20px; background: #1a1a2e; color: white; align-items: center; }
+.navbar a { color: #ccc; text-decoration: none; }
+.navbar a.active { color: #fff; font-weight: bold; border-bottom: 2px solid #fff; }
+.brand { font-weight: bold; margin-right: 12px; }
+.content { padding: 24px; background: white; flex: 1; }

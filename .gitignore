@@ -1,6 +1,5 @@
 ﻿# Dependencies
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
@@ -41,7 +40,6 @@ Thumbs.db
 .settings/
 
 # Nest / Vite
-nest-cli.json
 .vite/
 
 # Docker
