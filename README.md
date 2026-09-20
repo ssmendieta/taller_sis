@@ -1,4 +1,4 @@
-﻿# Proyecto Taller - HU ABC-158 (Fase 1 + 2 + 3) - HU Completada
+﻿# Proyecto Taller
 
 ## 1. Requisitos
 - Node.js >= 18, npm >= 9
