@@ -1,3 +1,11 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+// B1: carga temprana .env antes de AppModule (que importa DatabaseModule)
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
