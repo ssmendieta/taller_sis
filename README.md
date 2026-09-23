@@ -72,9 +72,9 @@ docker exec taller_postgres psql -U postgres -c "\l"  # debe listar auth_db, pro
 cd services/auth-service; npm run migration:run; cd ../..
 cd services/produccion-service; npm run migration:run; cd ../..
 # Verificar:
-docker exec taller_postgres psql -U postgres -d auth_db -c "\dt"              # debe mostrar roles, permisos, usuarios, etc.
-docker exec taller_postgres psql -U postgres -d produccion_db -c "\dt; \dv"  # debe mostrar 6 tablas + 2 vistas
-docker exec taller_postgres psql -U postgres -d logistica_db -c "\dt"         # debe estar vacío (correcto)
+docker exec taller_postgres psql -U postgres_user -d auth_db -c "\dt"              # debe mostrar roles, permisos, usuarios, etc.
+docker exec taller_postgres psql -U postgres_user -d produccion_db -c "\dt; \dv"  # debe mostrar 6 tablas + 2 vistas
+docker exec taller_postgres psql -U postgres_user -d logistica_db -c "\dt"         # debe estar vacío (correcto)
 ```
 
 **Paso 5 - Levantar todo y probar:**
