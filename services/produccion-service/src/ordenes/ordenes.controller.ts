@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  Query,
 } from '@nestjs/common';
 
 
@@ -19,15 +20,47 @@ export class OrdenesController {
 
 
 
-  @Get(':id/materiales')
-  obtenerMateriales(
-    @Param('id') id:string,
-  ){
+  // Buscar órdenes con filtros
+  @Get('buscar')
+  buscar(
 
-    return this.ordenesService.obtenerMateriales(
-      Number(id)
+    @Query('estado') estado?: string,
+
+    @Query('producto') producto?: string,
+
+    @Query('fecha') fecha?: string,
+
+  ) {
+
+
+    return this.ordenesService.buscar(
+      estado,
+      producto,
+      fecha,
     );
 
+
   }
+
+
+
+
+
+  // Mostrar materiales requeridos de una orden
+  @Get(':id/materiales')
+  obtenerMateriales(
+
+    @Param('id') id: string,
+
+  ) {
+
+
+    return this.ordenesService.obtenerMateriales(
+      Number(id),
+    );
+
+
+  }
+
 
 }

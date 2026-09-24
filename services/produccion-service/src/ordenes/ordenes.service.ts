@@ -47,11 +47,73 @@ export class OrdenesService {
 
       WHERE o.id = $1
 
+
     `,[id]);
 
 
-
     return resultado;
+
+  }
+
+
+
+  // Buscar órdenes mediante filtros
+  async buscar(
+    estado?: string,
+    producto?: string,
+    fecha?: string,
+  ) {
+
+
+    const query = this.ordenRepository
+      .createQueryBuilder('orden')
+      .where('1=1');
+
+
+
+    // Filtro por estado
+    if (estado) {
+
+      query.andWhere(
+        'orden.estado = :estado',
+        {
+          estado,
+        },
+      );
+
+    }
+
+
+
+    // Filtro por producto
+    if (producto) {
+
+      query.andWhere(
+        'orden.codigo ILIKE :producto',
+        {
+          producto: `%${producto}%`,
+        },
+      );
+
+    }
+
+
+
+    // Filtro por fecha programada
+    if (fecha) {
+
+      query.andWhere(
+        'orden.fechaProgramada = :fecha',
+        {
+          fecha,
+        },
+      );
+
+    }
+
+
+
+    return query.getMany();
 
   }
 
