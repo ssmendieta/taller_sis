@@ -8,6 +8,12 @@ dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config();
 
+console.log("DB DEBUG:");
+console.log("HOST:", process.env.DB_HOST);
+console.log("USER:", process.env.DB_USERNAME);
+console.log("PASS:", process.env.DB_PASSWORD);
+console.log("DATABASE:", process.env.DB_AUTH_DATABASE);
+
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST || process.env.POSTGRES_HOST || 'localhost',

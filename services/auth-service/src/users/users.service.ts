@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 
 import { Usuario } from './entities/usuario.entity';
 import { CreateUserDto } from './dto/create-user.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -28,16 +29,28 @@ export class UsersService {
   }
 
 
-  // Crear usuario
-  create(dto: CreateUserDto) {
+  // Crear usuario con contraseña inicial y bcrypt
+  async create(dto: CreateUserDto) {
+
+    // Si no envían contraseña, se asigna una inicial
+    const passwordInicial = dto.password || 'Cambio123*';
+
+
+    // Cifrar contraseña antes de guardar
+    const passwordHash = await bcrypt.hash(
+      passwordInicial,
+      10
+    );
+
 
     const usuario = this.usuarioRepository.create({
+
       nombreCompleto: dto.nombreCompleto,
+
       correo: dto.correo,
 
-      // Por ahora guardamos la contraseña recibida,
-      // después aquí irá el cifrado con bcrypt
-      passwordHash: dto.password,
+      // Se guarda únicamente el hash
+      passwordHash,
 
       rolId: dto.rolId,
 
@@ -45,12 +58,33 @@ export class UsersService {
 
     });
 
-    return this.usuarioRepository.save(usuario);
+
+    const usuarioGuardado = await this.usuarioRepository.save(usuario);
+
+
+    // Retornamos la contraseña inicial solo al crear
+    return {
+      usuario: usuarioGuardado,
+      passwordInicial,
+    };
   }
+
 
 
   // Actualizar datos del usuario
   async update(id: number, data: Partial<CreateUserDto>) {
+
+
+    // Si cambian contraseña, se vuelve a cifrar
+    if (data.password) {
+
+      data.password = await bcrypt.hash(
+        data.password,
+        10
+      );
+
+    }
+
 
     await this.usuarioRepository.update(
       id,
@@ -59,8 +93,10 @@ export class UsersService {
       }
     );
 
+
     return this.findOne(id);
   }
+
 
 
   // Desactivar usuario (baja lógica)
@@ -74,8 +110,10 @@ export class UsersService {
       }
     );
 
+
     return this.findOne(id);
   }
+
 
 
   // Activar usuario nuevamente
@@ -88,6 +126,7 @@ export class UsersService {
         eliminadoEn: null,
       }
     );
+
 
     return this.findOne(id);
   }
