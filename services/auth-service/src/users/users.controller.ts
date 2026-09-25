@@ -2,7 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param } from '@nestjs/common'
 
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
-
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('usuarios')
 export class UsersController {
@@ -12,10 +12,11 @@ export class UsersController {
   ) {}
 
 
-  @Get()
-  findAll() {
-    return this.usersService.findAll();
-  }
+ @Roles('ADMIN')
+@Get()
+findAll() {
+  return this.usersService.findAll();
+}
 
 
   @Get(':id')
