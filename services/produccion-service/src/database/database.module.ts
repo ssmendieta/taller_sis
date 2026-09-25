@@ -7,6 +7,12 @@ dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 dotenv.config();
+console.log("===== DB CONFIG =====");
+console.log("HOST:", process.env.DB_HOST);
+console.log("USER:", process.env.DB_USERNAME);
+console.log("PASS:", process.env.DB_PASSWORD);
+console.log("DATABASE:", process.env.DB_PRODUCCION_DATABASE);
+console.log("=====================");
 
 const dbEnabled = process.env.SKIP_DB !== 'true';
 
