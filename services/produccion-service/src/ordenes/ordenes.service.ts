@@ -24,28 +24,24 @@ export class OrdenesService {
 
       SELECT
 
-        o.id AS orden_id,
-        o.codigo AS orden_codigo,
+  o.id AS orden_id,
+  o.codigo AS orden_codigo,
 
-        m.codigo,
-        m.nombre,
-        m.unidad_medida,
+  m.codigo,
+  m.nombre,
+  m.unidad_medida,
 
-        rm.cantidad_requerida
+  (rm.cantidad_requerida * o.cantidad_solicitada) AS cantidad_requerida
 
+FROM ordenes_produccion o
 
-      FROM ordenes_produccion o
+INNER JOIN receta_material rm
+  ON rm.receta_id = o.receta_id
 
+INNER JOIN materiales m
+  ON m.id = rm.material_id
 
-      INNER JOIN receta_material rm
-        ON rm.receta_id = o.receta_id
-
-
-      INNER JOIN materiales m
-        ON m.id = rm.material_id
-
-
-      WHERE o.id = $1
+WHERE o.id = $1
 
 
     `,[id]);
