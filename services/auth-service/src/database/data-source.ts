@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { DataSource } from 'typeorm';
+import { Usuario } from '../usuarios/usuario.entity';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
@@ -17,6 +18,6 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || process.env.DB_AUTH_DATABASE || process.env.POSTGRES_DB || process.env.AUTH_DB || 'auth_db',
   synchronize: false,
   logging: false,
-  entities: [],
+  entities: [Usuario],
   migrations: [path.join(__dirname, 'migrations/*{.ts,.js}')],
 });

@@ -1,11 +1,13 @@
 import {
   ForbiddenException,
   Injectable,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
 import { compare } from 'bcryptjs';
+import { Repository } from 'typeorm';
+import { Usuario } from '../usuarios/usuario.entity';
 import { LoginDto } from './dto/login.dto';
 
 export interface UsuarioParaAuth {
@@ -20,7 +22,11 @@ export interface UsuarioParaAuth {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    @InjectRepository(Usuario)
+    private readonly usuarios: Repository<Usuario>,
+  ) {}
 
   async login(dto: LoginDto) {
     const correo = dto.correo.trim().toLowerCase();
@@ -65,10 +71,27 @@ export class AuthService {
   }
 
 
+  // Consulta ORM parametrizada (sin SQL concatenado), insensible a
+  // mayusculas para aprovechar el indice ux_usuarios_correo_ci.
   private async buscarUsuarioParaAuth(
     correoNormalizado: string,
   ): Promise<UsuarioParaAuth | null> {
-    throw new ServiceUnavailableException(
-    );
+    const usuario = await this.usuarios
+      .createQueryBuilder('u')
+      .addSelect('u.password_hash')
+      .where('LOWER(u.correo) = :correo', { correo: correoNormalizado })
+      .getOne();
+    if (!usuario) {
+      return null;
+    }
+    return {
+      id: usuario.id,
+      correo: usuario.correo,
+      password_hash: usuario.password_hash,
+      activo: usuario.activo,
+      eliminado_en: usuario.eliminado_en,
+      rol_id: usuario.rol_id,
+      nombre_completo: usuario.nombre_completo,
+    };
   }
 }
