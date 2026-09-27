@@ -27,7 +27,7 @@ const dbEnabled = process.env.SKIP_DB !== 'true';
             'produccion_db',
           autoLoadEntities: true,
           synchronize: false,
-          logging: false,
+          logging: true,
         }),
       ]
     : [],
