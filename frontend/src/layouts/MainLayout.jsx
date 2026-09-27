@@ -10,6 +10,8 @@ const iconos = {
   estado: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   ingresar: <><path d="M13 4h7v16h-7M3 12h13m-4-4 4 4-4 4" /></>,
   auditoria: <><path d="M5 3h14v18H5zM9 8h6m-6 4h6m-6 4h3" /></>,
+  roles: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4l5 5m0-5l-5 5" /></>,
+  usuarios: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8a3 3 0 1 1 2 5M21 20c0-2.8-1.9-5.1-4.5-5.8" /></>,
 };
 
 function IconoNavegacion({ nombre }) {
@@ -28,7 +30,10 @@ export default function MainLayout({ children }) {
           <Link className={isActive("/")} to="/"><IconoNavegacion nombre="inicio" />Inicio</Link>
           <Link className={isActive("/produccion")} to="/produccion"><IconoNavegacion nombre="produccion" />Producción</Link>
           <Link className={isActive("/produccion/ordenes")} to="/produccion/ordenes"><IconoNavegacion nombre="ordenes" />Órdenes</Link>
+          <Link className={isActive("/ordenes")} to="/ordenes"><IconoNavegacion nombre="ordenes" />Nueva orden</Link>
           <Link className={isActive("/recetas")} to="/recetas"><IconoNavegacion nombre="recetas" />Recetas</Link>
+          <Link className={isActive("/roles")} to="/roles"><IconoNavegacion nombre="roles" />Roles</Link>
+          <Link className={isActive("/usuarios")} to="/usuarios"><IconoNavegacion nombre="usuarios" />Usuarios</Link>
           <Link className={isActive("/logistica")} to="/logistica"><IconoNavegacion nombre="logistica" />Logística</Link>
           <Link className={isActive("/estado")} to="/estado"><IconoNavegacion nombre="estado" />Estado</Link>
           {import.meta.env.DEV && <Link className={isActive("/auditoria")} to="/auditoria"><IconoNavegacion nombre="auditoria" />Auditoría</Link>}

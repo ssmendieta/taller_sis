@@ -3,7 +3,7 @@ const API_GATEWAY_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API
 export const apiConfig = { gatewayUrl: API_GATEWAY_URL, apiUrl: API_GATEWAY_URL };
 
 export async function obtenerOrdenesProduccion(signal) {
-  const respuesta = await fetch(`${API_GATEWAY_URL}/api/produccion/ordenes-produccion`, { signal });
+  const respuesta = await fetch(`${API_GATEWAY_URL}/api/produccion/ordenes/buscar`, { signal });
   if (!respuesta.ok) {
     throw new Error("No se pudieron cargar las órdenes. Intenta de nuevo.");
   }

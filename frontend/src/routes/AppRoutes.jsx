@@ -7,6 +7,9 @@ import ConsultaAuditoriaPage from "../pages/ConsultaAuditoriaPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
 import RecetasPage from "../pages/RecetasPage.jsx";
+import RolesPage from "../pages/RolesPage.jsx";
+import UsuarioPage from "../pages/UsuarioPage.jsx";
+import OrdenPage from "../pages/OrdenPage.jsx";
 // ProtectedRoute queda sin usar hasta que exista login (envolver rutas ahora las redirigiría todas a /login).
 export default function AppRoutes() {
   return (
@@ -19,6 +22,9 @@ export default function AppRoutes() {
       <Route path="/recetas" element={<RecetasPage />} />
       <Route path="/logistica" element={<LogisticaPage />} />
       <Route path="/estado" element={<SystemStatusPage />} />
+      <Route path="/roles" element={<RolesPage />} />
+      <Route path="/usuarios" element={<UsuarioPage />} />
+      <Route path="/ordenes" element={<OrdenPage />} />
     </Routes>
   );
 }
