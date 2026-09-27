@@ -47,9 +47,6 @@ export class CreateRecetaDto {
   @IsBoolean()
   activa?: boolean;
 
-  // Opcional para compatibilidad con el frontend actual
-  // (RecetasPage.jsx envía solo producto_codigo/producto_nombre/activa).
-  // Si se envía, debe traer al menos un material.
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)

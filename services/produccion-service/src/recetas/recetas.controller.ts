@@ -15,11 +15,6 @@ import { RecetasService } from './recetas.service';
 import { CreateRecetaDto } from './dto/create-receta.dto';
 import { UpdateRecetaDto } from './dto/update-receta.dto';
 
-// Sin prefijo global en main.ts: el gateway reescribe '/api/produccion' -> ''
-// (api-gateway/src/proxy/proxy.module.ts), por lo que @Controller('recetas')
-// queda expuesto como /api/produccion/recetas.
-// ValidationPipe a nivel de controlador (no global) para no afectar a los
-// endpoints existentes que aún no usan DTO con class-validator (ej. materiales).
 @UsePipes(
   new ValidationPipe({
     whitelist: true,

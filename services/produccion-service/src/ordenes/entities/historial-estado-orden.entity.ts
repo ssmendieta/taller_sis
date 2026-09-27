@@ -4,10 +4,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-// Entity mínima para la tabla historial_estado_orden (DDL en la migración
-// 1710000000002). Solo se usa para registrar el cambio de estado dentro de la
-// misma transacción que actualiza la orden (ABC-148). ABC-149 implementará el
-// endpoint de consulta sobre esta misma tabla: no crear otra entity.
+
 @Entity('historial_estado_orden')
 export class HistorialEstadoOrden {
   @PrimaryGeneratedColumn('identity')
