@@ -13,12 +13,17 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   const managerCreate = jest.fn();
   const managerFindOne = jest.fn();
   const transaction = jest.fn();
+  const historialFind = jest.fn();
 
   const repositorioMock = {
     findOne,
     manager: {
       transaction,
     },
+  };
+
+  const historialRepositorioMock = {
+    find: historialFind,
   };
 
   beforeEach(() => {
@@ -35,7 +40,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    service = new OrdenesService(repositorioMock as any);
+    service = new OrdenesService(repositorioMock as any, historialRepositorioMock as any);
   });
 
   function ordenBase(estado: string) {
@@ -161,5 +166,57 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('tras cambiar el estado aparece exactamente una fila nueva en el historial con anterior y nuevo correctos (ABC-149)', async () => {
+    findOne.mockResolvedValue(ordenBase('EN_PRODUCCION'));
+    managerFindOne.mockResolvedValue({});
+
+    await service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.FINALIZADA,
+      motivo: 'Lote completo',
+      usuarioResponsableId: 7,
+    });
+
+    // El 1er save es la orden, el 2do es la única fila de historial.
+    expect(managerSave).toHaveBeenCalledTimes(2);
+    expect(managerCreate).toHaveBeenCalledTimes(1);
+    expect(managerCreate).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        ordenId: 1,
+        estadoAnterior: EstadoOrden.EN_PRODUCCION,
+        estadoNuevo: EstadoOrden.FINALIZADA,
+        usuarioResponsableId: 7,
+        motivo: 'Lote completo',
+      },
+    );
+  });
+
+  it('obtenerHistorial devuelve las filas ordenadas por fechaHora DESC', async () => {
+    findOne.mockResolvedValue(ordenBase('PLANIFICADA'));
+    const filas = [
+      { id: 2, ordenId: 1, estadoAnterior: 'PENDIENTE', estadoNuevo: 'PLANIFICADA' },
+      { id: 1, ordenId: 1, estadoAnterior: null, estadoNuevo: 'PENDIENTE' },
+    ];
+    historialFind.mockResolvedValue(filas);
+
+    const resultado = await service.obtenerHistorial(1);
+
+    expect(historialFind).toHaveBeenCalledWith({
+      where: { ordenId: 1 },
+      order: { fechaHora: 'DESC', id: 'DESC' },
+    });
+    expect(resultado).toEqual(filas);
+  });
+
+  it('obtenerHistorial rechaza con 404 una orden inexistente', async () => {
+    findOne.mockResolvedValue(null);
+
+    await expect(service.obtenerHistorial(999)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(historialFind).not.toHaveBeenCalled();
   });
 });

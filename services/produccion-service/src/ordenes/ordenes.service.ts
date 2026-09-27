@@ -20,6 +20,8 @@ export class OrdenesService {
   constructor(
     @InjectRepository(Orden)
     private readonly ordenRepository: Repository<Orden>,
+    @InjectRepository(HistorialEstadoOrden)
+    private readonly historialRepository: Repository<HistorialEstadoOrden>,
   ) {}
 
 
@@ -127,10 +129,7 @@ export class OrdenesService {
 
 
 
-  // Cambiar el estado de una orden (ABC-148).
-  // Valida la transición contra el flujo de ABC-147, actualiza el estado y
-  // sus marcas de tiempo, y registra la fila de historial, todo en una
-  // misma transacción.
+
   async cambiarEstado(
     id: number,
     dto: CambiarEstadoOrdenDto,
@@ -147,12 +146,7 @@ export class OrdenesService {
     }
 
 
-    // Validación manual contra el enum (decisión: no se usa ValidationPipe
-    // global en este servicio porque main.ts no lo tiene y un pipe global
-    // con whitelist rompería los endpoints existentes sin DTO decorados,
-    // como materiales o buscar; el controller aplica ValidationPipe solo a
-    // esta ruta, esto queda como segunda barrera y hace al service testeable
-    // de forma aislada).
+
     if (!Object.values(EstadoOrden).includes(dto.nuevoEstado)) {
       throw new BadRequestException(
         `Estado solicitado inválido: '${dto.nuevoEstado}'. Valores válidos: ${Object.values(EstadoOrden).join(', ')}`,
@@ -208,6 +202,31 @@ export class OrdenesService {
 
 
     return actualizada;
+
+
+  }
+
+
+  async obtenerHistorial(ordenId: number) {
+
+
+    const orden = await this.ordenRepository.findOne({
+      where: { id: ordenId },
+    });
+
+
+    if (!orden) {
+      throw new NotFoundException(`Orden con id ${ordenId} no encontrada`);
+    }
+
+
+    return this.historialRepository.find({
+      where: { ordenId },
+      order: {
+        fechaHora: 'DESC',
+        id: 'DESC',
+      },
+    });
 
 
   }

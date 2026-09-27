@@ -70,6 +70,24 @@ export class OrdenesController {
 
 
 
+  // Historial de estados de una orden (ABC-149, lectura).
+  @Get(':id/historial')
+  obtenerHistorial(
+
+    @Param('id', ParseIntPipe) id: number,
+
+  ) {
+
+
+    return this.ordenesService.obtenerHistorial(
+      id,
+    );
+
+
+  }
+
+
+
   // Cambiar el estado de una orden (ABC-148).
   // TODO: proteger con el PermisosGuard de ABC-151 (permiso
   // 'ordenes.cambiar_estado') y reemplazar usuarioResponsableId del body por
