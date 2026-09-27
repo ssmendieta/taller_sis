@@ -9,19 +9,19 @@ export class Auditoria {
   id!: string;
 
   @Column('bigint', {nullable: true})
-  usuario_id!: string | null;
+  usuario_actor_id!: string | null;
 
-  @Column('varchar', {length: 255})
+  @Column('varchar', {length: 120})
   accion!: string;
 
-  @Column('varchar', {length: 255})
+  @Column('varchar', {length: 120})
   entidad!: string;
 
-  @Column('varchar', {length: 255, nullable: true})
-  entidad_id!: string;
+  @Column('varchar', {length: 100, nullable: true})
+  entidad_id!: string | null;
 
   @Column('bigint', {nullable: true})
-  usuarios_afectados_id!: string | null;
+  usuario_afectado_id!: string | null;
 
   @Column('jsonb', {nullable: true})
   datos_antes!: unknown | null;
@@ -30,6 +30,6 @@ export class Auditoria {
   datos_despues!: unknown | null;
 
   @Column('timestamptz', {default: () => 'NOW()'})
-  creado_en!: Date;
+  fecha_hora!: Date;
 
 }

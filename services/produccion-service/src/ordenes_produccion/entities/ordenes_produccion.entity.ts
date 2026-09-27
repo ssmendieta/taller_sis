@@ -15,7 +15,7 @@ export class OrdenProduccion {
     receta_id!: string;
 
     @Column({type: 'numeric', precision: 14, scale: 4})
-    cantidad_solicitada!: number;
+    cantidad_solicitada!: string;
 
     @Column({type: 'date'})
     fecha_programada!: string;
@@ -27,13 +27,13 @@ export class OrdenProduccion {
     responsable_usuario_id!: string;
 
     @Column({type: 'timestamptz', nullable: true})
-    iniciada_en?: Date;
+    iniciada_en!: Date | null;
 
     @Column({type: 'timestamptz', nullable: true})
-    finalizada_en?: Date;
+    finalizada_en!: Date | null;
 
     @Column({type: 'timestamptz', nullable: true})
-    cancelada_en?: Date;
+    cancelada_en!: Date | null;
 
     @Column({type: 'timestamptz', default: () => 'NOW()'})
     creado_en!: Date;
