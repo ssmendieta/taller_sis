@@ -6,7 +6,7 @@ import LogisticaPage from "../pages/LogisticaPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
-
+import OrdenPage from "../pages/OrdenPage.jsx";
 
 export default function AppRoutes() {
   return (
@@ -18,7 +18,7 @@ export default function AppRoutes() {
       <Route path="/estado" element={<SystemStatusPage />} />
       <Route path="/roles" element={<RolesPage />} />
       <Route path="/usuarios" element={<UsuarioPage />} />
-      
+      <Route path="/ordenes" element={<OrdenPage />} />
     </Routes>
   );
 }
