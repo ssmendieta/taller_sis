@@ -16,11 +16,12 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   // Serializa respuestas con class-transformer: respeta @Exclude() (ej. password_hash)
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
-  // Validación global de DTOs (ramagemina): whitelist + forbidNonWhitelisted
+  // Validación global de DTOs (ramagemina+RamaSergio): whitelist + forbidNonWhitelisted + transform
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
 
