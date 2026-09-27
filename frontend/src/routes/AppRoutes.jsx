@@ -4,6 +4,7 @@ import LoginPage from "../pages/LoginPage.jsx";
 import ProduccionPage from "../pages/ProduccionPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
+import RolesPage from "../pages/RolesPage.jsx";
 
 export default function AppRoutes() {
   return (
@@ -13,6 +14,7 @@ export default function AppRoutes() {
       <Route path="/produccion" element={<ProduccionPage />} />
       <Route path="/logistica" element={<LogisticaPage />} />
       <Route path="/estado" element={<SystemStatusPage />} />
+      <Route path="/roles" element={<RolesPage />} />
     </Routes>
   );
 }

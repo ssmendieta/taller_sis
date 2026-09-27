@@ -13,6 +13,7 @@ export default function MainLayout({ children }) {
         <Link className={isActive("/produccion")} to="/produccion">Producción</Link>
         <Link className={isActive("/logistica")} to="/logistica">Logística</Link>
         <Link className={isActive("/estado")} to="/estado">Estado</Link>
+         <Link className={isActive("/roles")} to="/roles">Roles</Link>
       </nav>
       <main className="content">{children}</main>
     </div>
