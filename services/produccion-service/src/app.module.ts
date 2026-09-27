@@ -3,10 +3,13 @@ import { HealthModule } from './health/health.module';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { AvancesProduccionModule } from './avances_produccion/avances_produccion.module';
-import { OrdenesProduccionModule } from './ordenes_produccion/ordenes_produccion.module';
+import { OrdenesModule } from './ordenes/ordenes.module';
+import { RecetasModule } from './recetas/recetas.module';
+import { MaterialesModule } from './materiales/materiales.module';
+import { InventarioModule } from './inventario/inventario.module';
 
 @Module({
-  imports: [DatabaseModule, HealthModule, AvancesProduccionModule, OrdenesProduccionModule],
+  imports: [DatabaseModule, HealthModule, AvancesProduccionModule, OrdenesModule, RecetasModule, MaterialesModule, InventarioModule],
   controllers: [AppController],
 })
 export class AppModule {}

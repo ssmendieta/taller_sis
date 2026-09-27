@@ -7,7 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
 import { NestFactory, Reflector } from '@nestjs/core';
-import { ClassSerializerInterceptor } from '@nestjs/common';
+import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 import {DataSource} from 'typeorm';
@@ -16,6 +16,13 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   // Serializa respuestas con class-transformer: respeta @Exclude() (ej. password_hash)
   app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+  // Validación global de DTOs (ramagemina): whitelist + forbidNonWhitelisted
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
 
   const db=app.get(DataSource);
   console.log('db conectada: ', db.isInitialized);
