@@ -51,6 +51,8 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_DATABASE=${DB_AUTH_DATABASE:-auth_db}
       - SKIP_DB=${SKIP_DB:-false}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-1h}
     depends_on:
       postgres:
         condition: service_healthy

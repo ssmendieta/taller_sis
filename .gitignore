@@ -41,6 +41,7 @@ Thumbs.db
 
 # Nest / Vite
 .vite/
+*.tsbuildinfo
 
 # Docker
 .docker/

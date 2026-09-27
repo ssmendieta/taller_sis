@@ -10,7 +10,7 @@ const ordenesEjemplo = [
 ];
 
 function nombreProducto(orden) {
-  return orden.producto_nombre ?? orden.receta?.producto_nombre ?? "—";
+  return orden.producto_nombre ?? orden.receta?.producto_nombre ?? orden.codigo ?? "—";
 }
 
 function mostrarCantidad(valor) {
@@ -30,7 +30,7 @@ function mostrarEstado(valor) {
 
 function mostrarResponsable(orden) {
   return orden.responsable_nombre ?? orden.responsable?.nombre_completo ??
-    (orden.responsable_usuario_id ? `Usuario ${orden.responsable_usuario_id}` : "—");
+    (orden.responsable_usuario_id ?? orden.responsableUsuarioId ? `Usuario ${orden.responsable_usuario_id ?? orden.responsableUsuarioId}` : "—");
 }
 
 export default function ConsultaOrdenesPage() {
@@ -60,7 +60,7 @@ export default function ConsultaOrdenesPage() {
   }, [intento]);
 
   const ordenesVisibles = ordenes.filter((orden) => {
-    const fecha = mostrarFecha(orden.fecha_programada);
+    const fecha = mostrarFecha(orden.fecha_programada ?? orden.fechaProgramada);
     return nombreProducto(orden).toLocaleLowerCase("es-BO").includes(producto.toLocaleLowerCase("es-BO")) &&
       (!estado || orden.estado === estado) &&
       (!desde || fecha >= desde) &&
@@ -121,8 +121,8 @@ export default function ConsultaOrdenesPage() {
                 <tr key={orden.id ?? orden.codigo}>
                   <td className="orders-code">{orden.codigo ?? "—"}</td>
                   <td>{nombreProducto(orden)}</td>
-                  <td>{mostrarCantidad(orden.cantidad_solicitada)}</td>
-                  <td>{mostrarFecha(orden.fecha_programada)}</td>
+                  <td>{mostrarCantidad(orden.cantidad_solicitada ?? orden.cantidadSolicitada)}</td>
+                  <td>{mostrarFecha(orden.fecha_programada ?? orden.fechaProgramada)}</td>
                   <td><span className={`orders-status orders-status--${orden.estado ?? "DESCONOCIDO"}`}>{mostrarEstado(orden.estado)}</span></td>
                   <td>{mostrarResponsable(orden)}</td>
                 </tr>
