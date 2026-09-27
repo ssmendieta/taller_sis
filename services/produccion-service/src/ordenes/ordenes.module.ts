@@ -4,6 +4,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Orden } from './entities/orden.entity';
 
+import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
+
 import { OrdenesService } from './ordenes.service';
 
 import { OrdenesController } from './ordenes.controller';
@@ -14,7 +16,8 @@ import { OrdenesController } from './ordenes.controller';
 
   imports:[
     TypeOrmModule.forFeature([
-      Orden
+      Orden,
+      HistorialEstadoOrden
     ])
   ],
 

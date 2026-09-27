@@ -1,0 +1,165 @@
+import {
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
+import { OrdenesService } from './ordenes.service';
+import { EstadoOrden } from './estado-orden.enum';
+
+describe('OrdenesService.cambiarEstado (ABC-148)', () => {
+  let service: OrdenesService;
+
+  const findOne = jest.fn();
+  const managerSave = jest.fn();
+  const managerCreate = jest.fn();
+  const managerFindOne = jest.fn();
+  const transaction = jest.fn();
+
+  const repositorioMock = {
+    findOne,
+    manager: {
+      transaction,
+    },
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    managerCreate.mockImplementation((_clase: unknown, objeto: unknown) => objeto);
+    managerSave.mockImplementation(async (...args: unknown[]) => args[1] ?? args[0]);
+    transaction.mockImplementation(async (cb: (m: unknown) => unknown) =>
+      cb({
+        save: managerSave,
+        create: managerCreate,
+        findOne: managerFindOne,
+      }),
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    service = new OrdenesService(repositorioMock as any);
+  });
+
+  function ordenBase(estado: string) {
+    return {
+      id: 1,
+      codigo: 'OP-001',
+      recetaId: 1,
+      cantidadSolicitada: 10,
+      fechaProgramada: '2026-10-01',
+      estado,
+      responsableUsuarioId: 7,
+      iniciadaEn: null,
+      finalizadaEn: null,
+      canceladaEn: null,
+    };
+  }
+
+  it('aplica una transición válida y registra el historial en la misma transacción', async () => {
+    findOne.mockResolvedValue(ordenBase('PENDIENTE'));
+    managerFindOne.mockResolvedValue({ ...ordenBase('PLANIFICADA') });
+
+    const resultado = await service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.PLANIFICADA,
+      motivo: 'Planificada para el lunes',
+      usuarioResponsableId: 7,
+    });
+
+    expect(transaction).toHaveBeenCalledTimes(1);
+    // 1er save: la orden con el nuevo estado; 2do save: la fila de historial.
+    expect(managerSave).toHaveBeenCalledTimes(2);
+    expect(managerCreate).toHaveBeenCalledWith(
+      expect.anything(),
+      {
+        ordenId: 1,
+        estadoAnterior: EstadoOrden.PENDIENTE,
+        estadoNuevo: EstadoOrden.PLANIFICADA,
+        usuarioResponsableId: 7,
+        motivo: 'Planificada para el lunes',
+      },
+    );
+    expect(resultado).toEqual({ ...ordenBase('PLANIFICADA') });
+  });
+
+  it('marca iniciadaEn al pasar a EN_PRODUCCION', async () => {
+    findOne.mockResolvedValue(ordenBase('PLANIFICADA'));
+    managerFindOne.mockResolvedValue({});
+
+    await service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.EN_PRODUCCION,
+      usuarioResponsableId: 7,
+    });
+
+    const ordenGuardada = managerSave.mock.calls[0][1];
+    expect(ordenGuardada.estado).toBe(EstadoOrden.EN_PRODUCCION);
+    expect(ordenGuardada.iniciadaEn).toBeInstanceOf(Date);
+  });
+
+  it('marca finalizadaEn al pasar a FINALIZADA', async () => {
+    findOne.mockResolvedValue(ordenBase('EN_PRODUCCION'));
+    managerFindOne.mockResolvedValue({});
+
+    await service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.FINALIZADA,
+      usuarioResponsableId: 7,
+    });
+
+    const ordenGuardada = managerSave.mock.calls[0][1];
+    expect(ordenGuardada.finalizadaEn).toBeInstanceOf(Date);
+  });
+
+  it('marca canceladaEn al pasar a CANCELADA y guarda motivo null si no se envía', async () => {
+    findOne.mockResolvedValue(ordenBase('PENDIENTE'));
+    managerFindOne.mockResolvedValue({});
+
+    await service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.CANCELADA,
+      usuarioResponsableId: 7,
+    });
+
+    const ordenGuardada = managerSave.mock.calls[0][1];
+    expect(ordenGuardada.canceladaEn).toBeInstanceOf(Date);
+    expect(managerCreate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ motivo: null }),
+    );
+  });
+
+  it('rechaza con 400 una transición inválida sin tocar la BD', async () => {
+    findOne.mockResolvedValue(ordenBase('PLANIFICADA'));
+
+    await expect(
+      service.cambiarEstado(1, {
+        nuevoEstado: EstadoOrden.FINALIZADA,
+        usuarioResponsableId: 7,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 400 un estado fuera del enum', async () => {
+    findOne.mockResolvedValue(ordenBase('PENDIENTE'));
+
+    await expect(
+      service.cambiarEstado(1, {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        nuevoEstado: 'APROBADA' as any,
+        usuarioResponsableId: 7,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 404 una orden inexistente', async () => {
+    findOne.mockResolvedValue(null);
+
+    await expect(
+      service.cambiarEstado(999, {
+        nuevoEstado: EstadoOrden.PLANIFICADA,
+        usuarioResponsableId: 7,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(transaction).not.toHaveBeenCalled();
+  });
+});

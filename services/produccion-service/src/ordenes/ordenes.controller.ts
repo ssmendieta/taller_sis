@@ -1,12 +1,18 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  ParseIntPipe,
+  Patch,
   Query,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 
 
 import { OrdenesService } from './ordenes.service';
+import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 
 
 
@@ -57,6 +63,38 @@ export class OrdenesController {
 
     return this.ordenesService.obtenerMateriales(
       Number(id),
+    );
+
+
+  }
+
+
+
+  // Cambiar el estado de una orden (ABC-148).
+  // TODO: proteger con el PermisosGuard de ABC-151 (permiso
+  // 'ordenes.cambiar_estado') y reemplazar usuarioResponsableId del body por
+  // el id del usuario autenticado cuando ese guard esté disponible.
+  // ValidationPipe solo en esta ruta (no global): un pipe global con
+  // whitelist rompería los endpoints existentes sin DTO decorados.
+  @Patch(':id/estado')
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  )
+  cambiarEstado(
+
+    @Param('id', ParseIntPipe) id: number,
+
+    @Body() dto: CambiarEstadoOrdenDto,
+
+  ) {
+
+
+    return this.ordenesService.cambiarEstado(
+      id,
+      dto,
     );
 
 
