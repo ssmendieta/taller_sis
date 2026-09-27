@@ -50,4 +50,44 @@ export class Orden {
   })
   responsableUsuarioId: number;
 
+
+  @Column({
+    name: 'iniciada_en',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  iniciadaEn: Date;
+
+
+  @Column({
+    name: 'finalizada_en',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  finalizadaEn: Date;
+
+
+  @Column({
+    name: 'cancelada_en',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  canceladaEn: Date;
+
+
+  @Column({
+    name: 'creado_en',
+    type: 'timestamptz',
+    default: () => 'NOW()',
+  })
+  creadoEn: Date;
+
+
+  @Column({
+    name: 'actualizado_en',
+    type: 'timestamptz',
+    default: () => 'NOW()',
+  })
+  actualizadoEn: Date;
+
 }
