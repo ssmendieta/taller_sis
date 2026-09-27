@@ -6,11 +6,14 @@ dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 dotenv.config();
 
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
+import { ClassSerializerInterceptor } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Serializa respuestas con class-transformer: respeta @Exclude() (ej. password_hash)
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
   const port = process.env.PORT || 3001;
   await app.listen(port);
   console.log(`auth-service running on http://localhost:${port}`);

@@ -14,7 +14,8 @@ export class UsuariosService {
   ) {}
 
   async create(createUsuarioDto: CreateUsuarioDto): Promise<Usuario> {
-    const existeCorreo = await this.usuarioRepository.findOne({ where: { correo: createUsuarioDto.correo } });
+    const correo = createUsuarioDto.correo.trim().toLowerCase();
+    const existeCorreo = await this.usuarioRepository.findOne({ where: { correo } });
     if (existeCorreo) throw new ConflictException('El correo ya está registrado');
 
     const salt = await bcrypt.genSalt(10);
@@ -22,12 +23,17 @@ export class UsuariosService {
 
     const nuevoUsuario = this.usuarioRepository.create({
       nombre_completo: createUsuarioDto.nombre_completo,
-      correo: createUsuarioDto.correo,
+      correo,
       rol_id: createUsuarioDto.rol_id,
       password_hash,
     });
 
-    return await this.usuarioRepository.save(nuevoUsuario);
+    try {
+      return await this.usuarioRepository.save(nuevoUsuario);
+    } catch (error) {
+      if (this.esViolacionUnicidad(error)) throw new ConflictException('El correo ya está registrado');
+      throw error;
+    }
   }
 
   async findAll(): Promise<Usuario[]> {
@@ -49,8 +55,20 @@ export class UsuariosService {
       delete updateUsuarioDto.password;
     }
 
+    if (updateUsuarioDto.correo) {
+      const correo = updateUsuarioDto.correo.trim().toLowerCase();
+      const existente = await this.usuarioRepository.findOne({ where: { correo } });
+      if (existente && existente.id !== id) throw new ConflictException('El correo ya está registrado');
+      updateUsuarioDto.correo = correo;
+    }
+
     Object.assign(usuario, updateUsuarioDto);
-    return await this.usuarioRepository.save(usuario);
+    try {
+      return await this.usuarioRepository.save(usuario);
+    } catch (error) {
+      if (this.esViolacionUnicidad(error)) throw new ConflictException('El correo ya está registrado');
+      throw error;
+    }
   }
 
   async changeStatus(id: number, activo: boolean): Promise<Usuario> {
@@ -64,5 +82,10 @@ export class UsuariosService {
     usuario.eliminado_en = new Date();
     usuario.activo = false;
     await this.usuarioRepository.save(usuario);
+  }
+
+  private esViolacionUnicidad(error: unknown): boolean {
+    const e = error as { code?: string; driverError?: { code?: string } };
+    return e?.code === '23505' || e?.driverError?.code === '23505';
   }
 }

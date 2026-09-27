@@ -1,4 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 @Entity('usuarios')
 export class Usuario {
@@ -11,6 +12,7 @@ export class Usuario {
   @Column({ type: 'varchar', length: 255, unique: true })
   correo: string;
 
+  @Exclude()
   @Column({ type: 'text' })
   password_hash: string;
 
