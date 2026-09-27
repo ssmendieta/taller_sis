@@ -2,6 +2,8 @@ import { Routes, Route } from "react-router-dom";
 import HomePage from "../pages/HomePage.jsx";
 import LoginPage from "../pages/LoginPage.jsx";
 import ProduccionPage from "../pages/ProduccionPage.jsx";
+import ConsultaOrdenesPage from "../pages/ConsultaOrdenesPage.jsx";
+import ConsultaAuditoriaPage from "../pages/ConsultaAuditoriaPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
 
@@ -11,6 +13,8 @@ export default function AppRoutes() {
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/produccion" element={<ProduccionPage />} />
+      <Route path="/produccion/ordenes" element={<ConsultaOrdenesPage />} />
+      <Route path="/auditoria" element={<ConsultaAuditoriaPage />} />
       <Route path="/logistica" element={<LogisticaPage />} />
       <Route path="/estado" element={<SystemStatusPage />} />
     </Routes>

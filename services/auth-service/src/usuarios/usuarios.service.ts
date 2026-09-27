@@ -1,91 +1,112 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
-import { Usuario } from './entities/usuario.entity';
+import { IsNull, Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+import { Rol } from '../roles/entities/role.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
-import * as bcrypt from 'bcrypt';
+import { Usuario } from './entities/usuario.entity';
 
 @Injectable()
 export class UsuariosService {
   constructor(
     @InjectRepository(Usuario)
-    private readonly usuarioRepository: Repository<Usuario>,
+    private readonly usuarios: Repository<Usuario>,
+    @InjectRepository(Rol)
+    private readonly roles: Repository<Rol>,
   ) {}
 
-  async create(createUsuarioDto: CreateUsuarioDto): Promise<Usuario> {
-    const correo = createUsuarioDto.correo.trim().toLowerCase();
-    const existeCorreo = await this.usuarioRepository.findOne({ where: { correo } });
-    if (existeCorreo) throw new ConflictException('El correo ya está registrado');
+  private async validarRolActivo(rolId: number): Promise<void> {
+    if (!Number.isSafeInteger(rolId) || rolId < 1) {
+      throw new BadRequestException('El ID del rol debe ser un entero positivo');
+    }
+    const rol = await this.roles.findOne({ where: { id: String(rolId) } });
+    if (!rol) throw new BadRequestException('El rol indicado no existe');
+    if (!rol.activo) throw new BadRequestException('El rol indicado está inactivo');
+  }
 
-    const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(createUsuarioDto.password, salt);
+  private verificarCorreoDuplicado(error: unknown): never {
+    // La migración define un índice único sobre LOWER(correo).
+    if ((error as { driverError?: { constraint?: string } })?.driverError?.constraint === 'ux_usuarios_correo_ci') {
+      throw new ConflictException('El correo ya está registrado');
+    }
+    throw error;
+  }
 
-    const nuevoUsuario = this.usuarioRepository.create({
-      nombre_completo: createUsuarioDto.nombre_completo,
+  async create(dto: CreateUsuarioDto): Promise<Usuario> {
+    await this.validarRolActivo(dto.rol_id);
+    const correo = dto.correo.trim().toLowerCase();
+    if (await this.usuarios.createQueryBuilder('usuario')
+      .where('LOWER(usuario.correo) = :correo', { correo }).getOne()) {
+      throw new ConflictException('El correo ya está registrado');
+    }
+    const usuario = this.usuarios.create({
+      nombre_completo: dto.nombre_completo.trim(),
       correo,
-      rol_id: createUsuarioDto.rol_id,
-      password_hash,
+      rol_id: String(dto.rol_id),
+      password_hash: await bcrypt.hash(dto.password, 10),
     });
-
     try {
-      return await this.usuarioRepository.save(nuevoUsuario);
+      const guardado = await this.usuarios.save(usuario);
+      return this.findOne(guardado.id); // Nunca responder con password_hash.
     } catch (error) {
-      if (this.esViolacionUnicidad(error)) throw new ConflictException('El correo ya está registrado');
-      throw error;
+      this.verificarCorreoDuplicado(error);
     }
   }
 
-  async findAll(): Promise<Usuario[]> {
-    return await this.usuarioRepository.find({ where: { eliminado_en: IsNull() } });
+  findAll(): Promise<Usuario[]> {
+    return this.usuarios.find({ where: { eliminado_en: IsNull() } });
   }
 
-  async findOne(id: number): Promise<Usuario> {
-    const usuario = await this.usuarioRepository.findOne({ where: { id, eliminado_en: IsNull() } });
-    if (!usuario) throw new NotFoundException(`Usuario no encontrado`);
+  async rolesDisponibles(): Promise<Array<{ id: string; nombre: string }>> {
+    const roles = await this.roles.find({ where: { activo: true }, order: { nombre: 'ASC' } });
+    return roles.map(({ id, nombre }) => ({ id, nombre }));
+  }
+
+  async findOne(id: string): Promise<Usuario> {
+    if (!/^[1-9]\d*$/.test(id)) throw new BadRequestException('ID de usuario inválido');
+    const usuario = await this.usuarios.findOne({ where: { id, eliminado_en: IsNull() } });
+    if (!usuario) throw new NotFoundException('Usuario no encontrado');
     return usuario;
   }
 
-  async update(id: number, updateUsuarioDto: UpdateUsuarioDto): Promise<Usuario> {
+  async update(id: string, dto: UpdateUsuarioDto): Promise<Usuario> {
     const usuario = await this.findOne(id);
-
-    if (updateUsuarioDto.password) {
-      const salt = await bcrypt.genSalt(10);
-      usuario.password_hash = await bcrypt.hash(updateUsuarioDto.password, salt);
-      delete updateUsuarioDto.password;
+    if (dto.rol_id !== undefined) {
+      await this.validarRolActivo(dto.rol_id);
+      usuario.rol_id = String(dto.rol_id);
     }
-
-    if (updateUsuarioDto.correo) {
-      const correo = updateUsuarioDto.correo.trim().toLowerCase();
-      const existente = await this.usuarioRepository.findOne({ where: { correo } });
-      if (existente && existente.id !== id) throw new ConflictException('El correo ya está registrado');
-      updateUsuarioDto.correo = correo;
+    if (dto.nombre_completo !== undefined) usuario.nombre_completo = dto.nombre_completo.trim();
+    if (dto.correo !== undefined) {
+      const correo = dto.correo.trim().toLowerCase();
+      const repetido = await this.usuarios.createQueryBuilder('usuario')
+        .where('LOWER(usuario.correo) = :correo', { correo }).getOne();
+      if (repetido && repetido.id !== usuario.id) {
+        throw new ConflictException('El correo ya está registrado');
+      }
+      usuario.correo = correo;
     }
-
-    Object.assign(usuario, updateUsuarioDto);
+    if (dto.password !== undefined) usuario.password_hash = await bcrypt.hash(dto.password, 10);
     try {
-      return await this.usuarioRepository.save(usuario);
+      await this.usuarios.save(usuario);
+      return this.findOne(id);
     } catch (error) {
-      if (this.esViolacionUnicidad(error)) throw new ConflictException('El correo ya está registrado');
-      throw error;
+      this.verificarCorreoDuplicado(error);
     }
   }
 
-  async changeStatus(id: number, activo: boolean): Promise<Usuario> {
+  async changeStatus(id: string, activo: boolean): Promise<Usuario> {
+    if (typeof activo !== 'boolean') throw new BadRequestException('activo debe ser booleano');
     const usuario = await this.findOne(id);
     usuario.activo = activo;
-    return await this.usuarioRepository.save(usuario);
+    await this.usuarios.save(usuario);
+    return this.findOne(id);
   }
 
-  async softDelete(id: number): Promise<void> {
+  async softDelete(id: string): Promise<void> {
     const usuario = await this.findOne(id);
     usuario.eliminado_en = new Date();
     usuario.activo = false;
-    await this.usuarioRepository.save(usuario);
-  }
-
-  private esViolacionUnicidad(error: unknown): boolean {
-    const e = error as { code?: string; driverError?: { code?: string } };
-    return e?.code === '23505' || e?.driverError?.code === '23505';
+    await this.usuarios.save(usuario);
   }
 }
