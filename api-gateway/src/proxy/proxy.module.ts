@@ -1,45 +1,34 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { Request, Response, NextFunction } from 'express';
 
 @Module({})
 export class ProxyModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    const authTarget = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
-    const prodTarget = process.env.PRODUCCION_SERVICE_URL || 'http://localhost:3002';
-    const logiTarget = process.env.LOGISTICA_SERVICE_URL || 'http://localhost:3003';
+    consumer.apply(async (req: Request, res: Response, next: NextFunction) => {
+      if (!req.path.startsWith('/api/auth')) {
+        return next();
+      }
 
-    consumer
-      .apply(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        createProxyMiddleware({
-          target: authTarget,
-          changeOrigin: true,
-          pathRewrite: { '^/api/auth': '' },
-          logLevel: 'warn',
-        }) as any,
-      )
-      .forRoutes('api/auth');
+      try {
+        const body = req.body;
 
-    consumer
-      .apply(
-        createProxyMiddleware({
-          target: prodTarget,
-          changeOrigin: true,
-          pathRewrite: { '^/api/produccion': '' },
-          logLevel: 'warn',
-        }) as any,
-      )
-      .forRoutes('api/produccion');
+        const respuesta = await fetch('http://auth-service:3001/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        });
 
-    consumer
-      .apply(
-        createProxyMiddleware({
-          target: logiTarget,
-          changeOrigin: true,
-          pathRewrite: { '^/api/logistica': '' },
-          logLevel: 'warn',
-        }) as any,
-      )
-      .forRoutes('api/logistica');
+        const datos = await respuesta.text();
+
+        res.status(respuesta.status).send(datos);
+      } catch (error) {
+        console.error('Error conectando con auth-service:', error);
+        res.status(502).json({
+          message: 'No se pudo conectar con el servicio de autenticación',
+        });
+      }
+    }).forRoutes('*');
   }
 }

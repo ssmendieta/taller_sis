@@ -1,4 +1,5 @@
 ﻿import { Module } from '@nestjs/common';
+import { UserEntity } from '../users/user.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
@@ -26,6 +27,7 @@ const dbEnabled = process.env.SKIP_DB !== 'true';
             process.env.AUTH_DB ||
             'auth_db',
           autoLoadEntities: true,
+	  entities: [UserEntity],
           synchronize: false,
           logging: false,
         }),

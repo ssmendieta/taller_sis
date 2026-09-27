@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import "../styles/LoginPage.css";
+import { apiConfig } from "../services/api";
 
 function LoginPage() {
   const [correo, setCorreo] = useState("");
@@ -8,9 +9,8 @@ function LoginPage() {
   const [mostrarContraseña, setMostrarContraseña] = useState(false);
   const [cargando, setCargando] = useState(false);
 
-  const manejarSubmit = (e) => {
+  const manejarSubmit = async (e) => {
     e.preventDefault();
-
     setError("");
 
     if (!correo.trim()) {
@@ -25,32 +25,45 @@ function LoginPage() {
 
     setCargando(true);
 
-    // Simulación temporal del inicio de sesión
-    setTimeout(() => {
-      setCargando(false);
+    try {
+      const respuesta = await fetch(`${apiConfig.gatewayUrl}/api/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          correo,
+          password: contraseña,
+        }),
+      });
 
-      // Credenciales de prueba
-      if (
-        correo === "admin@gmail.com" &&
-        contraseña === "123456"
-      ) {
-        alert("Inicio de sesión exitoso.");
-      } else {
-        setError(
-          "Correo o contraseña incorrectos. Verifica tus datos e inténtalo nuevamente."
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok) {
+        throw new Error(
+          datos.message || "Correo o contraseña incorrectos."
         );
       }
-    }, 800);
+
+      // Guardar sesión
+      localStorage.setItem("usuario", JSON.stringify(datos.usuario));
+
+      // Ir a la página principal
+      window.location.href = "/";
+    } catch (error) {
+      setError(
+        error.message || "No se pudo iniciar sesión. Inténtalo nuevamente."
+      );
+    } finally {
+      setCargando(false);
+    }
   };
 
   return (
     <div className="login-page">
-
       <div className="login-card">
 
-        {/* ENCABEZADO */}
         <div className="login-header">
-
           <div className="login-icon"></div>
 
           <h1>Iniciar sesión</h1>
@@ -58,15 +71,11 @@ function LoginPage() {
           <p>
             Ingresa tus credenciales para acceder al sistema.
           </p>
-
         </div>
 
-        {/* FORMULARIO */}
         <form onSubmit={manejarSubmit} className="login-form">
 
-          {/* CORREO */}
           <div className="login-form-group">
-
             <label htmlFor="correo">
               Correo electrónico
             </label>
@@ -81,18 +90,14 @@ function LoginPage() {
                 setError("");
               }}
             />
-
           </div>
 
-          {/* CONTRASEÑA */}
           <div className="login-form-group">
-
             <label htmlFor="contraseña">
               Contraseña
             </label>
 
             <div className="password-container">
-
               <input
                 id="contraseña"
                 type={mostrarContraseña ? "text" : "password"}
@@ -113,19 +118,15 @@ function LoginPage() {
               >
                 {mostrarContraseña ? "Ocultar" : "Mostrar"}
               </button>
-
             </div>
-
           </div>
 
-          {/* MENSAJE DE ERROR */}
           {error && (
             <div className="login-error">
               <p>{error}</p>
             </div>
           )}
 
-          {/* BOTÓN INGRESAR */}
           <button
             type="submit"
             className="btn-login"
@@ -136,17 +137,13 @@ function LoginPage() {
 
         </form>
 
-        {/* PIE */}
         <div className="login-footer">
-
           <p>
             Acceso exclusivo para usuarios registrados.
           </p>
-
         </div>
 
       </div>
-
     </div>
   );
 }
