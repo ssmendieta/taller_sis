@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Rol } from '../roles/entities/role.entity';
 
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([

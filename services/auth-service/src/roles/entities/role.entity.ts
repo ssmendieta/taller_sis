@@ -26,11 +26,11 @@ export class Rol {
 
     @ManyToMany(() => Permisos, (permiso) => permiso.roles)
     @JoinTable({
-        name: 'roles_permisos', 
+        name: 'rol_permiso',
         joinColumn: {
             name: 'rol_id',
             referencedColumnName: 'id',
-            foreignKeyConstraintName: 'fk_roles_permisos_rol',
+            foreignKeyConstraintName: 'fk_rol_permiso_rol',
         },
         inverseJoinColumn: {
             name: 'permiso_id',

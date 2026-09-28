@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('ordenes_produccion')
 export class OrdenProduccion {
@@ -17,7 +17,7 @@ export class OrdenProduccion {
   @Column({ type: 'date' })
   fecha_programada: string;
 
-  @Column({ type: 'varchar', length: 50, default: 'Pendiente' })
+  @Column({ type: 'varchar', length: 50, default: 'PENDIENTE' })
   estado: string;
 
   @Column({ name: 'responsable_usuario_id', type: 'int' })
