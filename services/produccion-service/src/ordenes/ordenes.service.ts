@@ -50,7 +50,46 @@ WHERE o.id = $1
     return resultado;
 
   }
+// Obtener detalle de una orden
+async obtenerDetalle(id: number) {
 
+  const orden = await this.ordenRepository.findOne({
+    where: {
+      id
+    }
+  });
+
+  return orden;
+
+}
+
+
+// Obtener historial de estados de una orden
+async obtenerHistorial(id: number) {
+
+  const resultado = await this.ordenRepository.query(`
+
+    SELECT
+
+      h.id,
+      h.estado_anterior,
+      h.estado_nuevo,
+      h.usuario_responsable_id,
+      h.fecha_hora,
+      h.motivo
+
+    FROM historial_estado_orden h
+
+    WHERE h.orden_id = $1
+
+    ORDER BY h.fecha_hora DESC
+
+  `,[id]);
+
+
+  return resultado;
+
+}
 
 
   // Buscar órdenes mediante filtros

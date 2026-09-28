@@ -35,7 +35,8 @@ export default function MainLayout({ children }) {
         </span>
 
 
-        <Link 
+
+        <Link
           className={isActive("/")}
           to="/"
         >
@@ -44,7 +45,7 @@ export default function MainLayout({ children }) {
 
 
 
-        <Link 
+        <Link
           className={isActive("/login")}
           to="/login"
         >
@@ -53,16 +54,32 @@ export default function MainLayout({ children }) {
 
 
 
+
         {(rol === "ADMIN" || rol === "OPERADOR") && (
 
-          <Link
-            className={isActive("/produccion")}
-            to="/produccion"
-          >
-            Producción
-          </Link>
+          <>
+
+            <Link
+              className={isActive("/produccion")}
+              to="/produccion"
+            >
+              Producción
+            </Link>
+
+
+            <Link
+              className={isActive("/ordenes")}
+              to="/ordenes"
+            >
+              Órdenes
+            </Link>
+
+          </>
 
         )}
+
+
+
 
 
 
@@ -79,24 +96,29 @@ export default function MainLayout({ children }) {
 
 
 
+
+
+
         {rol === "ADMIN" && (
 
           <>
 
-          <Link
-            className={isActive("/recetas")}
-            to="/recetas"
-          >
-            Recetas
-          </Link>
+            <Link
+              className={isActive("/recetas")}
+              to="/recetas"
+            >
+              Recetas
+            </Link>
 
 
-          <Link
-            className={isActive("/estado")}
-            to="/estado"
-          >
-            Estado
-          </Link>
+
+            <Link
+              className={isActive("/estado")}
+              to="/estado"
+            >
+              Estado
+            </Link>
+
 
           </>
 
@@ -107,9 +129,11 @@ export default function MainLayout({ children }) {
       </nav>
 
 
+
       <main className="content">
         {children}
       </main>
+
 
 
     </div>

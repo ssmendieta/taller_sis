@@ -5,9 +5,7 @@ import {
   Query,
 } from '@nestjs/common';
 
-
 import { OrdenesService } from './ordenes.service';
-
 
 
 @Controller('ordenes')
@@ -32,17 +30,45 @@ export class OrdenesController {
 
   ) {
 
-
     return this.ordenesService.buscar(
       estado,
       producto,
       fecha,
     );
 
+  }
+
+
+
+  // Obtener detalle de una orden
+  @Get(':id')
+  obtenerDetalle(
+
+    @Param('id') id: string,
+
+  ) {
+
+    return this.ordenesService.obtenerDetalle(
+      Number(id),
+    );
 
   }
 
 
+
+  // Obtener historial de estados
+  @Get(':id/historial')
+  obtenerHistorial(
+
+    @Param('id') id: string,
+
+  ) {
+
+    return this.ordenesService.obtenerHistorial(
+      Number(id),
+    );
+
+  }
 
 
 
@@ -54,11 +80,9 @@ export class OrdenesController {
 
   ) {
 
-
     return this.ordenesService.obtenerMateriales(
       Number(id),
     );
-
 
   }
 

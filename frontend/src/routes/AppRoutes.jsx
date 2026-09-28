@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import HomePage from "../pages/HomePage.jsx";
 import LoginPage from "../pages/LoginPage.jsx";
 import ProduccionPage from "../pages/ProduccionPage.jsx";
+import OrdenesPage from "../pages/OrdenesPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
 import RecetasPage from "../pages/RecetasPage.jsx";
@@ -16,9 +17,17 @@ export default function AppRoutes() {
 
     <Routes>
 
-      <Route path="/" element={<HomePage />} />
+      <Route 
+        path="/" 
+        element={<HomePage />} 
+      />
 
-      <Route path="/login" element={<LoginPage />} />
+
+      <Route 
+        path="/login" 
+        element={<LoginPage />} 
+      />
+
 
 
       <Route
@@ -31,6 +40,18 @@ export default function AppRoutes() {
       />
 
 
+
+      <Route
+        path="/ordenes"
+        element={
+          <ProtectedRoute roles={["ADMIN","OPERADOR"]}>
+            <OrdenesPage />
+          </ProtectedRoute>
+        }
+      />
+
+
+
       <Route
         path="/recetas"
         element={
@@ -41,6 +62,7 @@ export default function AppRoutes() {
       />
 
 
+
       <Route
         path="/logistica"
         element={
@@ -49,6 +71,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       />
+
 
 
       <Route
