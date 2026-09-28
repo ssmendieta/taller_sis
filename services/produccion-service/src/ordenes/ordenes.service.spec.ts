@@ -17,6 +17,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
 
   const repositorioMock = {
     findOne,
+    query: jest.fn(),
     manager: {
       transaction,
     },
@@ -227,4 +228,99 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
 
     expect(historialFind).not.toHaveBeenCalled();
   });
+
+
+  it('ABC-172: devuelve DISPONIBLE cuando hay suficiente material', async () => {
+    findOne.mockResolvedValue(ordenBase('PENDIENTE'));
+
+    repositorioMock.query = jest.fn().mockResolvedValue([
+      {
+        material_id: 1,
+        codigo: 'MAT-001',
+        nombre: 'Acero',
+        unidad_medida: 'kg',
+        cantidad_requerida: 2,
+      },
+    ]);
+
+    inventarioRepositorioMock.findOne.mockResolvedValue({
+      materialId: 1,
+      cantidadDisponible: 25,
+    });
+
+    const resultado = await service.compararDisponibilidadMateriales(1);
+
+    expect(resultado.materiales[0]).toEqual(
+      expect.objectContaining({
+        material_id: 1,
+        cantidad_requerida: 20,
+        cantidad_disponible: 25,
+        estado: 'DISPONIBLE',
+      }),
+    );
+  });
+
+  it('ABC-172: devuelve INSUFICIENTE cuando el material disponible no alcanza', async () => {
+    findOne.mockResolvedValue(ordenBase('PENDIENTE'));
+
+    repositorioMock.query = jest.fn().mockResolvedValue([
+      {
+        material_id: 1,
+        codigo: 'MAT-001',
+        nombre: 'Acero',
+        unidad_medida: 'kg',
+        cantidad_requerida: 2,
+      },
+    ]);
+
+    inventarioRepositorioMock.findOne.mockResolvedValue({
+      materialId: 1,
+      cantidadDisponible: 15,
+    });
+
+    const resultado = await service.compararDisponibilidadMateriales(1);
+
+    expect(resultado.materiales[0]).toEqual(
+      expect.objectContaining({
+        cantidad_requerida: 20,
+        cantidad_disponible: 15,
+        estado: 'INSUFICIENTE',
+      }),
+    );
+  });
+
+  it('ABC-172: devuelve FALTANTE cuando no existe inventario para el material', async () => {
+    findOne.mockResolvedValue(ordenBase('PENDIENTE'));
+
+    repositorioMock.query = jest.fn().mockResolvedValue([
+      {
+        material_id: 1,
+        codigo: 'MAT-001',
+        nombre: 'Acero',
+        unidad_medida: 'kg',
+        cantidad_requerida: 2,
+      },
+    ]);
+
+    inventarioRepositorioMock.findOne.mockResolvedValue(null);
+
+    const resultado = await service.compararDisponibilidadMateriales(1);
+
+    expect(resultado.materiales[0]).toEqual(
+      expect.objectContaining({
+        cantidad_requerida: 20,
+        cantidad_disponible: 0,
+        estado: 'FALTANTE',
+      }),
+    );
+  });
+
+  it('ABC-172: devuelve 404 cuando la orden no existe', async () => {
+    findOne.mockResolvedValue(null);
+
+    await expect(
+      service.compararDisponibilidadMateriales(999),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
 });
