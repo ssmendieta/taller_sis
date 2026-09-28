@@ -26,6 +26,10 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     find: historialFind,
   };
 
+  const inventarioRepositorioMock = {
+    findOne: jest.fn(),
+  };
+
   beforeEach(() => {
     jest.clearAllMocks();
 
@@ -40,7 +44,11 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    service = new OrdenesService(repositorioMock as any, historialRepositorioMock as any);
+    service = new OrdenesService(
+      repositorioMock as any,
+      historialRepositorioMock as any,
+      inventarioRepositorioMock as any,
+    );
   });
 
   function ordenBase(estado: string) {
