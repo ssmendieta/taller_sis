@@ -6,6 +6,7 @@ import { Rol } from '../roles/entities/role.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Usuario } from './entities/usuario.entity';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 @Injectable()
 export class UsuariosService {
@@ -14,6 +15,7 @@ export class UsuariosService {
     private readonly usuarios: Repository<Usuario>,
     @InjectRepository(Rol)
     private readonly roles: Repository<Rol>,
+    private readonly auditoriaService: AuditoriaService,
   ) {}
 
   private async validarRolActivo(rolId: number): Promise<void> {
@@ -26,14 +28,13 @@ export class UsuariosService {
   }
 
   private verificarCorreoDuplicado(error: unknown): never {
-    // La migración define un índice único sobre LOWER(correo).
     if ((error as { driverError?: { constraint?: string } })?.driverError?.constraint === 'ux_usuarios_correo_ci') {
       throw new ConflictException('El correo ya está registrado');
     }
     throw error;
   }
 
-  async create(dto: CreateUsuarioDto): Promise<Usuario> {
+  async create(dto: CreateUsuarioDto, actorId?: number): Promise<Usuario> {
     await this.validarRolActivo(dto.rol_id);
     const correo = dto.correo.trim().toLowerCase();
     if (await this.usuarios.createQueryBuilder('usuario')
@@ -46,9 +47,28 @@ export class UsuariosService {
       rol_id: String(dto.rol_id),
       password_hash: await bcrypt.hash(dto.password, 10),
     });
+    
     try {
       const guardado = await this.usuarios.save(usuario);
-      return this.findOne(guardado.id); // Nunca responder con password_hash.
+      const creado = await this.findOne(guardado.id);
+
+      await this.auditoriaService.registrar({
+        usuarioId: actorId ? String(actorId) : null,
+        accion: 'CREACION_USUARIO',
+        entidad: 'USUARIO',
+        entidadId: creado.id,
+        usuarioAfectadoId: creado.id,
+        datosAntes: null,
+        datosDespues: {
+          id: creado.id,
+          nombre_completo: creado.nombre_completo,
+          correo: creado.correo,
+          rol_id: creado.rol_id,
+          activo: creado.activo,
+        },
+      });
+
+      return creado;
     } catch (error) {
       this.verificarCorreoDuplicado(error);
     }
@@ -70,8 +90,16 @@ export class UsuariosService {
     return usuario;
   }
 
-  async update(id: string, dto: UpdateUsuarioDto): Promise<Usuario> {
+  async update(id: string, dto: UpdateUsuarioDto, actorId?: number): Promise<Usuario> {
     const usuario = await this.findOne(id);
+    const datosAntes = {
+      nombre_completo: usuario.nombre_completo,
+      correo: usuario.correo,
+      rol_id: usuario.rol_id,
+    };
+
+    const cambioRol = dto.rol_id !== undefined && String(dto.rol_id) !== usuario.rol_id;
+
     if (dto.rol_id !== undefined) {
       await this.validarRolActivo(dto.rol_id);
       usuario.rol_id = String(dto.rol_id);
@@ -87,26 +115,85 @@ export class UsuariosService {
       usuario.correo = correo;
     }
     if (dto.password !== undefined) usuario.password_hash = await bcrypt.hash(dto.password, 10);
+
     try {
       await this.usuarios.save(usuario);
-      return this.findOne(id);
+      const actualizado = await this.findOne(id);
+      const datosDespues = {
+        nombre_completo: actualizado.nombre_completo,
+        correo: actualizado.correo,
+        rol_id: actualizado.rol_id,
+      };
+
+      if (cambioRol) {
+        await this.auditoriaService.registrar({
+          usuarioId: actorId ? String(actorId) : null,
+          accion: 'CAMBIO_ROL',
+          entidad: 'USUARIO',
+          entidadId: id,
+          usuarioAfectadoId: id,
+          datosAntes: { rol_id: datosAntes.rol_id },
+          datosDespues: { rol_id: datosDespues.rol_id },
+        });
+      }
+
+      if (dto.nombre_completo !== undefined || dto.correo !== undefined || dto.password !== undefined) {
+        await this.auditoriaService.registrar({
+          usuarioId: actorId ? String(actorId) : null,
+          accion: 'MODIFICACION_USUARIO',
+          entidad: 'USUARIO',
+          entidadId: id,
+          usuarioAfectadoId: id,
+          datosAntes,
+          datosDespues,
+        });
+      }
+
+      return actualizado;
     } catch (error) {
       this.verificarCorreoDuplicado(error);
     }
   }
 
-  async changeStatus(id: string, activo: boolean): Promise<Usuario> {
+  async changeStatus(id: string, activo: boolean, actorId?: number): Promise<Usuario> {
     if (typeof activo !== 'boolean') throw new BadRequestException('activo debe ser booleano');
     const usuario = await this.findOne(id);
+    const estadoAntes = usuario.activo;
+
     usuario.activo = activo;
     await this.usuarios.save(usuario);
-    return this.findOne(id);
+    const actualizado = await this.findOne(id);
+
+    await this.auditoriaService.registrar({
+      usuarioId: actorId ? String(actorId) : null,
+      accion: 'CAMBIO_ESTADO',
+      entidad: 'USUARIO',
+      entidadId: id,
+      usuarioAfectadoId: id,
+      datosAntes: { activo: estadoAntes },
+      datosDespues: { activo: actualizado.activo },
+    });
+
+    return actualizado;
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string, actorId?: number): Promise<void> {
     const usuario = await this.findOne(id);
-    usuario.eliminado_en = new Date();
+    const fechaBaja = new Date();
+    const estadoAntes = usuario.activo; 
+
+    usuario.eliminado_en = fechaBaja;
     usuario.activo = false;
     await this.usuarios.save(usuario);
+
+    await this.auditoriaService.registrar({
+      usuarioId: actorId ? String(actorId) : null,
+      accion: 'ELIMINACION_LOGICA',
+      entidad: 'USUARIO',
+      entidadId: id,
+      usuarioAfectadoId: id,
+      datosAntes: { activo: estadoAntes, eliminado_en: null },
+      datosDespues: { activo: false, eliminado_en: fechaBaja },
+    });
   }
 }
