@@ -7,7 +7,9 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { compare } from 'bcryptjs';
 import { Repository } from 'typeorm';
+
 import { Usuario } from '../usuarios/entities/usuario.entity';
+import { Rol } from '../roles/entities/role.entity';
 import { LoginDto } from './dto/login.dto';
 
 export interface UsuarioParaAuth {
@@ -16,7 +18,7 @@ export interface UsuarioParaAuth {
   password_hash: string;
   activo: boolean;
   eliminado_en: Date | string | null;
-  rol_id?: string | null;
+  rol_id: string | null;
   nombre_completo?: string;
 }
 
@@ -24,20 +26,23 @@ export interface UsuarioParaAuth {
 export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
+
     @InjectRepository(Usuario)
     private readonly usuarios: Repository<Usuario>,
+
+    @InjectRepository(Rol)
+    private readonly roles: Repository<Rol>,
   ) {}
 
   async login(dto: LoginDto) {
     const correo = dto.correo.trim().toLowerCase();
 
     const usuario = await this.buscarUsuarioParaAuth(correo);
-
     if (!usuario) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    if (usuario.activo === false) {
+    if (!usuario.activo) {
       throw new ForbiddenException('La cuenta se encuentra desactivada');
     }
 
@@ -45,18 +50,31 @@ export class AuthService {
       throw new ForbiddenException('La cuenta se encuentra desactivada');
     }
 
+    if (!usuario.rol_id) {
+      throw new ForbiddenException('El usuario no tiene un rol asignado en el sistema');
+    }
+
+    const rolAsignado = await this.roles.findOne({
+      where: { id: usuario.rol_id },
+      relations: ['permisos'],
+    });
+
+    if (!rolAsignado) {
+      throw new ForbiddenException('El rol asignado al usuario no existe');
+    }
+
     const coincide = await compare(dto.password, usuario.password_hash);
     if (!coincide) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const payload: Record<string, unknown> = {
+    const permisos = rolAsignado.permisos ?? [];
+
+    const payload = {
       sub: usuario.id,
       correo: usuario.correo,
+      rolId: usuario.rol_id,
     };
-    if (usuario.rol_id !== null && usuario.rol_id !== undefined) {
-      payload.rolId = usuario.rol_id;
-    }
 
     const accessToken = await this.jwtService.signAsync(payload);
 
@@ -66,13 +84,19 @@ export class AuthService {
       usuario: {
         id: usuario.id,
         correo: usuario.correo,
+        nombre_completo: usuario.nombre_completo ?? null,
+        rol: {
+          id: rolAsignado.id,
+          nombre: rolAsignado.nombre,
+        },
+        permisos: permisos.map((permiso) => ({
+          id: permiso.id,
+          nombre: permiso.nombre,
+        })),
       },
     };
   }
 
-
-  // Consulta ORM parametrizada (sin SQL concatenado), insensible a
-  // mayusculas para aprovechar el indice ux_usuarios_correo_ci.
   private async buscarUsuarioParaAuth(
     correoNormalizado: string,
   ): Promise<UsuarioParaAuth | null> {
@@ -81,9 +105,11 @@ export class AuthService {
       .addSelect('u.password_hash')
       .where('LOWER(u.correo) = :correo', { correo: correoNormalizado })
       .getOne();
+
     if (!usuario) {
       return null;
     }
+
     return {
       id: usuario.id,
       correo: usuario.correo,
