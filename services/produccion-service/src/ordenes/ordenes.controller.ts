@@ -37,6 +37,13 @@ export class OrdenesController {
     return this.ordenesService.buscar(estado, producto, fecha);
   }
 
+  @Get(':id/disponibilidad-materiales')
+  compararDisponibilidadMateriales(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.ordenesService.compararDisponibilidadMateriales(id);
+  }
+
   @Get(':id/materiales')
   obtenerMateriales(@Param('id') id: string) {
     return this.ordenesService.obtenerMateriales(Number(id));
