@@ -6,7 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { Orden } from './entities/orden.entity';
+import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
 import { EstadoOrden } from './estado-orden.enum';
 import { esTransicionValida } from './estado-orden.transiciones';
@@ -16,25 +16,21 @@ import { CreateOrdenDto } from './dto/create-orden.dto';
 @Injectable()
 export class OrdenesService {
   constructor(
-    @InjectRepository(Orden)
-    private readonly ordenRepository: Repository<Orden>,
+    @InjectRepository(OrdenProduccion)
+    private readonly ordenRepository: Repository<OrdenProduccion>,
     @InjectRepository(HistorialEstadoOrden)
     private readonly historialRepository: Repository<HistorialEstadoOrden>,
   ) {}
 
-  // Alta de ordenes (aporte de develop, adaptado a la entidad unificada
-  // Orden: el DTO usa nombres snake_case de su rama y aqui se mapean a las
-  // propiedades camelCase de la entidad).
-  async create(createOrdenDto: CreateOrdenDto): Promise<Orden> {
+  // Alta de ordenes (aporte de develop, conservado tal cual: el DTO usa los
+  // mismos nombres de propiedad que OrdenProduccion).
+  async create(createOrdenDto: CreateOrdenDto): Promise<OrdenProduccion> {
     const codigo = `ORD-${Math.floor(Date.now() / 1000)}`;
 
     const nuevaOrden = this.ordenRepository.create({
+      ...createOrdenDto,
       codigo,
       estado: 'PENDIENTE',
-      recetaId: createOrdenDto.producto_id,
-      cantidadSolicitada: createOrdenDto.cantidad,
-      fechaProgramada: createOrdenDto.fecha_programada as unknown as Date,
-      responsableUsuarioId: createOrdenDto.responsable_id,
     });
 
     return await this.ordenRepository.save(nuevaOrden);
@@ -72,7 +68,7 @@ export class OrdenesService {
     }
 
     if (fecha) {
-      query.andWhere('orden.fechaProgramada = :fecha', { fecha });
+      query.andWhere('orden.fecha_programada = :fecha', { fecha });
     }
 
     return query.getMany();
@@ -120,18 +116,18 @@ export class OrdenesService {
         orden.estado = dto.nuevoEstado;
 
         if (dto.nuevoEstado === EstadoOrden.EN_PRODUCCION) {
-          orden.iniciadaEn = new Date();
+          orden.iniciada_en = new Date();
         }
 
         if (dto.nuevoEstado === EstadoOrden.FINALIZADA) {
-          orden.finalizadaEn = new Date();
+          orden.finalizada_en = new Date();
         }
 
         if (dto.nuevoEstado === EstadoOrden.CANCELADA) {
-          orden.canceladaEn = new Date();
+          orden.cancelada_en = new Date();
         }
 
-        await manager.save(Orden, orden);
+        await manager.save(OrdenProduccion, orden);
 
         await manager.save(
           HistorialEstadoOrden,
@@ -144,7 +140,7 @@ export class OrdenesService {
           }),
         );
 
-        return manager.findOne(Orden, {
+        return manager.findOne(OrdenProduccion, {
           where: { id },
         });
 

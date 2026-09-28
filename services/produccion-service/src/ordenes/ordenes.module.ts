@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { Orden } from './entities/orden.entity';
+import { OrdenProduccion } from './entities/orden-produccion.entity';
 
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
 
@@ -12,7 +12,7 @@ import { OrdenesController } from './ordenes.controller';
 
   imports:[
     TypeOrmModule.forFeature([
-      Orden,
+      OrdenProduccion,
       HistorialEstadoOrden
     ])
   ],

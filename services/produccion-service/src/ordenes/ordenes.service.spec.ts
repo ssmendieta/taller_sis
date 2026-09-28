@@ -47,14 +47,14 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     return {
       id: 1,
       codigo: 'OP-001',
-      recetaId: 1,
-      cantidadSolicitada: 10,
-      fechaProgramada: '2026-10-01',
+      producto_id: 1,
+      cantidad: 10,
+      fecha_programada: '2026-10-01',
       estado,
-      responsableUsuarioId: 7,
-      iniciadaEn: null,
-      finalizadaEn: null,
-      canceladaEn: null,
+      responsable_id: 7,
+      iniciada_en: null,
+      finalizada_en: null,
+      cancelada_en: null,
     };
   }
 
@@ -84,7 +84,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     expect(resultado).toEqual({ ...ordenBase('PLANIFICADA') });
   });
 
-  it('marca iniciadaEn al pasar a EN_PRODUCCION', async () => {
+  it('marca iniciada_en al pasar a EN_PRODUCCION', async () => {
     findOne.mockResolvedValue(ordenBase('PLANIFICADA'));
     managerFindOne.mockResolvedValue({});
 
@@ -95,10 +95,10 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
 
     const ordenGuardada = managerSave.mock.calls[0][1];
     expect(ordenGuardada.estado).toBe(EstadoOrden.EN_PRODUCCION);
-    expect(ordenGuardada.iniciadaEn).toBeInstanceOf(Date);
+    expect(ordenGuardada.iniciada_en).toBeInstanceOf(Date);
   });
 
-  it('marca finalizadaEn al pasar a FINALIZADA', async () => {
+  it('marca finalizada_en al pasar a FINALIZADA', async () => {
     findOne.mockResolvedValue(ordenBase('EN_PRODUCCION'));
     managerFindOne.mockResolvedValue({});
 
@@ -108,10 +108,10 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     });
 
     const ordenGuardada = managerSave.mock.calls[0][1];
-    expect(ordenGuardada.finalizadaEn).toBeInstanceOf(Date);
+    expect(ordenGuardada.finalizada_en).toBeInstanceOf(Date);
   });
 
-  it('marca canceladaEn al pasar a CANCELADA y guarda motivo null si no se envía', async () => {
+  it('marca cancelada_en al pasar a CANCELADA y guarda motivo null si no se envía', async () => {
     findOne.mockResolvedValue(ordenBase('PENDIENTE'));
     managerFindOne.mockResolvedValue({});
 
@@ -121,7 +121,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     });
 
     const ordenGuardada = managerSave.mock.calls[0][1];
-    expect(ordenGuardada.canceladaEn).toBeInstanceOf(Date);
+    expect(ordenGuardada.cancelada_en).toBeInstanceOf(Date);
     expect(managerCreate).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ motivo: null }),
