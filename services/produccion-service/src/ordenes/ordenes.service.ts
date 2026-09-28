@@ -55,23 +55,27 @@ export class OrdenesService {
   }
 
   async buscar(estado?: string, producto?: string, fecha?: string) {
-    const query = this.ordenRepository
-      .createQueryBuilder('orden')
-      .where('1=1');
-
-    if (estado) {
-      query.andWhere('orden.estado = :estado', { estado });
-    }
-
-    if (producto) {
-      query.andWhere('orden.codigo ILIKE :producto', { producto: `%${producto}%` });
-    }
-
-    if (fecha) {
-      query.andWhere('orden.fecha_programada = :fecha', { fecha });
-    }
-
-    return query.getMany();
+    // La consulta entrega los nombres de la migración y el nombre del
+    // producto de recetas. El filtro producto se aplica al producto, no al
+    // código de la orden. La BD de Auth es independiente, por lo que aquí
+    // solo se expone el ID del responsable.
+    return this.ordenRepository.query(`
+      SELECT o.id::text AS id,
+             o.codigo,
+             r.producto_codigo,
+             r.producto_nombre,
+             o.cantidad_solicitada::text AS cantidad_solicitada,
+             o.fecha_programada::text AS fecha_programada,
+             o.estado,
+             o.responsable_usuario_id::text AS responsable_usuario_id
+      FROM ordenes_produccion o
+      JOIN recetas r ON r.id = o.receta_id
+      WHERE ($1::text IS NULL OR o.estado = $1)
+        AND ($2::text IS NULL OR r.producto_nombre ILIKE '%' || $2 || '%'
+             OR r.producto_codigo ILIKE '%' || $2 || '%')
+        AND ($3::date IS NULL OR o.fecha_programada = $3::date)
+      ORDER BY o.fecha_programada DESC, o.id DESC
+    `, [estado?.trim() || null, producto?.trim() || null, fecha?.trim() || null]);
   }
 
 
