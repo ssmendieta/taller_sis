@@ -2,6 +2,10 @@ import { INestApplication, ServiceUnavailableException, ValidationPipe } from '@
 import { Test } from '@nestjs/testing';
 import { OrdenesController } from './ordenes.controller';
 import { OrdenesService } from './ordenes.service';
+import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
+import { Repository } from 'typeorm';
+import { OrdenProduccion } from './entities/orden-produccion.entity';
+import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
 
 describe('ABC-168: creación de órdenes por HTTP', () => {
   let app: INestApplication;
@@ -12,7 +16,10 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
     const modulo = await Test.createTestingModule({
       controllers: [OrdenesController],
       providers: [{ provide: OrdenesService, useValue: { create: crear } }],
-    }).compile();
+    })
+      .overrideGuard(PermisoProduccionGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     app = modulo.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({
@@ -78,5 +85,18 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
 
     expect(respuesta.status).toBe(503);
     expect(respuesta.datos.message).toBe('Servicio de datos no disponible');
+  });
+
+  it('genera códigos distintos para dos órdenes creadas en el mismo segundo', async () => {
+    const ordenes = {
+      create: (datos: Record<string, unknown>) => datos,
+      save: async (datos: Record<string, unknown>) => datos,
+    } as unknown as Repository<OrdenProduccion>;
+    const servicio = new OrdenesService(ordenes, {} as Repository<HistorialEstadoOrden>);
+    const primera = await servicio.create(ordenValida);
+    const segunda = await servicio.create(ordenValida);
+    expect(primera.codigo).not.toBe(segunda.codigo);
+    expect(primera.codigo).toMatch(/^ORD-[a-f0-9]{32}$/);
+    expect(primera.codigo.length).toBeLessThanOrEqual(40);
   });
 });

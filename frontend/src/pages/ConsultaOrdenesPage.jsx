@@ -93,7 +93,6 @@ export default function ConsultaOrdenesPage() {
       await cambiarEstadoOrdenProduccion(
         accion.orden.id,
         accion.nuevoEstado,
-        usuario.id,
         accion.nuevoEstado === "CANCELADA" ? motivo.trim() : undefined,
       );
     } catch (fallo) {

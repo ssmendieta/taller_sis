@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
@@ -22,10 +23,9 @@ export class OrdenesService {
     private readonly historialRepository: Repository<HistorialEstadoOrden>,
   ) {}
 
-  // Alta de ordenes (aporte de develop, conservado tal cual: el DTO usa los
-  // mismos nombres de propiedad que OrdenProduccion).
   async create(createOrdenDto: CreateOrdenDto): Promise<OrdenProduccion> {
-    const codigo = `ORD-${Math.floor(Date.now() / 1000)}`;
+    
+    const codigo = `ORD-${randomUUID().replace(/-/g, '')}`;
 
     const nuevaOrden = this.ordenRepository.create({
       ...createOrdenDto,
@@ -55,10 +55,7 @@ export class OrdenesService {
   }
 
   async buscar(estado?: string, producto?: string, fecha?: string) {
-    // La consulta entrega los nombres de la migración y el nombre del
-    // producto de recetas. El filtro producto se aplica al producto, no al
-    // código de la orden. La BD de Auth es independiente, por lo que aquí
-    // solo se expone el ID del responsable.
+
     return this.ordenRepository.query(`
       SELECT o.id::text AS id,
              o.codigo,
@@ -83,8 +80,14 @@ export class OrdenesService {
 
   async cambiarEstado(
     id: number,
-    dto: CambiarEstadoOrdenDto,
+    dto: CambiarEstadoOrdenDto & { usuarioResponsableId: number },
   ) {
+    if (dto.nuevoEstado === EstadoOrden.CANCELADA && !dto.motivo?.trim()) {
+      throw new BadRequestException('Debe indicar el motivo de cancelación');
+    }
+    if (!Number.isSafeInteger(dto.usuarioResponsableId) || dto.usuarioResponsableId < 1) {
+      throw new BadRequestException('Usuario responsable inválido');
+    }
 
 
     const orden = await this.ordenRepository.findOne({
@@ -140,7 +143,7 @@ export class OrdenesService {
             estadoAnterior: estadoActual,
             estadoNuevo: dto.nuevoEstado,
             usuarioResponsableId: dto.usuarioResponsableId,
-            motivo: dto.motivo ?? null,
+            motivo: dto.motivo?.trim() ?? null,
           }),
         );
 

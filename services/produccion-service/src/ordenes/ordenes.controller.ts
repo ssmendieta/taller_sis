@@ -7,6 +7,9 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  SetMetadata,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -15,6 +18,7 @@ import {
 import { OrdenesService } from './ordenes.service';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
+import { PermisoProduccionGuard, PERMISO_PRODUCCION } from '../auth/permiso-produccion.guard';
 
 // Prefijo corto 'ordenes': el gateway reescribe /api/produccion -> '',
 // un prefijo 'api/produccion/ordenes' quedaria duplicado e inaccesible.
@@ -24,6 +28,8 @@ export class OrdenesController {
 
   // Alta de ordenes (aporte de develop, conservado).
   @Post()
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.crear')
   create(@Body() createOrdenDto: CreateOrdenDto) {
     return this.ordenesService.create(createOrdenDto);
   }
@@ -63,12 +69,10 @@ export class OrdenesController {
 
 
   // Cambiar el estado de una orden (ABC-148).
-  // TODO: proteger con el PermisosGuard de ABC-151 (permiso
-  // 'ordenes.cambiar_estado') y reemplazar usuarioResponsableId del body por
-  // el id del usuario autenticado cuando ese guard esté disponible.
-  // ValidationPipe solo en esta ruta (no global): un pipe global con
-  // whitelist rompería los endpoints existentes sin DTO decorados.
+  // El guard obtiene del servicio Auth al actor y sus permisos actuales.
   @Patch(':id/estado')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.cambiar_estado')
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -80,13 +84,14 @@ export class OrdenesController {
     @Param('id', ParseIntPipe) id: number,
 
     @Body() dto: CambiarEstadoOrdenDto,
+    @Req() request: { usuarioId: number },
 
   ) {
 
 
     return this.ordenesService.cambiarEstado(
       id,
-      dto,
+      { ...dto, usuarioResponsableId: request.usuarioId },
     );
 
 

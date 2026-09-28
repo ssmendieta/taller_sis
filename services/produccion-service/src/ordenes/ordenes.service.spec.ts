@@ -111,20 +111,27 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     expect(ordenGuardada.finalizada_en).toBeInstanceOf(Date);
   });
 
-  it('marca cancelada_en al pasar a CANCELADA y guarda motivo null si no se envía', async () => {
+  it('exige un motivo al cancelar y registra el motivo junto con la fecha', async () => {
     findOne.mockResolvedValue(ordenBase('PENDIENTE'));
     managerFindOne.mockResolvedValue({});
+
+    await expect(service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.CANCELADA,
+      usuarioResponsableId: 7,
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(transaction).not.toHaveBeenCalled();
 
     await service.cambiarEstado(1, {
       nuevoEstado: EstadoOrden.CANCELADA,
       usuarioResponsableId: 7,
+      motivo: '  Falta materia prima  ',
     });
 
     const ordenGuardada = managerSave.mock.calls[0][1];
     expect(ordenGuardada.cancelada_en).toBeInstanceOf(Date);
     expect(managerCreate).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ motivo: null }),
+      expect.objectContaining({ motivo: 'Falta materia prima' }),
     );
   });
 

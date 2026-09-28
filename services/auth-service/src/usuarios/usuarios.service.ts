@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Rol } from '../roles/entities/role.entity';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Usuario } from './entities/usuario.entity';
@@ -14,7 +15,39 @@ export class UsuariosService {
     private readonly usuarios: Repository<Usuario>,
     @InjectRepository(Rol)
     private readonly roles: Repository<Rol>,
+    private readonly auditoria: AuditoriaService,
   ) {}
+
+  private resumen(usuario: Usuario) {
+    return {
+      nombre_completo: usuario.nombre_completo,
+      correo: usuario.correo,
+      rol_id: usuario.rol_id,
+      activo: usuario.activo,
+      eliminado_en: usuario.eliminado_en,
+    };
+  }
+
+  private async guardarConAuditoria(
+    usuario: Usuario,
+    accion: string,
+    antes: ReturnType<UsuariosService['resumen']> | null,
+    actorId: string | null,
+  ): Promise<Usuario> {
+    return this.usuarios.manager.transaction(async (manager) => {
+      const guardado = await manager.getRepository(Usuario).save(usuario);
+      await this.auditoria.registrar({
+        usuario_actor_id: actorId,
+        accion,
+        entidad: 'usuarios',
+        entidad_id: guardado.id,
+        usuario_afectado_id: guardado.id,
+        datos_antes: antes,
+        datos_despues: this.resumen(guardado),
+      }, manager);
+      return guardado;
+    });
+  }
 
   private async validarRolActivo(rolId: number): Promise<void> {
     if (!Number.isSafeInteger(rolId) || rolId < 1) {
@@ -33,7 +66,7 @@ export class UsuariosService {
     throw error;
   }
 
-  async create(dto: CreateUsuarioDto): Promise<Usuario> {
+  async create(dto: CreateUsuarioDto, actorId: string | null = null): Promise<Usuario> {
     await this.validarRolActivo(dto.rol_id);
     const correo = dto.correo.trim().toLowerCase();
     if (await this.usuarios.createQueryBuilder('usuario')
@@ -47,7 +80,7 @@ export class UsuariosService {
       password_hash: await bcrypt.hash(dto.password, 10),
     });
     try {
-      const guardado = await this.usuarios.save(usuario);
+      const guardado = await this.guardarConAuditoria(usuario, 'CREAR_USUARIO', null, actorId);
       return this.findOne(guardado.id); // Nunca responder con password_hash.
     } catch (error) {
       this.verificarCorreoDuplicado(error);
@@ -70,8 +103,9 @@ export class UsuariosService {
     return usuario;
   }
 
-  async update(id: string, dto: UpdateUsuarioDto): Promise<Usuario> {
+  async update(id: string, dto: UpdateUsuarioDto, actorId: string | null = null): Promise<Usuario> {
     const usuario = await this.findOne(id);
+    const antes = this.resumen(usuario);
     if (dto.rol_id !== undefined) {
       await this.validarRolActivo(dto.rol_id);
       usuario.rol_id = String(dto.rol_id);
@@ -88,25 +122,29 @@ export class UsuariosService {
     }
     if (dto.password !== undefined) usuario.password_hash = await bcrypt.hash(dto.password, 10);
     try {
-      await this.usuarios.save(usuario);
+      const accion = dto.rol_id !== undefined && usuario.rol_id !== antes.rol_id
+        ? 'CAMBIAR_ROL' : 'EDITAR_USUARIO';
+      await this.guardarConAuditoria(usuario, accion, antes, actorId);
       return this.findOne(id);
     } catch (error) {
       this.verificarCorreoDuplicado(error);
     }
   }
 
-  async changeStatus(id: string, activo: boolean): Promise<Usuario> {
+  async changeStatus(id: string, activo: boolean, actorId: string | null = null): Promise<Usuario> {
     if (typeof activo !== 'boolean') throw new BadRequestException('activo debe ser booleano');
     const usuario = await this.findOne(id);
+    const antes = this.resumen(usuario);
     usuario.activo = activo;
-    await this.usuarios.save(usuario);
+    await this.guardarConAuditoria(usuario, activo ? 'ACTIVAR_USUARIO' : 'DESACTIVAR_USUARIO', antes, actorId);
     return this.findOne(id);
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string, actorId: string | null = null): Promise<void> {
     const usuario = await this.findOne(id);
+    const antes = this.resumen(usuario);
     usuario.eliminado_en = new Date();
     usuario.activo = false;
-    await this.usuarios.save(usuario);
+    await this.guardarConAuditoria(usuario, 'DAR_BAJA_USUARIO', antes, actorId);
   }
 }

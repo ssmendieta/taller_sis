@@ -3,11 +3,13 @@ import { BadRequestException, ConflictException, NotFoundException } from '@nest
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { Rol } from '../roles/entities/role.entity';
+import { AuditoriaService, EventoAuditoria } from '../auditoria/auditoria.service';
 import { Usuario } from './entities/usuario.entity';
 import { UsuariosService } from './usuarios.service';
 
 function preparar() {
   const usuarios: Usuario[] = [];
+  const eventos: EventoAuditoria[] = [];
   const roles = [
     { id: '1', nombre: 'Administrador', activo: true },
     { id: '2', nombre: 'Supervisor', activo: true },
@@ -44,11 +46,21 @@ function preparar() {
     find: async () => roles.filter((rol) => rol.activo),
   };
 
+  const manager = { getRepository: () => repoUsuarios };
+  Object.assign(repoUsuarios, {
+    manager: { transaction: async (operacion: (transactionManager: typeof manager) => Promise<unknown>) => operacion(manager) },
+  });
+  const auditoria = {
+    registrar: async (evento: EventoAuditoria) => { eventos.push(evento); },
+  };
+
   return {
     usuarios,
+    eventos,
     service: new UsuariosService(
       repoUsuarios as unknown as Repository<Usuario>,
       repoRoles as unknown as Repository<Rol>,
+      auditoria as unknown as AuditoriaService,
     ),
   };
 }
@@ -130,4 +142,22 @@ test('ABC-165: desactiva, consulta y da de baja lógica al usuario', async () =>
   assert.equal(usuarios[0].eliminado_en instanceof Date, true);
   assert.deepEqual(await service.findAll(), []);
   await assert.rejects(() => service.findOne('1'), NotFoundException);
+});
+
+test('ABC-186: crear, cambiar rol, desactivar y dar de baja produce eventos atribuibles y sin contraseña', async () => {
+  const { service, eventos } = preparar();
+  await service.create({ ...datos, rol_id: 1 }, '10');
+  await service.update('1', { nombre_completo: 'Nombre nuevo' }, '10');
+  await service.update('1', { rol_id: 2 }, '10');
+  await service.changeStatus('1', false, '10');
+  await service.softDelete('1', '10');
+
+  assert.deepEqual(eventos.map((evento) => evento.accion), [
+    'CREAR_USUARIO', 'EDITAR_USUARIO', 'CAMBIAR_ROL', 'DESACTIVAR_USUARIO', 'DAR_BAJA_USUARIO',
+  ]);
+  assert.ok(eventos.every((evento) => evento.usuario_actor_id === '10' && evento.usuario_afectado_id === '1'));
+  assert.equal(eventos[0].datos_antes, null);
+  assert.equal((eventos[2].datos_antes as { rol_id: string }).rol_id, '1');
+  assert.equal((eventos[2].datos_despues as { rol_id: string }).rol_id, '2');
+  assert.ok(eventos.every((evento) => !JSON.stringify(evento).includes('password_hash')));
 });

@@ -2,15 +2,15 @@
 const API_GATEWAY_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_GATEWAY_URL || "http://localhost:3000";
 export const apiConfig = { gatewayUrl: API_GATEWAY_URL, apiUrl: API_GATEWAY_URL };
 
-export async function cambiarEstadoOrdenProduccion(id, nuevoEstado, usuarioResponsableId, motivo) {
-  const token = sessionStorage.getItem("accessToken") || localStorage.getItem("accessToken");
+export async function cambiarEstadoOrdenProduccion(id, nuevoEstado, motivo) {
+  const token = sessionStorage.getItem("accessToken");
   const respuesta = await fetch(`${API_GATEWAY_URL}/api/produccion/ordenes/${encodeURIComponent(id)}/estado`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ nuevoEstado, usuarioResponsableId, ...(motivo ? { motivo } : {}) }),
+    body: JSON.stringify({ nuevoEstado, ...(motivo ? { motivo } : {}) }),
   });
 
   const datos = await respuesta.json().catch(() => null);
@@ -25,9 +25,13 @@ export async function cambiarEstadoOrdenProduccion(id, nuevoEstado, usuarioRespo
 }
 
 export async function crearOrdenProduccion(datos) {
+  const token = sessionStorage.getItem("accessToken");
   const respuesta = await fetch(`${API_GATEWAY_URL}/api/produccion/ordenes`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify(datos),
   });
 
@@ -61,7 +65,11 @@ export async function obtenerOrdenesProduccion(signal) {
 }
 
 export async function obtenerAuditoria(signal) {
-  const respuesta = await fetch(`${API_GATEWAY_URL}/api/auth/auditoria`, { signal });
+  const token = sessionStorage.getItem("accessToken");
+  const respuesta = await fetch(`${API_GATEWAY_URL}/api/auth/auditoria`, {
+    signal,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!respuesta.ok) {
     throw new Error("No se pudo cargar la auditoría. Intenta de nuevo.");
   }

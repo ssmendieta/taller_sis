@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Rol } from '../roles/entities/role.entity';
 import { LoginDto } from './dto/login.dto';
+import { JwtPayload } from '../authz/jwt-payload.interface';
 
 export interface UsuarioParaAuth {
   id: string;
@@ -62,13 +63,16 @@ export class AuthService {
     if (!rolAsignado) {
       throw new ForbiddenException('El rol asignado al usuario no existe');
     }
+    if (rolAsignado.activo === false) {
+      throw new ForbiddenException('El rol asignado está desactivado');
+    }
 
     const coincide = await compare(dto.password, usuario.password_hash);
     if (!coincide) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const permisos = rolAsignado.permisos ?? [];
+    const permisos = (rolAsignado.permisos ?? []).filter((permiso) => permiso.activo);
 
     const payload = {
       sub: usuario.id,
@@ -94,6 +98,25 @@ export class AuthService {
           nombre: permiso.nombre,
         })),
       },
+    };
+  }
+
+  // Auth conserva la fuente de verdad sobre el usuario y sus permisos actuales.
+  // Producción consulta este endpoint protegido antes de efectuar una operación.
+  async sesionActual(usuario: JwtPayload) {
+    const rol = await this.roles.findOne({
+      where: { id: String(usuario.rolId) },
+      relations: ['permisos'],
+    });
+    if (!rol || !rol.activo) {
+      throw new ForbiddenException('El rol asignado ya no está disponible');
+    }
+    return {
+      id: String(usuario.sub),
+      rol: rol.nombre,
+      permisos: (rol.permisos ?? [])
+        .filter((permiso) => permiso.activo)
+        .map((permiso) => permiso.codigo),
     };
   }
 

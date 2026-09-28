@@ -28,7 +28,10 @@ function preparar(usuarios: UsuarioPrueba[]) {
   const repositorioRoles = {
     findOne: async ({ where }: { where: { id: string } }) =>
       ['1', '2', '3', '4'].includes(where.id)
-        ? { id: where.id, nombre: 'Administrador', permisos: [{ id: '7', nombre: 'Gestionar usuarios' }] }
+        ? { id: where.id, nombre: 'Administrador', activo: true, permisos: [
+            { id: '7', nombre: 'Gestionar usuarios', codigo: 'usuarios.gestionar', activo: true },
+            { id: '8', nombre: 'Permiso desactivado', codigo: 'ordenes.crear', activo: false },
+          ] }
         : null,
   } as unknown as Repository<Rol>;
   const jwt = {
@@ -111,5 +114,17 @@ describe('ABC-167: pruebas del servicio de autenticación', () => {
       await servicio.login({ correo: 'ana@example.com', password: 'ClaveSegura123!' });
       assert.equal(payloads[0].rolId, rolId);
     }
+  });
+
+  it('devuelve el rol actual y solo permisos activos a un token ya validado', async () => {
+    const { servicio } = preparar([await usuarioDePrueba()]);
+    const respuesta = await servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '1' });
+    assert.deepEqual(respuesta, {
+      id: '3', rol: 'Administrador', permisos: ['usuarios.gestionar'],
+    });
+    await assert.rejects(
+      () => servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '999' }),
+      ForbiddenException,
+    );
   });
 });

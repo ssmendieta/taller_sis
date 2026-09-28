@@ -7,6 +7,7 @@ import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
 
 import { OrdenesService } from './ordenes.service';
 import { OrdenesController } from './ordenes.controller';
+import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 
 @Module({
 
@@ -24,7 +25,8 @@ import { OrdenesController } from './ordenes.controller';
 
 
   providers:[
-    OrdenesService
+    OrdenesService,
+    PermisoProduccionGuard
   ]
 
 })

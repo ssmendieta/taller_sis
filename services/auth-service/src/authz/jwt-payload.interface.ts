@@ -1,6 +1,6 @@
 
 export interface JwtPayload {
-  sub: number;
+  sub: number | string;
   correo: string;
-  rolId?: number;
+  rolId?: number | string;
 }

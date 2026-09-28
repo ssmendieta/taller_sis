@@ -44,11 +44,11 @@ export class PermisosGuard implements CanActivate {
     }
 
     const rol = await this.rolRepository.findOne({
-      where: { id: usuario.rolId as unknown as string },
+      where: { id: String(usuario.rolId) },
       relations: { permisos: true },
     });
 
-    const tienePermiso = (rol?.permisos ?? []).some(
+    const tienePermiso = rol?.activo !== false && (rol?.permisos ?? []).some(
       (permiso) => permiso.codigo === codigo && permiso.activo === true,
     );
 
