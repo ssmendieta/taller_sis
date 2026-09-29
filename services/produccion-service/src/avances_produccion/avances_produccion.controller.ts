@@ -9,6 +9,7 @@ export class AvancesProduccionController {
 
   @Post()
   create(@Body() createAvancesProduccionDto: CreateAvancesProduccionDto) {
+    // ABC-151 aún debe proporcionar una identidad validada a Production Service.
     return this.avancesProduccionService.create(createAvancesProduccionDto);
   }
 
