@@ -8,7 +8,11 @@ import { AuditoriaModule } from '../auditoria/auditoria.module';
 import { AuthzModule } from '../authz/authz.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Usuario, Rol]), AuditoriaModule, AuthzModule],
+  imports: [
+    TypeOrmModule.forFeature([Usuario, Rol]),
+    AuditoriaModule,
+    AuthzModule,
+  ],
   controllers: [UsuariosController],
   providers: [UsuariosService],
   exports: [UsuariosService],

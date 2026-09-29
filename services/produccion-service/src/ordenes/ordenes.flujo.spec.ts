@@ -48,7 +48,11 @@ describe('ABC-170: flujo completo de estados de una orden', () => {
       find: async () => [...registros].reverse(),
     } as unknown as Repository<HistorialEstadoOrden>;
 
-    service = new OrdenesService(ordenRepository, historialRepository);
+    service = new OrdenesService(ordenRepository, historialRepository, {} as any,
+      { findOne: async () => ({ activa: true }) } as any);
+    jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
+      orden_id: 42, orden_codigo: 'ORD-42', cantidad_producir: 1, materiales: [],
+    });
   });
 
   async function pasarA(estado: EstadoOrden, motivo?: string) {
@@ -56,7 +60,9 @@ describe('ABC-170: flujo completo de estados de una orden', () => {
       nuevoEstado: estado,
       usuarioResponsableId: 7,
       motivo,
-    });
+    }, estado === EstadoOrden.EN_PRODUCCION
+      ? { sub: 7, rolNombre: 'Encargado de Producción' }
+      : undefined);
   }
 
   it('recorre PENDIENTE → PLANIFICADA → EN_PRODUCCION → FINALIZADA con historial', async () => {

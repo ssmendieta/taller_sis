@@ -1,7 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +17,15 @@ import { EstadoOrden } from './estado-orden.enum';
 import { esTransicionValida } from './estado-orden.transiciones';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { CreateOrdenDto } from './dto/create-orden.dto';
+import { Inventario } from '../inventario/entities/inventario.entity';
+import { RecetasService } from '../recetas/recetas.service';
+
+// Este principal debe provenir de autenticación verificada; el controlador
+// actual no lo proporciona hasta que ABC-151 integre Production Service.
+export interface UsuarioAutenticadoProduccion {
+  sub: string | number;
+  rolNombre: string;
+}
 
 @Injectable()
 export class OrdenesService {
@@ -21,6 +34,9 @@ export class OrdenesService {
     private readonly ordenRepository: Repository<OrdenProduccion>,
     @InjectRepository(HistorialEstadoOrden)
     private readonly historialRepository: Repository<HistorialEstadoOrden>,
+    @InjectRepository(Inventario)
+    private readonly inventarioRepository: Repository<Inventario>,
+    private readonly recetasService: RecetasService,
   ) {}
 
   async create(createOrdenDto: CreateOrdenDto): Promise<OrdenProduccion> {
@@ -75,18 +91,113 @@ export class OrdenesService {
     `, [estado?.trim() || null, producto?.trim() || null, fecha?.trim() || null]);
   }
 
+  async compararDisponibilidadMateriales(id: number) {
+    const orden = await this.ordenRepository.findOne({
+      where: { id },
+    });
 
+    if (!orden) {
+      throw new NotFoundException(`Orden ${id} no encontrada`);
+    }
+
+    const materiales = await this.ordenRepository.query(
+      `
+      SELECT
+        m.id AS material_id,
+        m.codigo,
+        m.nombre,
+        m.unidad_medida,
+        rm.cantidad_requerida
+      FROM ordenes_produccion o
+      INNER JOIN receta_material rm
+        ON rm.receta_id = o.receta_id
+      INNER JOIN materiales m
+        ON m.id = rm.material_id
+      WHERE o.id = $1
+      `,
+      [id],
+    );
+
+    const resultado = [];
+
+    for (const material of materiales) {
+      const cantidadRequerida =
+        Number(material.cantidad_requerida) * Number(orden.cantidad);
+
+      const inventario = await this.inventarioRepository.findOne({
+        where: {
+          materialId: Number(material.material_id),
+        },
+      });
+
+      const cantidadDisponible = inventario
+        ? Number(inventario.cantidadDisponible)
+        : 0;
+
+      let estado: string;
+
+      if (!inventario || cantidadDisponible === 0) {
+        estado = 'FALTANTE';
+      } else if (cantidadDisponible < cantidadRequerida) {
+        estado = 'INSUFICIENTE';
+      } else {
+        estado = 'DISPONIBLE';
+      }
+
+      resultado.push({
+        material_id: Number(material.material_id),
+        codigo: material.codigo,
+        nombre: material.nombre,
+        unidad_medida: material.unidad_medida,
+        cantidad_requerida: cantidadRequerida,
+        cantidad_disponible: cantidadDisponible,
+        estado,
+      });
+    }
+
+    return {
+      orden_id: orden.id,
+      orden_codigo: orden.codigo,
+      cantidad_producir: Number(orden.cantidad),
+      materiales: resultado,
+    };
+  }
 
 
   async cambiarEstado(
     id: number,
-    dto: CambiarEstadoOrdenDto & { usuarioResponsableId: number },
+    dto: CambiarEstadoOrdenDto,
+    usuarioAutenticado?: UsuarioAutenticadoProduccion,
   ) {
     if (dto.nuevoEstado === EstadoOrden.CANCELADA && !dto.motivo?.trim()) {
       throw new BadRequestException('Debe indicar el motivo de cancelación');
     }
     if (!Number.isSafeInteger(dto.usuarioResponsableId) || dto.usuarioResponsableId < 1) {
       throw new BadRequestException('Usuario responsable inválido');
+    }
+
+    const esInicio = dto.nuevoEstado === EstadoOrden.EN_PRODUCCION;
+
+    if (esInicio && !usuarioAutenticado) {
+      throw new ServiceUnavailableException(
+        'No se puede iniciar la orden: Production Service aún no recibe la identidad validada de ABC-151.',
+      );
+    }
+
+    if (esInicio && usuarioAutenticado.rolNombre !== 'Encargado de Producción') {
+      throw new ForbiddenException(
+        'Solo el rol Encargado de Producción puede iniciar órdenes.',
+      );
+    }
+
+    if (esInicio) {
+      const responsableId = Number(usuarioAutenticado.sub);
+      if (!Number.isSafeInteger(responsableId) || responsableId < 1) {
+        throw new UnauthorizedException(
+          'La identidad autenticada no contiene un ID de usuario válido.',
+        );
+      }
+      dto = { ...dto, usuarioResponsableId: responsableId };
     }
 
 
@@ -109,6 +220,36 @@ export class OrdenesService {
 
 
     const estadoActual = orden.estado as EstadoOrden;
+
+    if (esInicio && estadoActual !== EstadoOrden.PLANIFICADA) {
+      throw new BadRequestException(
+        `La orden ${id} debe estar en '${EstadoOrden.PLANIFICADA}' para iniciar; estado actual: '${estadoActual}'.`,
+      );
+    }
+
+    if (esInicio) {
+      const receta = await this.recetasService.findOne(orden.producto_id);
+      if (!receta.activa) {
+        throw new ConflictException({
+          message: 'No se puede iniciar la orden porque su receta está inactiva.',
+          orden_id: id,
+          receta_id: orden.producto_id,
+        });
+      }
+
+      const disponibilidad = await this.compararDisponibilidadMateriales(id);
+      const materialesFaltantes = disponibilidad.materiales.filter(
+        (material) => material.estado === 'INSUFICIENTE' || material.estado === 'FALTANTE',
+      );
+
+      if (materialesFaltantes.length > 0) {
+        throw new ConflictException({
+          message: 'No se puede iniciar la orden porque faltan materiales.',
+          orden_id: id,
+          materiales_faltantes: materialesFaltantes,
+        });
+      }
+    }
 
     if (!esTransicionValida(estadoActual, dto.nuevoEstado)) {
       throw new BadRequestException(

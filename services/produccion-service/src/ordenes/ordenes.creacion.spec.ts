@@ -92,7 +92,7 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
       create: (datos: Record<string, unknown>) => datos,
       save: async (datos: Record<string, unknown>) => datos,
     } as unknown as Repository<OrdenProduccion>;
-    const servicio = new OrdenesService(ordenes, {} as Repository<HistorialEstadoOrden>);
+    const servicio = new OrdenesService(ordenes, {} as Repository<HistorialEstadoOrden>, {} as any, {} as any);
     const primera = await servicio.create(ordenValida);
     const segunda = await servicio.create(ordenValida);
     expect(primera.codigo).not.toBe(segunda.codigo);

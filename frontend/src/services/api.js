@@ -66,7 +66,7 @@ export async function obtenerOrdenesProduccion(signal) {
 
 export async function obtenerAuditoria(signal) {
   const token = sessionStorage.getItem("accessToken");
-  const respuesta = await fetch(`${API_GATEWAY_URL}/api/auth/auditoria`, {
+  const respuesta = await fetch(`${API_GATEWAY_URL}/api/auth/auditoria/listado`, {
     signal,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

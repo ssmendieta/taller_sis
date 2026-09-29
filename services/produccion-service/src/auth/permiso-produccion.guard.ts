@@ -20,6 +20,7 @@ export class PermisoProduccionGuard implements CanActivate {
       headers: { authorization?: string };
       body?: { nuevoEstado?: string };
       usuarioId?: number;
+      usuarioAutenticado?: { sub: number; rolNombre: string };
     }>();
     const authorization = request.headers.authorization;
     if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) {
@@ -65,6 +66,7 @@ export class PermisoProduccionGuard implements CanActivate {
       throw new ForbiddenException('No tiene permisos para esta operación');
     }
     request.usuarioId = usuarioId;
+    request.usuarioAutenticado = { sub: usuarioId, rolNombre: identidad.rol };
     return true;
   }
 }

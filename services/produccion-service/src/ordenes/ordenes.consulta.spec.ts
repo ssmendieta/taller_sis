@@ -13,6 +13,8 @@ describe('ABC-169: consulta de órdenes', () => {
   const servicio = new OrdenesService(
     { query } as unknown as Repository<OrdenProduccion>,
     {} as Repository<HistorialEstadoOrden>,
+    {} as any,
+    {} as any,
   );
 
   beforeEach(() => query.mockClear());

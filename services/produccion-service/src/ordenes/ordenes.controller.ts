@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 
 
-import { OrdenesService } from './ordenes.service';
+import { OrdenesService, UsuarioAutenticadoProduccion } from './ordenes.service';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { PermisoProduccionGuard, PERMISO_PRODUCCION } from '../auth/permiso-produccion.guard';
@@ -41,6 +41,13 @@ export class OrdenesController {
     @Query('fecha') fecha?: string,
   ) {
     return this.ordenesService.buscar(estado, producto, fecha);
+  }
+
+  @Get(':id/disponibilidad-materiales')
+  compararDisponibilidadMateriales(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.ordenesService.compararDisponibilidadMateriales(id);
   }
 
   @Get(':id/materiales')
@@ -84,7 +91,7 @@ export class OrdenesController {
     @Param('id', ParseIntPipe) id: number,
 
     @Body() dto: CambiarEstadoOrdenDto,
-    @Req() request: { usuarioId: number },
+    @Req() request: { usuarioId: number; usuarioAutenticado: UsuarioAutenticadoProduccion },
 
   ) {
 
@@ -92,6 +99,7 @@ export class OrdenesController {
     return this.ordenesService.cambiarEstado(
       id,
       { ...dto, usuarioResponsableId: request.usuarioId },
+      request.usuarioAutenticado,
     );
 
 
