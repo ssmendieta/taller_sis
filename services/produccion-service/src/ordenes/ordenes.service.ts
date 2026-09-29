@@ -1,7 +1,11 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -13,6 +17,14 @@ import { esTransicionValida } from './estado-orden.transiciones';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { Inventario } from '../inventario/entities/inventario.entity';
+import { RecetasService } from '../recetas/recetas.service';
+
+// Este principal debe provenir de autenticación verificada; el controlador
+// actual no lo proporciona hasta que ABC-151 integre Production Service.
+export interface UsuarioAutenticadoProduccion {
+  sub: string | number;
+  rolNombre: string;
+}
 
 @Injectable()
 export class OrdenesService {
@@ -23,6 +35,7 @@ export class OrdenesService {
     private readonly historialRepository: Repository<HistorialEstadoOrden>,
     @InjectRepository(Inventario)
     private readonly inventarioRepository: Repository<Inventario>,
+    private readonly recetasService: RecetasService,
   ) {}
 
   // Alta de ordenes (aporte de develop, conservado tal cual: el DTO usa los
@@ -153,7 +166,32 @@ export class OrdenesService {
   async cambiarEstado(
     id: number,
     dto: CambiarEstadoOrdenDto,
+    usuarioAutenticado?: UsuarioAutenticadoProduccion,
   ) {
+
+    const esInicio = dto.nuevoEstado === EstadoOrden.EN_PRODUCCION;
+
+    if (esInicio && !usuarioAutenticado) {
+      throw new ServiceUnavailableException(
+        'No se puede iniciar la orden: Production Service aún no recibe la identidad validada de ABC-151.',
+      );
+    }
+
+    if (esInicio && usuarioAutenticado.rolNombre !== 'Encargado de Producción') {
+      throw new ForbiddenException(
+        'Solo el rol Encargado de Producción puede iniciar órdenes.',
+      );
+    }
+
+    if (esInicio) {
+      const responsableId = Number(usuarioAutenticado.sub);
+      if (!Number.isSafeInteger(responsableId) || responsableId < 1) {
+        throw new UnauthorizedException(
+          'La identidad autenticada no contiene un ID de usuario válido.',
+        );
+      }
+      dto = { ...dto, usuarioResponsableId: responsableId };
+    }
 
 
     const orden = await this.ordenRepository.findOne({
@@ -175,6 +213,36 @@ export class OrdenesService {
 
 
     const estadoActual = orden.estado as EstadoOrden;
+
+    if (esInicio && estadoActual !== EstadoOrden.PLANIFICADA) {
+      throw new BadRequestException(
+        `La orden ${id} debe estar en '${EstadoOrden.PLANIFICADA}' para iniciar; estado actual: '${estadoActual}'.`,
+      );
+    }
+
+    if (esInicio) {
+      const receta = await this.recetasService.findOne(orden.producto_id);
+      if (!receta.activa) {
+        throw new ConflictException({
+          message: 'No se puede iniciar la orden porque su receta está inactiva.',
+          orden_id: id,
+          receta_id: orden.producto_id,
+        });
+      }
+
+      const disponibilidad = await this.compararDisponibilidadMateriales(id);
+      const materialesFaltantes = disponibilidad.materiales.filter(
+        (material) => material.estado === 'INSUFICIENTE' || material.estado === 'FALTANTE',
+      );
+
+      if (materialesFaltantes.length > 0) {
+        throw new ConflictException({
+          message: 'No se puede iniciar la orden porque faltan materiales.',
+          orden_id: id,
+          materiales_faltantes: materialesFaltantes,
+        });
+      }
+    }
 
     if (!esTransicionValida(estadoActual, dto.nuevoEstado)) {
       throw new BadRequestException(
