@@ -186,24 +186,38 @@ export class OrdenesService {
   ) {
 
     const esInicio = dto.nuevoEstado === EstadoOrden.EN_PRODUCCION;
+    const esFinalizacion = dto.nuevoEstado === EstadoOrden.FINALIZADA;
+    const esCancelacion = dto.nuevoEstado === EstadoOrden.CANCELADA;
+    const requiereEncargadoProduccion =
+      esInicio || esFinalizacion || esCancelacion;
+    const accion = esInicio
+      ? 'iniciar'
+      : esFinalizacion
+        ? 'finalizar'
+        : 'cancelar';
 
-    if (esInicio && !usuarioAutenticado) {
+    if (requiereEncargadoProduccion && !usuarioAutenticado) {
       throw new ServiceUnavailableException(
-        'No se puede iniciar la orden: Production Service aún no recibe la identidad validada de ABC-151.',
+        `No se puede ${accion} la orden: Production Service aún no recibe la identidad validada de ABC-151.`,
       );
     }
 
-    if (esInicio && usuarioAutenticado.rolNombre !== 'Encargado de Producción') {
+    if (
+      requiereEncargadoProduccion &&
+      usuarioAutenticado.rolNombre !== 'Encargado de Producción'
+    ) {
       throw new ForbiddenException(
-        'Solo el rol Encargado de Producción puede iniciar órdenes.',
+        `Solo el rol Encargado de Producción puede ${accion} órdenes.`,
       );
     }
 
-    if (esInicio) {
+    if (requiereEncargadoProduccion) {
       const responsableId = Number(usuarioAutenticado.sub);
       if (!Number.isSafeInteger(responsableId) || responsableId < 1) {
         throw new UnauthorizedException(
-          'La identidad autenticada no contiene un ID de usuario válido.',
+          esInicio
+            ? 'La identidad autenticada no contiene un ID de usuario válido.'
+            : 'La identidad autenticada no contiene un ID de usuario válido para cerrar la orden.',
         );
       }
       dto = { ...dto, usuarioResponsableId: responsableId };
@@ -225,6 +239,16 @@ export class OrdenesService {
       throw new BadRequestException(
         `Estado solicitado inválido: '${dto.nuevoEstado}'. Valores válidos: ${Object.values(EstadoOrden).join(', ')}`,
       );
+    }
+
+    if (esCancelacion) {
+      const motivo = dto.motivo?.trim();
+      if (!motivo) {
+        throw new BadRequestException(
+          'Debe proporcionar un motivo no vacío para cancelar la orden.',
+        );
+      }
+      dto = { ...dto, motivo };
     }
 
 
