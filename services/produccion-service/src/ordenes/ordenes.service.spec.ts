@@ -13,6 +13,8 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   let service: OrdenesService;
 
   const findOne = jest.fn();
+  const find = jest.fn();
+  const createQueryBuilder = jest.fn();
   const managerSave = jest.fn();
   const managerCreate = jest.fn();
   const managerFindOne = jest.fn();
@@ -21,7 +23,9 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   const recetaFindOne = jest.fn();
 
   const repositorioMock = {
+    find,
     findOne,
+    createQueryBuilder,
     query: jest.fn(),
     manager: {
       transaction,
@@ -362,6 +366,54 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     );
 
     expect(historialFind).not.toHaveBeenCalled();
+  });
+
+  it('ABC-144: devuelve las órdenes del repositorio sin filtros', async () => {
+    const ordenes = [ordenBase('PENDIENTE'), ordenBase('PLANIFICADA')];
+    find.mockResolvedValue(ordenes);
+
+    await expect(service.findAll()).resolves.toBe(ordenes);
+    expect(find).toHaveBeenCalledTimes(1);
+    expect(find).toHaveBeenCalledWith();
+  });
+
+  it('ABC-144: consulta el código exacto y devuelve la orden encontrada', async () => {
+    const orden = { ...ordenBase('PLANIFICADA'), codigo: 'OP-001' };
+    findOne.mockResolvedValue(orden);
+
+    await expect(service.findByCodigo('OP-001')).resolves.toBe(orden);
+    expect(findOne).toHaveBeenCalledWith({ where: { codigo: 'OP-001' } });
+  });
+
+  it('ABC-144: responde 404 cuando el código exacto no existe', async () => {
+    findOne.mockResolvedValue(null);
+
+    await expect(service.findByCodigo('OP-NO-EXISTE')).rejects.toThrow(
+      new NotFoundException('Orden con código OP-NO-EXISTE no encontrada'),
+    );
+    expect(findOne).toHaveBeenCalledWith({ where: { codigo: 'OP-NO-EXISTE' } });
+  });
+
+  it('conserva la búsqueda existente por estado, producto y fecha', async () => {
+    const getMany = jest.fn().mockResolvedValue([]);
+    const andWhere = jest.fn();
+    const where = jest.fn().mockReturnValue({ andWhere, getMany });
+    andWhere.mockReturnValue({ andWhere, getMany });
+    createQueryBuilder.mockReturnValue({ where });
+
+    await expect(service.buscar('PLANIFICADA', 'OP-00', '2026-10-01')).resolves.toEqual([]);
+
+    expect(where).toHaveBeenCalledWith('1=1');
+    expect(andWhere).toHaveBeenNthCalledWith(1, 'orden.estado = :estado', {
+      estado: 'PLANIFICADA',
+    });
+    expect(andWhere).toHaveBeenNthCalledWith(2, 'orden.codigo ILIKE :producto', {
+      producto: '%OP-00%',
+    });
+    expect(andWhere).toHaveBeenNthCalledWith(3, 'orden.fecha_programada = :fecha', {
+      fecha: '2026-10-01',
+    });
+    expect(getMany).toHaveBeenCalledTimes(1);
   });
 
 
