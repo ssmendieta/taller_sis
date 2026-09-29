@@ -1,7 +1,12 @@
+
 import React, { useState } from "react";
 import "../styles/OrdenPage.css";
 
 function OrdenPage() {
+  const [usuario] = useState(() =>
+    JSON.parse(localStorage.getItem("usuario") || "null")
+  );
+
   const [ordenes, setOrdenes] = useState([
     {
       id: 1,
@@ -10,7 +15,7 @@ function OrdenPage() {
       cantidad: 50,
       fecha: "27/09/2026",
       prioridad: "Normal",
-      estado: "Registrada",
+      estado: "PLANIFICADA",
     },
     {
       id: 2,
@@ -19,7 +24,7 @@ function OrdenPage() {
       cantidad: 30,
       fecha: "27/09/2026",
       prioridad: "Alta",
-      estado: "Registrada",
+      estado: "PLANIFICADA",
     },
   ]);
 
@@ -94,12 +99,12 @@ function OrdenPage() {
 
     const nuevaOrden = {
       id: Date.now(),
-      numero: `ORD-${String(ordenes.length + 1).padStart(3, "0")}`,
+      numero: "ORD-" + String(ordenes.length + 1).padStart(3, "0"),
       producto: formulario.producto,
       cantidad: Number(formulario.cantidad),
       fecha: formulario.fecha.split("-").reverse().join("/"),
       prioridad: formulario.prioridad,
-      estado: "Registrada",
+      estado: "PLANIFICADA",
     };
 
     setOrdenes((anteriores) => [...anteriores, nuevaOrden]);
@@ -113,9 +118,57 @@ function OrdenPage() {
     }, 3000);
   };
 
+  const iniciarProduccion = async (orden) => {
+    if (!usuario?.id) {
+      setMensaje("No se encontró el usuario responsable.");
+      return;
+    }
+
+    try {
+      const respuesta = await fetch(
+        `http://localhost:3000/api/produccion/ordenes/${orden.id}/estado`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nuevoEstado: "EN_PRODUCCION",
+            usuarioResponsableId: Number(usuario.id),
+          }),
+        }
+      );
+
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok) {
+        throw new Error(
+          Array.isArray(datos.message)
+            ? datos.message.join(", ")
+            : datos.message || "No se pudo iniciar la producción."
+        );
+      }
+
+      setOrdenes((anteriores) =>
+        anteriores.map((item) =>
+          item.id === orden.id
+            ? { ...item, estado: "EN_PRODUCCION" }
+            : item
+        )
+      );
+
+      setMensaje("Producción iniciada correctamente.");
+
+      setTimeout(() => {
+        setMensaje("");
+      }, 3000);
+    } catch (error) {
+      setMensaje(error.message);
+    }
+  };
+
   return (
     <div className="ordenes-container">
-
       <div className="ordenes-header">
         <div>
           <h1>Órdenes</h1>
@@ -169,8 +222,19 @@ function OrdenPage() {
 
                 <td>
                   <span className="estado-orden">
-                    ● {orden.estado}
+                    • {orden.estado}
                   </span>
+
+                  {usuario?.rolId === 2 &&
+                    orden.estado === "PLANIFICADA" && (
+                      <button
+                        type="button"
+                        className="btn-iniciar-produccion"
+                        onClick={() => iniciarProduccion(orden)}
+                      >
+                        Iniciar producción
+                      </button>
+                    )}
                 </td>
               </tr>
             ))}
@@ -181,7 +245,6 @@ function OrdenPage() {
       {mostrarFormulario && (
         <div className="orden-modal-overlay">
           <div className="orden-modal">
-
             <div className="orden-modal-header">
               <div>
                 <h2>Crear nueva orden</h2>
@@ -200,7 +263,6 @@ function OrdenPage() {
             </div>
 
             <form onSubmit={registrarOrden}>
-
               <div className="orden-form-group">
                 <label>
                   Producto <span>*</span>
@@ -303,7 +365,6 @@ function OrdenPage() {
                   Registrar orden
                 </button>
               </div>
-
             </form>
           </div>
         </div>
@@ -315,9 +376,9 @@ function OrdenPage() {
           {mensaje}
         </div>
       )}
-
     </div>
   );
 }
 
 export default OrdenPage;
+
