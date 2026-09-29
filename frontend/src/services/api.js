@@ -19,7 +19,7 @@ export async function cambiarEstadoOrdenProduccion(id, nuevoEstado, motivo) {
     throw new Error(
       (Array.isArray(mensaje) ? mensaje.join(". ") : mensaje) ||
         `No se pudo actualizar la orden (${respuesta.status}).`,
-    );
+    ); 
   }
   return datos;
 }

@@ -2,7 +2,7 @@ export function nombreUsuarioAuditoria(registro, tipo) {
   const id = registro[`usuario_${tipo}_id`];
   const nombre = registro[`usuario_${tipo}_nombre`] ?? registro[`usuario_${tipo}`]?.nombre_completo;
   return nombre ?? (id != null ? `Usuario #${id}` : tipo === "actor" ? "Sistema" : "—");
-}
+} 
 
 export function diaAuditoria(valor) {
   if (!valor) return "";
