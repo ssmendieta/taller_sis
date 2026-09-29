@@ -52,6 +52,22 @@ export class OrdenesService {
     return await this.ordenRepository.save(nuevaOrden);
   }
 
+  async findAll(): Promise<OrdenProduccion[]> {
+    return this.ordenRepository.find();
+  }
+
+  async findByCodigo(codigo: string): Promise<OrdenProduccion> {
+    const orden = await this.ordenRepository.findOne({
+      where: { codigo },
+    });
+
+    if (!orden) {
+      throw new NotFoundException(`Orden con código ${codigo} no encontrada`);
+    }
+
+    return orden;
+  }
+
   async obtenerMateriales(id: number) {
     const resultado = await this.ordenRepository.query(`
       SELECT

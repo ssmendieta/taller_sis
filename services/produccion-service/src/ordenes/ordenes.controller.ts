@@ -28,6 +28,11 @@ export class OrdenesController {
     return this.ordenesService.create(createOrdenDto);
   }
 
+  @Get()
+  findAll() {
+    return this.ordenesService.findAll();
+  }
+
   @Get('buscar')
   buscar(
     @Query('estado') estado?: string,
@@ -35,6 +40,11 @@ export class OrdenesController {
     @Query('fecha') fecha?: string,
   ) {
     return this.ordenesService.buscar(estado, producto, fecha);
+  }
+
+  @Get('codigo/:codigo')
+  findByCodigo(@Param('codigo') codigo: string) {
+    return this.ordenesService.findByCodigo(codigo);
   }
 
   @Get(':id/disponibilidad-materiales')
