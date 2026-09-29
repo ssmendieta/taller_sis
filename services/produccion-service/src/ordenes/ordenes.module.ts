@@ -7,6 +7,7 @@ import { Inventario } from '../inventario/entities/inventario.entity';
 
 import { OrdenesService } from './ordenes.service';
 import { OrdenesController } from './ordenes.controller';
+import { RecetasModule } from '../recetas/recetas.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { OrdenesController } from './ordenes.controller';
       HistorialEstadoOrden,
       Inventario,
     ]),
+    RecetasModule,
   ],
   controllers: [OrdenesController],
   providers: [OrdenesService],
