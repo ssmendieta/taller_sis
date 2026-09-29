@@ -1,11 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Rol } from '../roles/entities/role.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { Usuario } from './entities/usuario.entity';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 @Injectable()
 export class UsuariosService {
@@ -14,6 +15,8 @@ export class UsuariosService {
     private readonly usuarios: Repository<Usuario>,
     @InjectRepository(Rol)
     private readonly roles: Repository<Rol>,
+    private readonly auditoriaService: AuditoriaService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private async validarRolActivo(rolId: number): Promise<void> {
@@ -26,14 +29,13 @@ export class UsuariosService {
   }
 
   private verificarCorreoDuplicado(error: unknown): never {
-    // La migración define un índice único sobre LOWER(correo).
     if ((error as { driverError?: { constraint?: string } })?.driverError?.constraint === 'ux_usuarios_correo_ci') {
       throw new ConflictException('El correo ya está registrado');
     }
     throw error;
   }
 
-  async create(dto: CreateUsuarioDto): Promise<Usuario> {
+  async create(dto: CreateUsuarioDto, actorId?: number): Promise<Usuario> {
     await this.validarRolActivo(dto.rol_id);
     const correo = dto.correo.trim().toLowerCase();
     if (await this.usuarios.createQueryBuilder('usuario')
@@ -46,9 +48,34 @@ export class UsuariosService {
       rol_id: String(dto.rol_id),
       password_hash: await bcrypt.hash(dto.password, 10),
     });
+    
     try {
-      const guardado = await this.usuarios.save(usuario);
-      return this.findOne(guardado.id); // Nunca responder con password_hash.
+      return await this.dataSource.transaction(async (manager) => {
+        const usuarios = manager.getRepository(Usuario);
+        const guardado = await usuarios.save(usuario);
+        const creado = await usuarios.findOne({
+          where: { id: guardado.id, eliminado_en: IsNull() },
+        });
+        if (!creado) throw new NotFoundException('Usuario no encontrado');
+
+        await this.auditoriaService.registrar({
+          usuarioId: actorId ? String(actorId) : null,
+          accion: 'CREACION_USUARIO',
+          entidad: 'USUARIO',
+          entidadId: creado.id,
+          usuarioAfectadoId: creado.id,
+          datosAntes: null,
+          datosDespues: {
+            id: creado.id,
+            nombre_completo: creado.nombre_completo,
+            correo: creado.correo,
+            rol_id: creado.rol_id,
+            activo: creado.activo,
+          },
+        }, manager);
+
+        return creado;
+      });
     } catch (error) {
       this.verificarCorreoDuplicado(error);
     }
@@ -70,8 +97,16 @@ export class UsuariosService {
     return usuario;
   }
 
-  async update(id: string, dto: UpdateUsuarioDto): Promise<Usuario> {
+  async update(id: string, dto: UpdateUsuarioDto, actorId?: number): Promise<Usuario> {
     const usuario = await this.findOne(id);
+    const datosAntes = {
+      nombre_completo: usuario.nombre_completo,
+      correo: usuario.correo,
+      rol_id: usuario.rol_id,
+    };
+
+    const cambioRol = dto.rol_id !== undefined && String(dto.rol_id) !== usuario.rol_id;
+
     if (dto.rol_id !== undefined) {
       await this.validarRolActivo(dto.rol_id);
       usuario.rol_id = String(dto.rol_id);
@@ -87,26 +122,100 @@ export class UsuariosService {
       usuario.correo = correo;
     }
     if (dto.password !== undefined) usuario.password_hash = await bcrypt.hash(dto.password, 10);
+
     try {
-      await this.usuarios.save(usuario);
-      return this.findOne(id);
+      return await this.dataSource.transaction(async (manager) => {
+        const usuarios = manager.getRepository(Usuario);
+        await usuarios.save(usuario);
+        const resultado = await usuarios.findOne({
+          where: { id, eliminado_en: IsNull() },
+        });
+        if (!resultado) throw new NotFoundException('Usuario no encontrado');
+        const datosDespues = {
+          nombre_completo: resultado.nombre_completo,
+          correo: resultado.correo,
+          rol_id: resultado.rol_id,
+        };
+
+        if (cambioRol) {
+          await this.auditoriaService.registrar({
+            usuarioId: actorId ? String(actorId) : null,
+            accion: 'CAMBIO_ROL',
+            entidad: 'USUARIO',
+            entidadId: id,
+            usuarioAfectadoId: id,
+            datosAntes: { rol_id: datosAntes.rol_id },
+            datosDespues: { rol_id: datosDespues.rol_id },
+          }, manager);
+        }
+
+        if (dto.nombre_completo !== undefined || dto.correo !== undefined || dto.password !== undefined) {
+          await this.auditoriaService.registrar({
+            usuarioId: actorId ? String(actorId) : null,
+            accion: 'MODIFICACION_USUARIO',
+            entidad: 'USUARIO',
+            entidadId: id,
+            usuarioAfectadoId: id,
+            datosAntes,
+            datosDespues,
+          }, manager);
+        }
+
+        return resultado;
+      });
     } catch (error) {
       this.verificarCorreoDuplicado(error);
     }
   }
 
-  async changeStatus(id: string, activo: boolean): Promise<Usuario> {
+  async changeStatus(id: string, activo: boolean, actorId?: number): Promise<Usuario> {
     if (typeof activo !== 'boolean') throw new BadRequestException('activo debe ser booleano');
     const usuario = await this.findOne(id);
-    usuario.activo = activo;
-    await this.usuarios.save(usuario);
-    return this.findOne(id);
+    const estadoAntes = usuario.activo;
+
+    return this.dataSource.transaction(async (manager) => {
+      const usuarios = manager.getRepository(Usuario);
+      usuario.activo = activo;
+      await usuarios.save(usuario);
+      const actualizado = await usuarios.findOne({
+        where: { id, eliminado_en: IsNull() },
+      });
+      if (!actualizado) throw new NotFoundException('Usuario no encontrado');
+
+      await this.auditoriaService.registrar({
+        usuarioId: actorId ? String(actorId) : null,
+        accion: 'CAMBIO_ESTADO',
+        entidad: 'USUARIO',
+        entidadId: id,
+        usuarioAfectadoId: id,
+        datosAntes: { activo: estadoAntes },
+        datosDespues: { activo: actualizado.activo },
+      }, manager);
+
+      return actualizado;
+    });
   }
 
-  async softDelete(id: string): Promise<void> {
+  async softDelete(id: string, actorId?: number): Promise<void> {
     const usuario = await this.findOne(id);
-    usuario.eliminado_en = new Date();
-    usuario.activo = false;
-    await this.usuarios.save(usuario);
+    const fechaBaja = new Date();
+    const estadoAntes = usuario.activo; 
+
+    await this.dataSource.transaction(async (manager) => {
+      const usuarios = manager.getRepository(Usuario);
+      usuario.eliminado_en = fechaBaja;
+      usuario.activo = false;
+      await usuarios.save(usuario);
+
+      await this.auditoriaService.registrar({
+        usuarioId: actorId ? String(actorId) : null,
+        accion: 'ELIMINACION_LOGICA',
+        entidad: 'USUARIO',
+        entidadId: id,
+        usuarioAfectadoId: id,
+        datosAntes: { activo: estadoAntes, eliminado_en: null },
+        datosDespues: { activo: false, eliminado_en: fechaBaja },
+      }, manager);
+    });
   }
 }
