@@ -1,39 +1,33 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import {
+  actualizarUsuario,
+  cambiarEstadoUsuario,
+  crearUsuario,
+  darDeBajaUsuario,
+  listarRolesActivos,
+  listarUsuarios,
+} from "../services/usuarios";
 import "../styles/UsuarioPage.css";
 
-const usuariosIniciales = [
-  {
-    id: 1,
-    nombre: "Juan Pérez",
-    correo: "juan.perez@gmail.com",
-    rol: "Encargado de Producción",
-    estado: "Activo",
-  },
-  {
-    id: 2,
-    nombre: "María López",
-    correo: "maria.lopez@gmail.com",
-    rol: "Encargado de Logística",
-    estado: "Activo",
-  },
-  {
-    id: 3,
-    nombre: "Carlos Ruiz",
-    correo: "carlos.ruiz@gmail.com",
-    rol: "Supervisor",
-    estado: "Inactivo",
-  },
-];
-
-const roles = [
-  "Administrador",
-  "Encargado de Producción",
-  "Encargado de Logística",
-  "Supervisor",
-];
+function prepararUsuario(usuario, roles) {
+  const rolId = String(usuario.rol_id);
+  return {
+    id: String(usuario.id),
+    nombre: usuario.nombre_completo,
+    correo: usuario.correo,
+    rol_id: rolId,
+    rol: roles.find((rol) => String(rol.id) === rolId)?.nombre ?? "Rol inactivo o no disponible",
+    estado: usuario.activo ? "Activo" : "Inactivo",
+  };
+}
 
 function UsuarioPage() {
-  const [usuarios, setUsuarios] = useState(usuariosIniciales);
+  const [usuarios, setUsuarios] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState("");
+  const [intento, setIntento] = useState(0);
+  const [guardando, setGuardando] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Todos");
@@ -46,6 +40,7 @@ function UsuarioPage() {
   const [accionPendiente, setAccionPendiente] = useState(null);
 
   const [mensaje, setMensaje] = useState("");
+  const [mensajeError, setMensajeError] = useState(false);
 
   const [formulario, setFormulario] = useState({
     nombre: "",
@@ -54,7 +49,27 @@ function UsuarioPage() {
     rol: "",
   });
 
-  // Filtrar usuarios
+  useEffect(() => {
+    const controller = new AbortController();
+    setCargando(true);
+    setErrorCarga("");
+    Promise.all([
+      listarUsuarios(controller.signal),
+      listarRolesActivos(controller.signal),
+    ])
+      .then(([datosUsuarios, datosRoles]) => {
+        setRoles(datosRoles);
+        setUsuarios(datosUsuarios.map((usuario) => prepararUsuario(usuario, datosRoles)));
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") setErrorCarga(error.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCargando(false);
+      });
+    return () => controller.abort();
+  }, [intento]);
+
   const usuariosFiltrados = usuarios.filter((usuario) => {
     const coincideBusqueda =
       usuario.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
@@ -66,7 +81,6 @@ function UsuarioPage() {
     return coincideBusqueda && coincideEstado;
   });
 
-  // Abrir modal para crear
   const abrirCrear = () => {
     setModoEdicion(false);
     setUsuarioSeleccionado(null);
@@ -81,7 +95,6 @@ function UsuarioPage() {
     setMostrarModal(true);
   };
 
-  // Abrir modal para editar
   const abrirEditar = (usuario) => {
     setModoEdicion(true);
     setUsuarioSeleccionado(usuario);
@@ -90,13 +103,12 @@ function UsuarioPage() {
       nombre: usuario.nombre,
       correo: usuario.correo,
       contraseña: "",
-      rol: usuario.rol,
+      rol: usuario.rol_id,
     });
 
     setMostrarModal(true);
   };
 
-  // Cambiar valores del formulario
   const manejarCambio = (e) => {
     const { name, value } = e.target;
 
@@ -106,111 +118,79 @@ function UsuarioPage() {
     });
   };
 
-  // Guardar usuario
-  const guardarUsuario = (e) => {
+  const guardarUsuario = async (e) => {
     e.preventDefault();
 
-    // Validación básica
-    if (!formulario.nombre || !formulario.correo || !formulario.rol) {
-      mostrarMensaje("Completa todos los campos obligatorios.");
+    if (guardando) return;
+    if (!formulario.nombre.trim() || !formulario.correo.trim() || !formulario.rol) {
+      mostrarMensaje("Completa todos los campos obligatorios.", true);
+      return;
+    }
+    if (!roles.some((rol) => String(rol.id) === formulario.rol)) {
+      mostrarMensaje("Selecciona un rol activo.", true);
+      return;
+    }
+    if (!modoEdicion && formulario.contraseña.length < 6) {
+      mostrarMensaje("La contraseña inicial debe tener al menos 6 caracteres.", true);
       return;
     }
 
-    // Comprobar correo duplicado
-    const correoExiste = usuarios.some(
-      (usuario) =>
-        usuario.correo.toLowerCase() === formulario.correo.toLowerCase() &&
-        (!modoEdicion || usuario.id !== usuarioSeleccionado.id)
-    );
+    const datos = {
+      nombre_completo: formulario.nombre.trim(),
+      correo: formulario.correo.trim(),
+      rol_id: Number(formulario.rol),
+      ...(!modoEdicion ? { password: formulario.contraseña } : {}),
+    };
 
-    if (correoExiste) {
-      mostrarMensaje("Ya existe un usuario con este correo.");
-      return;
+    setGuardando(true);
+    try {
+      const guardado = modoEdicion
+        ? await actualizarUsuario(usuarioSeleccionado.id, datos)
+        : await crearUsuario(datos);
+      const usuario = prepararUsuario(guardado, roles);
+      setUsuarios((actuales) => modoEdicion
+        ? actuales.map((item) => item.id === usuario.id ? usuario : item)
+        : [...actuales, usuario]);
+      setMostrarModal(false);
+      mostrarMensaje(modoEdicion ? "Usuario actualizado correctamente." : "Usuario creado correctamente.");
+    } catch (error) {
+      mostrarMensaje(error.message || "No se pudo guardar el usuario.", true);
+    } finally {
+      setGuardando(false);
     }
-
-    if (modoEdicion) {
-      setUsuarios(
-        usuarios.map((usuario) =>
-          usuario.id === usuarioSeleccionado.id
-            ? {
-                ...usuario,
-                nombre: formulario.nombre,
-                correo: formulario.correo,
-                rol: formulario.rol,
-              }
-            : usuario
-        )
-      );
-
-      mostrarMensaje("Usuario actualizado correctamente.");
-    } else {
-      if (!formulario.contraseña) {
-        mostrarMensaje("Ingresa una contraseña inicial.");
-        return;
-      }
-
-      const nuevoUsuario = {
-        id: Date.now(),
-        nombre: formulario.nombre,
-        correo: formulario.correo,
-        rol: formulario.rol,
-        estado: "Activo",
-      };
-
-      setUsuarios([...usuarios, nuevoUsuario]);
-
-      mostrarMensaje("Usuario creado correctamente.");
-    }
-
-    setMostrarModal(false);
   };
 
-  // Preparar activar/desactivar/baja
   const prepararAccion = (usuario, accion) => {
     setUsuarioSeleccionado(usuario);
     setAccionPendiente(accion);
     setMostrarConfirmacion(true);
   };
 
-  // Ejecutar acción
-  const ejecutarAccion = () => {
-    if (!usuarioSeleccionado || !accionPendiente) return;
-
-    let nuevoEstado = usuarioSeleccionado.estado;
-    let mensajeAccion = "";
-
-    if (accionPendiente === "activar") {
-      nuevoEstado = "Activo";
-      mensajeAccion = "Usuario activado correctamente.";
+  const ejecutarAccion = async () => {
+    if (!usuarioSeleccionado || !accionPendiente || guardando) return;
+    setGuardando(true);
+    try {
+      if (accionPendiente === "baja") {
+        await darDeBajaUsuario(usuarioSeleccionado.id);
+        setUsuarios((actuales) => actuales.filter((item) => item.id !== usuarioSeleccionado.id));
+      } else {
+        const actualizado = await cambiarEstadoUsuario(usuarioSeleccionado.id, accionPendiente === "activar");
+        const usuario = prepararUsuario(actualizado, roles);
+        setUsuarios((actuales) => actuales.map((item) => item.id === usuario.id ? usuario : item));
+      }
+      setMostrarConfirmacion(false);
+      setAccionPendiente(null);
+      mostrarMensaje("Cambio guardado correctamente.");
+    } catch (error) {
+      mostrarMensaje(error.message || "No se pudo actualizar el usuario.", true);
+    } finally {
+      setGuardando(false);
     }
-
-    if (accionPendiente === "desactivar") {
-      nuevoEstado = "Inactivo";
-      mensajeAccion = "Usuario desactivado correctamente.";
-    }
-
-    if (accionPendiente === "baja") {
-      nuevoEstado = "Dado de baja";
-      mensajeAccion = "Usuario dado de baja correctamente.";
-    }
-
-    setUsuarios(
-      usuarios.map((usuario) =>
-        usuario.id === usuarioSeleccionado.id
-          ? { ...usuario, estado: nuevoEstado }
-          : usuario
-      )
-    );
-
-    setMostrarConfirmacion(false);
-    setAccionPendiente(null);
-
-    mostrarMensaje(mensajeAccion);
   };
 
-  // Mensajes temporales
-  const mostrarMensaje = (texto) => {
+  const mostrarMensaje = (texto, esError = false) => {
     setMensaje(texto);
+    setMensajeError(esError);
 
     setTimeout(() => {
       setMensaje("");
@@ -232,7 +212,6 @@ function UsuarioPage() {
   return (
     <div className="usuarios-container">
 
-      {/* ENCABEZADO */}
       <div className="usuarios-header">
         <div>
           <h1>Usuarios</h1>
@@ -241,12 +220,18 @@ function UsuarioPage() {
           </p>
         </div>
 
-        <button className="btn-nuevo" onClick={abrirCrear}>
+        <button className="btn-nuevo" onClick={abrirCrear} disabled={cargando || !!errorCarga || roles.length === 0}>
           + Nuevo usuario
         </button>
       </div>
 
-      {/* FILTROS */}
+      {cargando && <p role="status">Cargando usuarios y roles…</p>}
+      {errorCarga && <div className="usuarios-error" role="alert">
+        <p>No se pudieron cargar los usuarios o los roles: {errorCarga}</p>
+        <button type="button" onClick={() => setIntento((actual) => actual + 1)}>Reintentar</button>
+      </div>}
+      {!cargando && !errorCarga && roles.length === 0 && <p role="alert">No hay roles activos disponibles para asignar.</p>}
+
       <div className="usuarios-filtros">
 
         <div className="buscador">
@@ -270,13 +255,11 @@ function UsuarioPage() {
             <option value="Todos">Todos</option>
             <option value="Activo">Activos</option>
             <option value="Inactivo">Inactivos</option>
-            <option value="Dado de baja">Dados de baja</option>
           </select>
         </div>
 
       </div>
 
-      {/* TABLA */}
       <div className="tabla-container">
         <table className="usuarios-tabla">
 
@@ -291,7 +274,7 @@ function UsuarioPage() {
           </thead>
 
           <tbody>
-            {usuariosFiltrados.length > 0 ? (
+            {!cargando && !errorCarga && usuariosFiltrados.length > 0 ? (
               usuariosFiltrados.map((usuario) => (
                 <tr key={usuario.id}>
 
@@ -368,19 +351,18 @@ function UsuarioPage() {
 
                 </tr>
               ))
-            ) : (
+            ) : !cargando && !errorCarga ? (
               <tr>
                 <td colSpan="5" className="sin-resultados">
                   No se encontraron usuarios.
                 </td>
               </tr>
-            )}
+            ) : null}
           </tbody>
 
         </table>
       </div>
 
-      {/* MODAL CREAR / EDITAR */}
       {mostrarModal && (
         <div className="modal-overlay">
 
@@ -467,9 +449,12 @@ function UsuarioPage() {
                 >
                   <option value="">Seleccionar rol</option>
 
+                  {modoEdicion && !roles.some((rol) => String(rol.id) === formulario.rol) && formulario.rol && (
+                    <option value={formulario.rol} disabled>Rol actual inactivo: selecciona otro</option>
+                  )}
                   {roles.map((rol) => (
-                    <option key={rol} value={rol}>
-                      {rol}
+                    <option key={rol.id} value={String(rol.id)}>
+                      {rol.nombre}
                     </option>
                   ))}
                 </select>
@@ -485,7 +470,7 @@ function UsuarioPage() {
                   Cancelar
                 </button>
 
-                <button type="submit" className="btn-guardar">
+                <button type="submit" className="btn-guardar" disabled={guardando}>
                   {modoEdicion
                     ? "Guardar cambios"
                     : "Crear usuario"}
@@ -500,7 +485,6 @@ function UsuarioPage() {
         </div>
       )}
 
-      {/* MODAL CONFIRMACIÓN */}
       {mostrarConfirmacion && usuarioSeleccionado && (
         <div className="modal-overlay">
 
@@ -543,6 +527,7 @@ function UsuarioPage() {
                     : "btn-confirmar-danger"
                 }
                 onClick={ejecutarAccion}
+                disabled={guardando}
               >
                 {accionPendiente === "activar"
                   ? "Activar"
@@ -558,10 +543,9 @@ function UsuarioPage() {
         </div>
       )}
 
-      {/* MENSAJE */}
       {mensaje && (
-        <div className="mensaje-exito">
-          <span>✓</span>
+        <div className={mensajeError ? "mensaje-exito mensaje-error" : "mensaje-exito"} role="alert">
+          <span>{mensajeError ? "!" : "✓"}</span>
           {mensaje}
         </div>
       )}

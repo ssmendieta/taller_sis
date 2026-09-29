@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Auditoria } from './entities/auditoria.entity';
@@ -22,6 +22,29 @@ export class AuditoriaService {
     @InjectRepository(Auditoria)
     private readonly repo: Repository<Auditoria>,
   ) {}
+
+  // Lectura con nombres para la pantalla que aún consume el listado completo.
+  findAll() {
+    return this.repo.createQueryBuilder('a')
+      .leftJoin('usuarios', 'actor', 'actor.id = a.usuario_actor_id')
+      .leftJoin('usuarios', 'afectado', 'afectado.id = a.usuario_afectado_id')
+      .select([
+        'a.id AS id', 'a.usuario_actor_id AS usuario_actor_id',
+        'a.accion AS accion', 'a.entidad AS entidad', 'a.entidad_id AS entidad_id',
+        'a.usuario_afectado_id AS usuario_afectado_id', 'a.fecha_hora AS fecha_hora',
+        'actor.nombre_completo AS usuario_actor_nombre',
+        'afectado.nombre_completo AS usuario_afectado_nombre',
+      ])
+      .orderBy('a.fecha_hora', 'DESC')
+      .addOrderBy('a.id', 'DESC')
+      .getRawMany();
+  }
+
+  async findOne(id: string): Promise<Auditoria> {
+    const registro = await this.repo.findOneBy({ id });
+    if (!registro) throw new NotFoundException('Registro de auditoría no encontrado');
+    return registro;
+  }
 
   async consultar(query: QueryAuditoriaDto) {
     const fechaHasta =

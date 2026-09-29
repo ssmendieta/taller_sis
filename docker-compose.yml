@@ -72,6 +72,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_DATABASE=${DB_PRODUCCION_DATABASE:-produccion_db}
       - SKIP_DB=${SKIP_DB:-false}
+      - AUTH_SERVICE_URL=http://auth-service:3001
     depends_on:
       postgres:
         condition: service_healthy

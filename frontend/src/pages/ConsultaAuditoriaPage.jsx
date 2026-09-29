@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { obtenerAuditoria } from "../services/api.js";
+import { diaAuditoria, filtrarAuditoria, nombreUsuarioAuditoria, paginaAuditoria } from "../services/auditoriaFiltros.js";
 import "../styles/consulta-auditoria.css";
 
 const TAMANO_PAGINA = 8;
@@ -18,23 +19,17 @@ const auditoriaEjemplo = [
 ];
 
 function nombreUsuario(registro, tipo) {
-  const id = registro[`usuario_${tipo}_id`];
-  const nombre = registro[`usuario_${tipo}_nombre`] ?? registro[`usuario_${tipo}`]?.nombre_completo;
-  return nombre ?? (id != null ? `Usuario #${id}` : tipo === "actor" ? "Sistema" : "—");
+  return nombreUsuarioAuditoria(registro, tipo);
 }
 
 function fechaRegistro(valor) {
   if (!valor) return { fecha: "—", hora: "—", orden: "" };
   const fecha = new Date(valor);
   if (Number.isNaN(fecha.getTime())) return { fecha: "—", hora: "—", orden: "" };
-  const partes = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/La_Paz", year: "numeric", month: "2-digit", day: "2-digit",
-  }).formatToParts(fecha);
-  const campo = (tipo) => partes.find((parte) => parte.type === tipo)?.value;
   return {
     fecha: new Intl.DateTimeFormat("es-BO", { timeZone: "America/La_Paz", day: "2-digit", month: "2-digit", year: "numeric" }).format(fecha),
     hora: new Intl.DateTimeFormat("es-BO", { timeZone: "America/La_Paz", hour: "2-digit", minute: "2-digit", hour12: false }).format(fecha),
-    orden: `${campo("year")}-${campo("month")}-${campo("day")}`,
+    orden: diaAuditoria(valor),
   };
 }
 
@@ -62,15 +57,9 @@ export default function ConsultaAuditoriaPage() {
   }, [intento]);
 
   const acciones = [...new Set(registros.map((registro) => registro.accion).filter(Boolean))].sort();
-  const filtrados = registros.filter((registro) => {
-    const fecha = fechaRegistro(registro.fecha_hora).orden;
-    const texto = `${nombreUsuario(registro, "actor")} ${nombreUsuario(registro, "afectado")}`.toLocaleLowerCase("es-BO");
-    return texto.includes(usuario.toLocaleLowerCase("es-BO")) &&
-      (!accion || registro.accion === accion) &&
-      (!desde || fecha >= desde) && (!hasta || fecha <= hasta);
-  }).sort((a, b) => (new Date(b.fecha_hora).getTime() || 0) - (new Date(a.fecha_hora).getTime() || 0));
+  const filtrados = filtrarAuditoria(registros, { usuario, accion, desde, hasta });
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / TAMANO_PAGINA));
-  const visibles = filtrados.slice((pagina - 1) * TAMANO_PAGINA, pagina * TAMANO_PAGINA);
+  const visibles = paginaAuditoria(filtrados, pagina, TAMANO_PAGINA);
   const actualizar = (setter) => (evento) => { setter(evento.target.value); setPagina(1); };
 
   return (

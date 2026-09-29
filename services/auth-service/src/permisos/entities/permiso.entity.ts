@@ -9,10 +9,10 @@ export class Permisos {
     })
     id!: string;
 
-    @Column('varchar', {length: 80, unique: true})
+    @Column('varchar', {length: 120, unique: true})
     codigo!: string;
 
-    @Column('varchar', {length: 80, unique: true})
+    @Column('varchar', {length: 120})
     nombre!: string;
 
     @Column('varchar', {length: 255, nullable: true})
@@ -24,7 +24,7 @@ export class Permisos {
     @Column('timestamptz', {default: () => 'NOW()'})
     creado_en!: Date;
 
-    @ManyToMany('Rol', (rol: any) => rol.permisos)
+    @ManyToMany(() => Rol, (rol) => rol.permisos)
     roles!: Rol[];
 
 }

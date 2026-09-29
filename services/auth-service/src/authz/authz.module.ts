@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Rol } from '../roles/entities/role.entity';
+import { Usuario } from '../usuarios/entities/usuario.entity';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PermisosGuard } from './permisos.guard';
@@ -27,7 +28,7 @@ import { PermisosGuard } from './permisos.guard';
 // 'ordenes.cambiar_estado' con el endpoint de ABC-148 es una tarea aparte
 // de coordinación entre servicios.
 @Module({
-  imports: [TypeOrmModule.forFeature([Rol])],
+  imports: [TypeOrmModule.forFeature([Rol, Usuario])],
   providers: [JwtStrategy, JwtAuthGuard, PermisosGuard],
   exports: [JwtAuthGuard, PermisosGuard],
 })

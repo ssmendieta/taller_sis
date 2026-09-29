@@ -1,39 +1,31 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { AvancesProduccionController } from './avances_produccion.controller';
 import { AvancesProduccionService } from './avances_produccion.service';
-import { CreateAvancesProduccionDto } from './dto/create-avances_produccion.dto';
 
 describe('AvancesProduccionController', () => {
-  let controller: AvancesProduccionController;
-  const create = jest.fn();
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [AvancesProduccionController],
-      providers: [
-        {
-          provide: AvancesProduccionService,
-          useValue: { create },
-        },
-      ],
-    }).compile();
-
-    controller = module.get<AvancesProduccionController>(AvancesProduccionController);
+  it('ofrece el registro y lectura de avances, sin borrarlos ni editarlos', async () => {
+    const servicio = { create: jest.fn().mockResolvedValue({ id: '1' }) };
+    const controller = new AvancesProduccionController(servicio as unknown as AvancesProduccionService);
+    expect(Object.getOwnPropertyNames(AvancesProduccionController.prototype).sort())
+      .toEqual(['constructor', 'create', 'findAll', 'findOne'].sort());
+    const usuarioAutenticado = { sub: 7, rolNombre: 'Encargado de Producción' };
+    await expect(
+      controller.create({ orden_id: 1, cantidad_producida: 2 }, { usuarioAutenticado }),
+    ).resolves.toEqual({ id: '1' });
+    expect(servicio.create).toHaveBeenCalledWith(
+      { orden_id: 1, cantidad_producida: 2 },
+      usuarioAutenticado,
+    );
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
+  it('POST /avances-produccion pasa el DTO y la identidad autenticada al servicio', async () => {
+    const create = jest.fn().mockResolvedValue({ id: '71' });
+    const controller = new AvancesProduccionController({ create } as unknown as AvancesProduccionService);
+    const dto = { orden_id: 42, cantidad_producida: 2.5 };
+    const usuarioAutenticado = { sub: 9, rolNombre: 'Encargado de Producción' };
 
-  it('POST /avances-produccion pasa solamente los datos del avance al servicio', () => {
-    const dto: CreateAvancesProduccionDto = {
-      orden_id: 42,
-      cantidad_producida: 2.5,
-    };
+    await controller.create(dto, { usuarioAutenticado });
 
-    controller.create(dto);
-
-    expect(create).toHaveBeenCalledWith(dto);
+    expect(create).toHaveBeenCalledWith(dto, usuarioAutenticado);
     expect(create).toHaveBeenCalledTimes(1);
   });
 });

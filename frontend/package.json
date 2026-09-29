@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --port 5173",
     "build": "vite build",
+    "test:session": "node --test scripts/sesion.test.mjs",
+    "test:audit": "node --test scripts/auditoria.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {

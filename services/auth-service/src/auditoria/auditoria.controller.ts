@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../authz/jwt-auth.guard';
 import { PermisosGuard } from '../authz/permisos.guard';
 import { RequierePermiso } from '../authz/requiere-permiso.decorator';
@@ -14,5 +14,16 @@ export class AuditoriaController {
   @Get()
   consultar(@Query() query: QueryAuditoriaDto) {
     return this.auditoriaService.consultar(query);
+  }
+
+  // La pantalla actual filtra localmente y necesita el listado con nombres.
+  @Get('listado')
+  findAll() {
+    return this.auditoriaService.findAll();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.auditoriaService.findOne(id);
   }
 }
