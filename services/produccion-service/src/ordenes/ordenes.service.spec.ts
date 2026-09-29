@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { OrdenesService } from './ordenes.service';
 import { EstadoOrden } from './estado-orden.enum';
@@ -252,28 +253,164 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
 
     await service.cambiarEstado(1, {
       nuevoEstado: EstadoOrden.FINALIZADA,
-      usuarioResponsableId: 7,
-    });
+      usuarioResponsableId: 999,
+    }, usuarioProduccion);
 
     const ordenGuardada = managerSave.mock.calls[0][1];
     expect(ordenGuardada.finalizada_en).toBeInstanceOf(Date);
+    expect(managerCreate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ usuarioResponsableId: 27 }),
+    );
   });
 
-  it('marca cancelada_en al pasar a CANCELADA y guarda motivo null si no se envía', async () => {
+  it('cancela desde PENDIENTE con motivo y registra fecha y responsable autenticado', async () => {
     findOne.mockResolvedValue(ordenBase('PENDIENTE'));
     managerFindOne.mockResolvedValue({});
 
     await service.cambiarEstado(1, {
       nuevoEstado: EstadoOrden.CANCELADA,
-      usuarioResponsableId: 7,
-    });
+      motivo: '  Falta de insumos  ',
+      usuarioResponsableId: 999,
+    }, usuarioProduccion);
 
     const ordenGuardada = managerSave.mock.calls[0][1];
     expect(ordenGuardada.cancelada_en).toBeInstanceOf(Date);
     expect(managerCreate).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ motivo: null }),
+      expect.objectContaining({
+        usuarioResponsableId: 27,
+        motivo: 'Falta de insumos',
+      }),
     );
+  });
+
+  it.each([EstadoOrden.PENDIENTE, EstadoOrden.PLANIFICADA])(
+    'rechaza finalizar desde %s usando la matriz existente', async (estado) => {
+      findOne.mockResolvedValue(ordenBase(estado));
+
+      await expect(
+        service.cambiarEstado(
+          1,
+          { nuevoEstado: EstadoOrden.FINALIZADA, usuarioResponsableId: 999 },
+          usuarioProduccion,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([EstadoOrden.PENDIENTE, EstadoOrden.PLANIFICADA, EstadoOrden.EN_PRODUCCION])(
+    'permite cancelar desde %s con motivo', async (estado) => {
+      findOne.mockResolvedValue(ordenBase(estado));
+      managerFindOne.mockResolvedValue({});
+
+      await service.cambiarEstado(
+        1,
+        {
+          nuevoEstado: EstadoOrden.CANCELADA,
+          motivo: 'Cancelación solicitada',
+          usuarioResponsableId: 999,
+        },
+        usuarioProduccion,
+      );
+
+      expect(managerSave.mock.calls[0][1].cancelada_en).toBeInstanceOf(Date);
+      expect(managerCreate).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          estadoAnterior: estado,
+          estadoNuevo: EstadoOrden.CANCELADA,
+          usuarioResponsableId: 27,
+          motivo: 'Cancelación solicitada',
+        }),
+      );
+    },
+  );
+
+  it.each([undefined, '', '   '])(
+    'rechaza cancelar con motivo ausente o vacío (%s)', async (motivo) => {
+      findOne.mockResolvedValue(ordenBase('PENDIENTE'));
+
+      await expect(
+        service.cambiarEstado(
+          1,
+          {
+            nuevoEstado: EstadoOrden.CANCELADA,
+            motivo,
+            usuarioResponsableId: 999,
+          },
+          usuarioProduccion,
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([EstadoOrden.FINALIZADA, EstadoOrden.CANCELADA])(
+    'no permite transiciones posteriores desde %s', async (estado) => {
+      findOne.mockResolvedValue(ordenBase(estado));
+
+      await expect(
+        service.cambiarEstado(1, {
+          nuevoEstado: EstadoOrden.PLANIFICADA,
+          usuarioResponsableId: 7,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('requiere la identidad ABC-151 y el rol correcto para cerrar una orden', async () => {
+    await expect(
+      service.cambiarEstado(1, {
+        nuevoEstado: EstadoOrden.FINALIZADA,
+        usuarioResponsableId: 7,
+      }),
+    ).rejects.toThrow(/identidad validada de ABC-151/);
+
+    await expect(
+      service.cambiarEstado(
+        1,
+        {
+          nuevoEstado: EstadoOrden.CANCELADA,
+          motivo: 'Motivo válido',
+          usuarioResponsableId: 7,
+        },
+        { sub: 27, rolNombre: 'Supervisor' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza finalizar una orden con rol Supervisor', async () => {
+    await expect(
+      service.cambiarEstado(
+        1,
+        {
+          nuevoEstado: EstadoOrden.FINALIZADA,
+          usuarioResponsableId: 7,
+        },
+        { sub: 27, rolNombre: 'Supervisor' },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('responde 503 al cancelar una orden sin identidad autenticada', async () => {
+    await expect(
+      service.cambiarEstado(1, {
+        nuevoEstado: EstadoOrden.CANCELADA,
+        motivo: 'Motivo válido',
+        usuarioResponsableId: 7,
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+
+    expect(transaction).not.toHaveBeenCalled();
   });
 
   it('rechaza con 400 una transición inválida sin tocar la BD', async () => {
@@ -283,7 +420,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       service.cambiarEstado(1, {
         nuevoEstado: EstadoOrden.FINALIZADA,
         usuarioResponsableId: 7,
-      }),
+      }, usuarioProduccion),
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(transaction).not.toHaveBeenCalled();
@@ -323,8 +460,8 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     await service.cambiarEstado(1, {
       nuevoEstado: EstadoOrden.FINALIZADA,
       motivo: 'Lote completo',
-      usuarioResponsableId: 7,
-    });
+      usuarioResponsableId: 999,
+    }, usuarioProduccion);
 
     // El 1er save es la orden, el 2do es la única fila de historial.
     expect(managerSave).toHaveBeenCalledTimes(2);
@@ -335,7 +472,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
         ordenId: 1,
         estadoAnterior: EstadoOrden.EN_PRODUCCION,
         estadoNuevo: EstadoOrden.FINALIZADA,
-        usuarioResponsableId: 7,
+        usuarioResponsableId: 27,
         motivo: 'Lote completo',
       },
     );
