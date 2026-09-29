@@ -4,6 +4,7 @@ import LoginPage from "../pages/LoginPage.jsx";
 import ProduccionPage from "../pages/ProduccionPage.jsx";
 import ConsultaOrdenesPage from "../pages/ConsultaOrdenesPage.jsx";
 import ConsultaAuditoriaPage from "../pages/ConsultaAuditoriaPage.jsx";
+import OrdenesPage from "../pages/OrdenesPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
 import RecetasPage from "../pages/RecetasPage.jsx";
@@ -23,6 +24,7 @@ export default function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/produccion" element={privada(<ProduccionPage />, PRODUCCION)} />
       <Route path="/produccion/ordenes" element={privada(<ConsultaOrdenesPage />, CONSULTA_ORDENES)} />
+      <Route path="/produccion/avances" element={privada(<OrdenesPage />, PRODUCCION)} />
       <Route path="/auditoria" element={privada(<ConsultaAuditoriaPage />, ADMINISTRADOR)} />
       <Route path="/recetas" element={privada(<RecetasPage />, PRODUCCION)} />
       <Route path="/logistica" element={<LogisticaPage />} />

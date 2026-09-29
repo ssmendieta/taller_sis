@@ -68,6 +68,19 @@ export class OrdenesService {
     return orden;
   }
 
+  // Detalle de una orden por id (ABC-187, aporte de ramagemina).
+  async obtenerDetalle(id: number): Promise<OrdenProduccion> {
+    const orden = await this.ordenRepository.findOne({
+      where: { id },
+    });
+
+    if (!orden) {
+      throw new NotFoundException(`Orden con id ${id} no encontrada`);
+    }
+
+    return orden;
+  }
+
   async obtenerMateriales(id: number) {
     const resultado = await this.ordenRepository.query(`
       SELECT

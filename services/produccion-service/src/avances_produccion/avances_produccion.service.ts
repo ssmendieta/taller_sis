@@ -164,4 +164,33 @@ export class AvancesProduccionService {
     if (!avance) throw new NotFoundException('Avance no encontrado');
     return avance;
   }
+
+  // Avances de una orden (aporte de ramagemina, ABC-195/ABC-196).
+  listarPorOrden(ordenId: number) {
+    return this.ordenRepository.manager.query(
+      `
+      SELECT id::text AS id, orden_id::text AS orden_id,
+             cantidad_producida::text AS cantidad_producida, fecha_hora,
+             usuario_responsable_id::text AS usuario_responsable_id
+      FROM avances_produccion
+      WHERE orden_id = $1
+      ORDER BY fecha_hora DESC, id DESC
+    `,
+      [ordenId],
+    );
+  }
+
+  // Total producido de una orden (aporte de ramagemina, ABC-195/ABC-196).
+  async totalProducido(ordenId: number) {
+    const [fila] = (await this.ordenRepository.manager.query(
+      `
+      SELECT COALESCE(SUM(cantidad_producida), 0) AS total
+      FROM avances_produccion
+      WHERE orden_id = $1
+    `,
+      [ordenId],
+    )) as Array<{ total: string | number }>;
+
+    return Number(fila?.total ?? 0);
+  }
 }

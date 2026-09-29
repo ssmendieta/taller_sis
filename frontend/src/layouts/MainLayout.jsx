@@ -13,6 +13,7 @@ const iconos = {
   auditoria: <><path d="M5 3h14v18H5zM9 8h6m-6 4h6m-6 4h3" /></>,
   roles: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4l5 5m0-5l-5 5" /></>,
   usuarios: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8a3 3 0 1 1 2 5M21 20c0-2.8-1.9-5.1-4.5-5.8" /></>,
+  avances: <><path d="M4 19h16" /><path d="M7 16V9m5 7V5m5 11v-6" /></>,
 };
 
 function IconoNavegacion({ nombre }) {
@@ -38,6 +39,7 @@ export default function MainLayout({ children }) {
           {esProduccion && <Link className={isActive("/produccion")} to="/produccion"><IconoNavegacion nombre="produccion" />Producción</Link>}
           {(esSupervisor || esProduccion) && <Link className={isActive("/produccion/ordenes")} to="/produccion/ordenes"><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
           {esProduccion && <Link className={isActive("/ordenes")} to="/ordenes"><IconoNavegacion nombre="ordenes" />Nueva orden</Link>}
+          {esProduccion && <Link className={isActive("/produccion/avances")} to="/produccion/avances"><IconoNavegacion nombre="avances" />Avances</Link>}
           {esProduccion && <Link className={isActive("/recetas")} to="/recetas"><IconoNavegacion nombre="recetas" />Recetas</Link>}
           {esAdministrador && <Link className={isActive("/roles")} to="/roles"><IconoNavegacion nombre="roles" />Roles</Link>}
           {esAdministrador && <Link className={isActive("/usuarios")} to="/usuarios"><IconoNavegacion nombre="usuarios" />Usuarios</Link>}

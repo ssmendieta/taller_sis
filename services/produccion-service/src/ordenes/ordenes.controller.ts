@@ -53,6 +53,13 @@ export class OrdenesController {
     return this.ordenesService.findByCodigo(codigo);
   }
 
+  // Detalle de una orden (ABC-187, aporte de ramagemina).
+  // Debe declararse despues de rutas literales como 'buscar'.
+  @Get(':id')
+  obtenerDetalle(@Param('id', ParseIntPipe) id: number) {
+    return this.ordenesService.obtenerDetalle(id);
+  }
+
   @Get(':id/disponibilidad-materiales')
   compararDisponibilidadMateriales(
     @Param('id', ParseIntPipe) id: number,
