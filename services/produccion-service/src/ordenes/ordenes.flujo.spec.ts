@@ -60,9 +60,7 @@ describe('ABC-170: flujo completo de estados de una orden', () => {
       nuevoEstado: estado,
       usuarioResponsableId: 7,
       motivo,
-    }, estado === EstadoOrden.EN_PRODUCCION
-      ? { sub: 7, rolNombre: 'Encargado de Producción' }
-      : undefined);
+    }, { sub: 7, rolNombre: 'Encargado de Producción' });
   }
 
   it('recorre PENDIENTE → PLANIFICADA → EN_PRODUCCION → FINALIZADA con historial', async () => {
