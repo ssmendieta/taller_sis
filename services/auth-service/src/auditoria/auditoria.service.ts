@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Auditoria } from './entities/auditoria.entity';
+import { QueryAuditoriaDto } from './dto/query-auditoria.dto';
 
 export interface RegistrarAuditoriaParams {
   usuarioId?: string | number | null;
@@ -21,6 +22,67 @@ export class AuditoriaService {
     @InjectRepository(Auditoria)
     private readonly repo: Repository<Auditoria>,
   ) {}
+
+  async consultar(query: QueryAuditoriaDto) {
+    const fechaHasta =
+      query.fechaHasta !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(query.fechaHasta)
+        ? `${query.fechaHasta}T23:59:59.999Z`
+        : query.fechaHasta;
+
+    if (
+      query.fechaDesde !== undefined &&
+      fechaHasta !== undefined &&
+      new Date(query.fechaDesde).getTime() > new Date(fechaHasta).getTime()
+    ) {
+      throw new BadRequestException('fechaDesde no puede ser posterior a fechaHasta');
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const qb = this.repo.createQueryBuilder('auditoria');
+
+    if (query.usuario_actor_id !== undefined) {
+      qb.andWhere('auditoria.usuario_actor_id = :usuario_actor_id', {
+        usuario_actor_id: query.usuario_actor_id,
+      });
+    }
+    if (query.accion !== undefined) {
+      qb.andWhere('auditoria.accion = :accion', { accion: query.accion });
+    }
+    if (query.entidad !== undefined) {
+      qb.andWhere('auditoria.entidad = :entidad', { entidad: query.entidad });
+    }
+    if (query.entidad_id !== undefined) {
+      qb.andWhere('auditoria.entidad_id = :entidad_id', {
+        entidad_id: query.entidad_id,
+      });
+    }
+    if (query.fechaDesde !== undefined) {
+      qb.andWhere('auditoria.fecha_hora >= :fechaDesde', {
+        fechaDesde: query.fechaDesde,
+      });
+    }
+    if (query.fechaHasta !== undefined) {
+      qb.andWhere('auditoria.fecha_hora <= :fechaHasta', {
+        fechaHasta,
+      });
+    }
+
+    const [items, total] = await qb
+      .orderBy('auditoria.fecha_hora', 'DESC')
+      .addOrderBy('auditoria.id', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
 
   async registrar(
     params: RegistrarAuditoriaParams,
