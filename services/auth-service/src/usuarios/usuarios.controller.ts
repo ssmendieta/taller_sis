@@ -21,6 +21,8 @@ import { UsuariosService } from './usuarios.service';
 
 import { JwtAuthGuard } from '../authz/jwt-auth.guard';
 import { JwtPayload } from '../authz/jwt-payload.interface';
+import { PermisosGuard } from '../authz/permisos.guard';
+import { RequierePermiso } from '../authz/requiere-permiso.decorator';
 
 interface RequestWithUser extends Request {
   user?: JwtPayload;
@@ -35,7 +37,8 @@ interface RequestWithUser extends Request {
     transform: true,
   }),
 )
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermisosGuard)
+@RequierePermiso('usuarios.gestionar')
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 

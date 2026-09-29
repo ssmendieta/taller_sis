@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Auditoria } from './entities/auditoria.entity';
 
 export interface RegistrarAuditoriaParams {
@@ -22,9 +22,13 @@ export class AuditoriaService {
     private readonly repo: Repository<Auditoria>,
   ) {}
 
-  async registrar(params: RegistrarAuditoriaParams): Promise<Auditoria> {
+  async registrar(
+    params: RegistrarAuditoriaParams,
+    manager?: EntityManager,
+  ): Promise<Auditoria> {
     try {
-      const registro = this.repo.create({
+      const repo = manager?.getRepository(Auditoria) ?? this.repo;
+      const registro = repo.create({
         usuario_actor_id:
           params.usuarioId !== undefined && params.usuarioId !== null
             ? String(params.usuarioId)
@@ -48,7 +52,7 @@ export class AuditoriaService {
         datos_despues: params.datosDespues ?? null,
       });
 
-      return await this.repo.save(registro);
+      return await repo.save(registro);
     } catch (error) {
       this.logger.error(
         `Error registrando auditoría para acción ${params.accion}: ${

@@ -1,7 +1,7 @@
 import { describe, it, expect, jest } from '@jest/globals';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Rol } from '../roles/entities/role.entity';
 import { Usuario } from './entities/usuario.entity';
 import { UsuariosService } from './usuarios.service';
@@ -17,7 +17,7 @@ describe('UsuariosService', () => {
     ];
 
     const repoUsuarios = {
-      create: (datos: Partial<Usuario>) => datos as Usuario,
+      create: (datos: Partial<Usuario>) => ({ activo: true, eliminado_en: null, ...datos }) as Usuario,
       createQueryBuilder: () => ({
         where: (_sql: string, { correo }: { correo: string }) => ({
           getOne: async () => usuarios.find((usuario) => usuario.correo.toLowerCase() === correo) ?? null,
@@ -50,6 +50,20 @@ describe('UsuariosService', () => {
     const mockAuditoriaService = {
       registrar: jest.fn().mockImplementation(async () => {}),
     };
+    const dataSource = {
+      transaction: async (callback: (manager: any) => Promise<unknown>) => {
+        const snapshot = usuarios.map((usuario) => ({ ...usuario }));
+        const manager = {
+          getRepository: () => repoUsuarios,
+        };
+        try {
+          return await callback(manager);
+        } catch (error) {
+          usuarios.splice(0, usuarios.length, ...snapshot);
+          throw error;
+        }
+      },
+    };
 
     return {
       usuarios,
@@ -58,6 +72,7 @@ describe('UsuariosService', () => {
         repoUsuarios as unknown as Repository<Usuario>,
         repoRoles as unknown as Repository<Rol>,
         mockAuditoriaService as unknown as AuditoriaService,
+        dataSource as unknown as DataSource,
       ),
     };
   }
@@ -148,8 +163,19 @@ describe('UsuariosService', () => {
     expect(mockAuditoriaService.registrar).toHaveBeenCalledWith(expect.objectContaining({
       accion: 'CREACION_USUARIO',
       usuarioId: '42',
+      entidad: 'USUARIO',
+      entidadId: creado.id,
       usuarioAfectadoId: creado.id,
-    }));
+      datosAntes: null,
+      datosDespues: expect.objectContaining({
+        id: creado.id,
+        nombre_completo: datos.nombre_completo,
+        correo: datos.correo,
+        rol_id: '1',
+        activo: true,
+      }),
+    }), expect.anything());
+    expect(mockAuditoriaService.registrar).toHaveBeenCalledTimes(1);
   });
 
   it('ABC-164: audita la modificación de datos de un usuario', async () => {
@@ -162,8 +188,51 @@ describe('UsuariosService', () => {
     expect(mockAuditoriaService.registrar).toHaveBeenCalledWith(expect.objectContaining({
       accion: 'MODIFICACION_USUARIO',
       usuarioId: '42',
+      entidad: 'USUARIO',
+      entidadId: '1',
       usuarioAfectadoId: '1',
-    }));
+      datosAntes: expect.objectContaining({ nombre_completo: datos.nombre_completo }),
+      datosDespues: expect.objectContaining({ nombre_completo: 'Nuevo Nombre' }),
+    }), expect.anything());
+  });
+
+  it('ABC-164: audita el cambio de rol con los valores anterior y nuevo', async () => {
+    const { service, mockAuditoriaService } = preparar();
+    await service.create({ ...datos, rol_id: 1 } as any, 42);
+    mockAuditoriaService.registrar.mockClear();
+
+    await service.update('1', { rol_id: 2 } as any, 42);
+
+    expect(mockAuditoriaService.registrar).toHaveBeenCalledTimes(1);
+    expect(mockAuditoriaService.registrar).toHaveBeenCalledWith(expect.objectContaining({
+      usuarioId: '42',
+      accion: 'CAMBIO_ROL',
+      entidad: 'USUARIO',
+      entidadId: '1',
+      usuarioAfectadoId: '1',
+      datosAntes: { rol_id: '1' },
+      datosDespues: { rol_id: '2' },
+    }), expect.anything());
+  });
+
+  it('ABC-164: registra por separado el cambio de rol y los otros datos editados', async () => {
+    const { service, mockAuditoriaService } = preparar();
+    await service.create({ ...datos, rol_id: 1 } as any, 42);
+    mockAuditoriaService.registrar.mockClear();
+
+    await service.update('1', { rol_id: 2, nombre_completo: 'Nombre nuevo' } as any, 42);
+
+    expect(mockAuditoriaService.registrar).toHaveBeenCalledTimes(2);
+    expect(mockAuditoriaService.registrar).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ accion: 'CAMBIO_ROL' }),
+      expect.anything(),
+    );
+    expect(mockAuditoriaService.registrar).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ accion: 'MODIFICACION_USUARIO' }),
+      expect.anything(),
+    );
   });
 
   it('ABC-164: audita el cambio de estado', async () => {
@@ -176,8 +245,12 @@ describe('UsuariosService', () => {
     expect(mockAuditoriaService.registrar).toHaveBeenCalledWith(expect.objectContaining({
       accion: 'CAMBIO_ESTADO',
       usuarioId: '42',
+      entidad: 'USUARIO',
+      entidadId: '1',
       usuarioAfectadoId: '1',
-    }));
+      datosAntes: { activo: true },
+      datosDespues: { activo: false },
+    }), expect.anything());
   });
 
   it('ABC-164: audita la eliminación lógica registrando su estado previo real', async () => {
@@ -191,7 +264,36 @@ describe('UsuariosService', () => {
     expect(mockAuditoriaService.registrar).toHaveBeenCalledWith(expect.objectContaining({
       accion: 'ELIMINACION_LOGICA',
       usuarioId: '42',
+      entidad: 'USUARIO',
+      entidadId: '1',
+      usuarioAfectadoId: '1',
       datosAntes: expect.objectContaining({ activo: false }), // Validamos que capture que ya estaba inactivo
-    }));
+      datosDespues: expect.objectContaining({ activo: false, eliminado_en: expect.any(Date) }),
+    }), expect.anything());
+  });
+
+  it('ABC-164: revierte la creación si falla el registro de auditoría', async () => {
+    const { service, usuarios, mockAuditoriaService } = preparar();
+    mockAuditoriaService.registrar.mockImplementation(async () => {
+      throw new Error('auditoria indisponible');
+    });
+
+    await expect(service.create({ ...datos, rol_id: 1 } as any, 42)).rejects.toThrow(
+      'auditoria indisponible',
+    );
+    expect(usuarios).toHaveLength(0);
+  });
+
+  it('ABC-164: revierte el cambio de estado si falla el registro de auditoría', async () => {
+    const { service, usuarios, mockAuditoriaService } = preparar();
+    await service.create({ ...datos, rol_id: 1 } as any, 42);
+    mockAuditoriaService.registrar.mockImplementation(async () => {
+      throw new Error('auditoria indisponible');
+    });
+
+    await expect(service.changeStatus('1', false, 42)).rejects.toThrow(
+      'auditoria indisponible',
+    );
+    expect(usuarios[0].activo).toBe(true);
   });
 });
