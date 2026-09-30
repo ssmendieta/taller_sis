@@ -16,6 +16,7 @@ Revisar con: `git diff origin/develop..feature/cierre-sprint1 --stat`.
 | WP7 órdenes backend | `ordenes con validaciones y codigos secuenciales` |
 | WP9 recetas y materiales | `recetas con versiones y materiales` |
 | WP10 e2e + trazabilidad y WP11 docs e infra (mismo commit) | `pruebas e2e, trazabilidad y documentacion` |
+| Integración con develop local | `usuarios: valida nombre` |
 
 Además, dentro de ese commit van dos fixes: `seed:admin` transaccional (el
 primer intento dejaba el usuario sin auditoría si fallaba el insert) y el
@@ -27,8 +28,9 @@ permiso `ordenes.consultar` para Encargado — ver "Bloqueante" abajo.
   (`dist/main.js` generado) y frontend (`dist/index.html`). El bug del
   `tsbuildinfo` fuera de `dist` se corrigió con `tsBuildInfoFile: dist/.tsbuildinfo`
   en los 4 tsconfig. 5/5 OK.
-- `npx jest` auth: 69 pass, 1 skip (arranque real, solo con ARRANQUE_REAL=1).
+- `npx jest` auth: 71 pass, 1 skip (arranque real, solo con ARRANQUE_REAL=1).
   Producción: 133 pass, 1 skip. Nada que pasaba antes falla.
+  Última corrida local 30-sep: auth 14/14 suites, prod 15/15 suites.
 - Migraciones desde cero (`auth_db`, `produccion_db` recreadas): auth 6/6,
   producción 3/3. Segunda ejecución: "No migrations are pending" en ambas.
 - `seed:admin` dos veces: crea 1 usuario + 1 auditoría, la segunda no duplica.
@@ -51,6 +53,14 @@ permiso `ordenes.consultar` para Encargado — ver "Bloqueante" abajo.
 `docs/trazabilidad-sprint1.md`: una fila por subtarea (endpoints, archivos,
 pantallas, pruebas). Los títulos exactos de historias/subtareas son los de
 Jira; si alguno difiere, vale la clave ABC.
+
+## Integración
+
+- Se portó la validación de nombre completo (rechaza vacío/solo espacios,
+  recorta bordes) sobre la protección de administrador existente (no
+  autodesactivación, no dejar sin administrador). Se conserva el código
+  secuencial `ORD-AAAA-NNNNN` con reintento ante colisión, que cubre el caso
+  de colisiones y mantiene el e2e en verde.
 
 ## Bloqueante arreglado al paso (avisado)
 
