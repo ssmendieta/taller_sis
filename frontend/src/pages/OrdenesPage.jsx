@@ -16,6 +16,8 @@ import { formatearCantidad, formatearFecha } from "../utils/format.js";
 import { BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import CrearOrdenModal from "../components/ordenes/CrearOrdenModal.jsx";
+import Paginacion, { paginar, totalPaginas } from "../components/ui/Paginacion.jsx";
+import { FORMATO_TITULO } from "../constants/marca.js";
 
 // Pantalla unificada "Órdenes" (ruta /ordenes).
 // Fusiona OrdenPage (creación), ConsultaOrdenesPage (filtros + estados)
@@ -33,9 +35,12 @@ export default function OrdenesPage() {
   const [estado, setEstado] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+  const [pagina, setPagina] = useState(1);
   const [mostrarCrear, setMostrarCrear] = useState(false);
   const [aviso, setAviso] = useState("");
   const permiteCrear = puedeCrear(usuario);
+
+  useEffect(() => { document.title = FORMATO_TITULO("Órdenes"); }, []);
 
   async function cargarOrdenes() {
     setCargando(true);
@@ -44,6 +49,7 @@ export default function OrdenesPage() {
       const datos = await obtenerOrdenes();
       const lista = Array.isArray(datos) ? datos : [];
       setOrdenes(lista);
+      setPagina(1);
       // Totales de avance (progreso producido vs solicitado). Se cargan en
       // segundo plano y no bloquean el listado si fallan.
       const relevantes = lista.filter((o) => ["EN_PRODUCCION", "FINALIZADA"].includes(o.estado));
@@ -85,17 +91,16 @@ export default function OrdenesPage() {
       (!hasta || fecha <= hasta)
     );
   }), [ordenes, producto, estado, desde, hasta]);
+  const paginasOrdenes = totalPaginas(ordenesVisibles);
+  const ordenesPaginadas = paginar(ordenesVisibles, pagina);
+
+  function cambiarFiltro(fijar) {
+    return (evento) => { fijar(evento.target.value); setPagina(1); };
+  }
 
   function unidadDe(orden) {
     return orden?.unidad_producto ?? orden?.unidad_medida ?? "";
   }
-
-  const resumen = useMemo(() => ({
-    total: ordenes.length,
-    enProduccion: ordenes.filter((o) => o.estado === "EN_PRODUCCION").length,
-    pendientes: ordenes.filter((o) => o.estado === "PENDIENTE").length,
-    finalizadas: ordenes.filter((o) => o.estado === "FINALIZADA").length,
-  }), [ordenes]);
 
   function abrirDetalle(id) {
     if (id != null) navigate(`/ordenes/${id}`);
@@ -112,28 +117,15 @@ export default function OrdenesPage() {
     <section className="ts-page" aria-labelledby="ordenes-title">
       <PageHeader
         titulo="Órdenes"
-        descripcion="Consulta las órdenes, su avance y el responsable. Selecciona una fila para ver el detalle."
-        conteo={!cargando && !error ? `${ordenes.length} órdenes registradas` : null}
+        conteo={!cargando && !error ? `${ordenes.length} órdenes` : null}
         accion={permiteCrear ? (
           <button type="button" className="ts-btn ts-btn-primary" onClick={() => setMostrarCrear(true)}>
-            + Nueva orden
+            Nueva orden
           </button>
         ) : null}
       />
 
       {aviso && <p className="ts-success" role="status">{aviso}</p>}
-
-      {!cargando && !error && (
-        <div className="ts-panel" aria-label="Resumen de órdenes" style={{ marginBottom: 16 }}>
-          <div className="ts-panel-title"><h2>Resumen</h2></div>
-          <div className="ts-filters" style={{ paddingTop: 4 }}>
-            <span>Total de órdenes: <strong>{resumen.total}</strong></span>
-            <span>En producción: <strong>{resumen.enProduccion}</strong></span>
-            <span>Pendientes: <strong>{resumen.pendientes}</strong></span>
-            <span>Finalizadas: <strong>{resumen.finalizadas}</strong></span>
-          </div>
-        </div>
-      )}
 
       {cargando && <p className="ts-feedback" role="status">Cargando órdenes…</p>}
       {error && (
@@ -143,17 +135,17 @@ export default function OrdenesPage() {
         </div>
       )}
       {!cargando && !error && ordenes.length === 0 && (
-        <p className="ts-feedback">Todavía no hay órdenes registradas.</p>
+        <p className="ts-feedback">Sin órdenes.</p>
       )}
       {!cargando && !error && ordenes.length > 0 && (
         <div className="ts-panel">
-          <div className="ts-panel-title"><h2 id="ordenes-title">Listado de órdenes</h2><span>{ordenesVisibles.length} resultados</span></div>
+          <div className="ts-panel-title"><h2 id="ordenes-title">Listado</h2><span>{ordenesVisibles.length} resultados</span></div>
           <div className="ts-filters">
             <label htmlFor="filtro-producto">Producto
-              <input id="filtro-producto" type="search" value={producto} onChange={(e) => setProducto(e.target.value)} placeholder="Buscar producto" />
+              <input id="filtro-producto" type="search" value={producto} onChange={cambiarFiltro(setProducto)} placeholder="Buscar producto" />
             </label>
             <label htmlFor="filtro-estado">Estado
-              <select id="filtro-estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
+              <select id="filtro-estado" value={estado} onChange={cambiarFiltro(setEstado)}>
                 <option value="">Todos</option>
                 <option value="PENDIENTE">Pendiente</option>
                 <option value="PLANIFICADA">Planificada</option>
@@ -163,15 +155,15 @@ export default function OrdenesPage() {
               </select>
             </label>
             <label htmlFor="filtro-desde">Desde
-              <input id="filtro-desde" type="date" value={desde} max={hasta || undefined} onChange={(e) => setDesde(e.target.value)} />
+              <input id="filtro-desde" type="date" value={desde} max={hasta || undefined} onChange={cambiarFiltro(setDesde)} />
             </label>
             <label htmlFor="filtro-hasta">Hasta
-              <input id="filtro-hasta" type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} />
+              <input id="filtro-hasta" type="date" value={hasta} min={desde || undefined} onChange={cambiarFiltro(setHasta)} />
             </label>
-            <button type="button" className="ts-btn" onClick={() => { setProducto(""); setEstado(""); setDesde(""); setHasta(""); }}>Limpiar</button>
+            <button type="button" className="ts-btn ts-btn-quiet" onClick={() => { setProducto(""); setEstado(""); setDesde(""); setHasta(""); setPagina(1); }}>Limpiar filtros</button>
           </div>
           {ordenesVisibles.length === 0 ? (
-            <p className="ts-empty">No hay órdenes que coincidan con estos filtros.</p>
+            <p className="ts-empty">Sin resultados.</p>
           ) : (
             <div className="ts-table-wrap">
               <table className="ts-table">
@@ -188,7 +180,7 @@ export default function OrdenesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ordenesVisibles.map((orden) => {
+                  {ordenesPaginadas.map((orden) => {
                     const solicitada = cantidadSolicitadaOrden(orden);
                     const acumulado = totales[orden.id] ?? 0;
                     return (
@@ -220,6 +212,7 @@ export default function OrdenesPage() {
               </table>
             </div>
           )}
+          <Paginacion pagina={pagina} total={paginasOrdenes} alCambiar={setPagina} etiqueta="Paginación de órdenes" />
         </div>
       )}
 
@@ -227,9 +220,9 @@ export default function OrdenesPage() {
         abierto={mostrarCrear}
         alCerrar={() => setMostrarCrear(false)}
         alCrear={(creada) => {
-          setAviso(`Orden ${creada.codigo ?? creada.id} registrada correctamente.`);
+          setAviso(`Orden ${creada.codigo ?? creada.id} creada.`);
           setMostrarCrear(false);
-          if (creada?.id) navigate(`/ordenes/${creada.id}`, { state: { exito: `Orden ${creada.codigo ?? creada.id} creada correctamente.` } });
+          if (creada?.id) navigate(`/ordenes/${creada.id}`, { state: { exito: `Orden ${creada.codigo ?? creada.id} creada.` } });
           else setIntento((actual) => actual + 1);
         }}
       />

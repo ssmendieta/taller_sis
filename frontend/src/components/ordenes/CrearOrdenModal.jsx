@@ -23,7 +23,6 @@ export default function CrearOrdenModal({ abierto, alCerrar, alCrear }) {
   const [guardando, setGuardando] = useState(false);
   const hoy = hoyISO();
   const puedeIrARecetas = tienePermiso(usuario, "recetas.gestionar");
-  const nombreUsuario = usuario?.nombre_completo ?? usuario?.nombre ?? usuario?.correo ?? "tu usuario";
 
   useEffect(() => {
     if (!abierto) return;
@@ -53,8 +52,6 @@ export default function CrearOrdenModal({ abierto, alCerrar, alCrear }) {
     return () => window.removeEventListener("keydown", tecla);
   }, [abierto, guardando, alCerrar]);
 
-  if (!abierto) return null;
-
   const recetaElegida = recetas.find((r) => String(r.id) === String(formulario.producto_id));
   const unidad = recetaElegida?.unidad_producto ?? "";
 
@@ -68,6 +65,8 @@ export default function CrearOrdenModal({ abierto, alCerrar, alCrear }) {
       requerida: Number(m.cantidad_requerida) * cant,
     }));
   }, [recetaElegida, formulario.cantidad]);
+
+  if (!abierto) return null;
 
   function manejarCambio(evento) {
     const { name, value } = evento.target;
@@ -117,13 +116,12 @@ export default function CrearOrdenModal({ abierto, alCerrar, alCrear }) {
   return (
     <div className="ts-modal-overlay">
       <div className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="titulo-nueva-orden">
-        <h2 id="titulo-nueva-orden">Crear nueva orden</h2>
-        <p>Selecciona una receta activa e ingresa los datos de programación.</p>
+        <h2 id="titulo-nueva-orden">Crear orden</h2>
         {errorCarga ? (
           <p className="ts-modal-error" role="alert">{errorCarga}</p>
         ) : recetas.length === 0 ? (
           <div role="status">
-            <p className="ts-empty">No hay recetas activas. Crea una receta antes de registrar órdenes.</p>
+            <p className="ts-empty">Sin recetas activas. Crea una receta antes de registrar órdenes.</p>
             {puedeIrARecetas && <Link className="ts-btn ts-btn-primary" to="/recetas" onClick={alCerrar}>Ir a Recetas</Link>}
           </div>
         ) : (
@@ -148,26 +146,25 @@ export default function CrearOrdenModal({ abierto, alCerrar, alCrear }) {
             </label>
             {vistaPrevia.length > 0 && (
               <div className="ts-panel" style={{ margin: "8px 0" }}>
-                <div className="ts-panel-title"><h3>Materiales requeridos (vista previa)</h3></div>
+                <div className="ts-panel-title"><h3>Materiales requeridos</h3></div>
                 <ul>
                   {vistaPrevia.map((m, i) => (
                     <li key={i}>{m.nombre}{m.codigo ? ` (${m.codigo})` : ""} — {formatearCantidad(m.requerida, m.unidad)}</li>
                   ))}
                 </ul>
-                <p className="ts-empty" style={{ textAlign: "left" }}>El cálculo final lo confirma el servidor al crear la orden.</p>
+                <p className="ts-field-help">Cálculo estimado. El servidor confirma al crear la orden.</p>
               </div>
             )}
             <label htmlFor="nueva-orden-fecha">Fecha programada *
               <input id="nueva-orden-fecha" type="date" name="fecha_programada" min={hoy} value={formulario.fecha_programada} onChange={manejarCambio} disabled={guardando} />
               {errores.fecha_programada && <small className="ts-field-error">{errores.fecha_programada}</small>}
             </label>
-            <p className="ts-empty" style={{ textAlign: "left" }}>Si no eliges fecha se usa hoy ({hoy.split("-").reverse().join("/")}). No se permiten fechas pasadas.</p>
-            <p>Responsable: {nombreUsuario}</p>
+            <p className="ts-field-help">Hoy ({hoy.split("-").reverse().join("/")}). Sin fechas pasadas.</p>
             {errorGuardado && <p role="alert" className="ts-modal-error">{errorGuardado}</p>}
             <div className="ts-modal-actions">
               <button type="button" className="ts-btn" disabled={guardando} onClick={alCerrar}>Cancelar</button>
               <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando}>
-                {guardando ? "Guardando…" : "Registrar orden"}
+                {guardando ? "Guardando…" : "Crear orden"}
               </button>
             </div>
           </form>

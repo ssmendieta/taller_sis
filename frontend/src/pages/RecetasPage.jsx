@@ -15,6 +15,8 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { formatearCantidad, formatearFechaHora, mensajeHumano } from "../utils/format.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { BadgeActivo } from "../components/ui/Badges.jsx";
+import Paginacion, { paginar, totalPaginas } from "../components/ui/Paginacion.jsx";
+import { FORMATO_TITULO } from "../constants/marca.js";
 
 const lineaVacia = { material_id: "", cantidad_requerida: "" };
 
@@ -34,6 +36,8 @@ export default function RecetasPage() {
   const [erroresCampo, setErroresCampo] = useState({});
   const [errorForm, setErrorForm] = useState("");
   const [mensaje, setMensaje] = useState("");
+  const [avisoFlotante, setAvisoFlotante] = useState("");
+  const [pagina, setPagina] = useState(1);
   const [verInactivas, setVerInactivas] = useState(false);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -79,6 +83,14 @@ export default function RecetasPage() {
   useEffect(() => {
     cargar();
   }, []);
+
+  useEffect(() => { document.title = FORMATO_TITULO("Recetas"); }, []);
+
+  useEffect(() => {
+    if (!avisoFlotante) return;
+    const t = setTimeout(() => setAvisoFlotante(""), 6000);
+    return () => clearTimeout(t);
+  }, [avisoFlotante]);
 
   useEffect(() => {
     if (mostrarFormulario && primerCampo.current) primerCampo.current.focus();
@@ -226,9 +238,15 @@ export default function RecetasPage() {
         setMensaje(`Receta ${creada.producto_codigo ?? "nueva"} creada. El código se generó automáticamente.`);
       }
       setMostrarFormulario(false);
+      setPagina(1);
       await cargar();
     } catch (e) {
-      setErrorForm(mensajeHumano(e, "No se pudo guardar la receta."));
+      const crudo = e?.message ?? "";
+      if (/órdenes asociadas|ordenes asociadas|nueva versión|nueva version/i.test(crudo)) {
+        setAvisoFlotante("No se puede editar esta receta porque ya tiene órdenes asociadas. Crea una nueva versión con los cambios.");
+      } else {
+        setErrorForm(mensajeHumano(e, "No se pudo guardar la receta."));
+      }
     } finally {
       setGuardando(false);
     }
@@ -291,15 +309,16 @@ export default function RecetasPage() {
   }
 
   const visibles = recetas.filter((r) => (verInactivas ? true : r.activa));
+  const paginasRecetas = totalPaginas(visibles);
+  const recetasVisibles = paginar(visibles, pagina);
   const puedeGestionarMateriales = tienePermiso(usuario, "recetas.gestionar");
 
   return (
     <section className="ts-page" aria-labelledby="recetas-titulo">
       <PageHeader
         titulo="Recetas"
-        descripcion="Gestión de recetas de productos y sus materiales."
         conteo={!cargando && !error ? `${visibles.length} recetas` : null}
-        accion={<button type="button" className="ts-btn ts-btn-primary" onClick={abrirCrear}>+ Nueva receta</button>}
+        accion={<button type="button" className="ts-btn ts-btn-primary" onClick={abrirCrear}>Nueva receta</button>}
       />
 
       {mensaje && <p className="ts-success" role="status">{mensaje}</p>}
@@ -313,15 +332,15 @@ export default function RecetasPage() {
 
       {!cargando && !error && (
         <div className="ts-panel">
-          <div className="ts-panel-title"><h2 id="recetas-titulo">Listado de recetas</h2><span>{visibles.length} resultados</span></div>
-          <div className="ts-filters">
-            <label htmlFor="recetas-ver-inactivas" style={{ flex: "0 0 auto", flexDirection: "row", alignItems: "center" }}>
-              <input id="recetas-ver-inactivas" type="checkbox" checked={verInactivas} onChange={(e) => setVerInactivas(e.target.checked)} />
+          <div className="ts-panel-title"><h2 id="recetas-titulo">Listado</h2><span>{visibles.length} resultados</span></div>
+          <div className="ts-filters" style={{ paddingTop: 0, paddingBottom: 10 }}>
+            <label htmlFor="recetas-ver-inactivas" className="ts-check-discreto">
+              <input id="recetas-ver-inactivas" type="checkbox" checked={verInactivas} onChange={(e) => { setVerInactivas(e.target.checked); setPagina(1); }} />
               Ver inactivas (versiones anteriores)
             </label>
           </div>
           {visibles.length === 0 ? (
-            <p className="ts-empty">Todavía no hay recetas. Crea la primera con “+ Nueva receta”.</p>
+            <p className="ts-empty">Sin recetas.</p>
           ) : (
             <div className="ts-table-wrap">
               <table className="ts-table">
@@ -338,7 +357,7 @@ export default function RecetasPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibles.map((receta) => (
+                  {recetasVisibles.map((receta) => (
                     <tr key={receta.id}>
                       <td className="ts-code">{receta.producto_codigo}</td>
                       <td>{receta.producto_nombre}</td>
@@ -358,10 +377,10 @@ export default function RecetasPage() {
                         )}
                       </td>
                       <td className="ts-actions">
-                        <button type="button" className="ts-btn" onClick={() => abrirEditar(receta)}>Editar</button>
-                        {receta.activa && <button type="button" className="ts-btn" onClick={() => setConfirmarDesactivar(receta)}>Desactivar</button>}
-                        <button type="button" className="ts-btn" onClick={() => abrirVersion(receta)}>Nueva versión</button>
-                        <button type="button" className="ts-btn" onClick={() => verVersiones(receta)}>Ver versiones</button>
+                        <button type="button" className="ts-btn ts-btn--sm" onClick={() => abrirEditar(receta)}>Editar</button>
+                        {receta.activa && <button type="button" className="ts-btn ts-btn--sm" onClick={() => setConfirmarDesactivar(receta)}>Desactivar</button>}
+                        <button type="button" className="ts-btn ts-btn--sm" onClick={() => abrirVersion(receta)}>Nueva versión</button>
+                        <button type="button" className="ts-btn ts-btn--sm ts-btn-quiet" onClick={() => verVersiones(receta)} title="Ver versiones">Versiones</button>
                       </td>
                     </tr>
                   ))}
@@ -369,17 +388,25 @@ export default function RecetasPage() {
               </table>
             </div>
           )}
+          <Paginacion pagina={pagina} total={paginasRecetas} alCambiar={setPagina} etiqueta="Paginación de recetas" />
+        </div>
+      )}
+
+      {avisoFlotante && (
+        <div className="ts-toast" role="alert">
+          <p>{avisoFlotante}</p>
+          <button type="button" className="ts-btn ts-btn--sm ts-btn-quiet" onClick={() => setAvisoFlotante("")} aria-label="Cerrar aviso">
+            Cerrar
+          </button>
         </div>
       )}
 
       {mostrarFormulario && (
         <div className="ts-modal-overlay">
           <div className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="receta-form-titulo">
-            <h2 id="receta-form-titulo">{versionando ? `Nueva versión de ${versionando.producto_codigo}` : editando ? `Editar receta ${editando.producto_codigo}` : "Registrar receta"}</h2>
-            {(versionando || editando) ? (
-              <p>Código de producto (solo lectura): <strong className="ts-code">{(versionando ?? editando).producto_codigo}</strong></p>
-            ) : (
-              <p>El código se genera automáticamente (p. ej. PRD-0001). No necesitas escribirlo.</p>
+            <h2 id="receta-form-titulo">{versionando ? `Nueva versión de ${versionando.producto_codigo}` : editando ? `Editar receta ${editando.producto_codigo}` : "Crear receta"}</h2>
+            {(versionando || editando) && (
+              <p>Código: <strong className="ts-code">{(versionando ?? editando).producto_codigo}</strong></p>
             )}
             <form onSubmit={guardar} noValidate>
               <label htmlFor="receta-nombre">Nombre del producto *
@@ -408,8 +435,8 @@ export default function RecetasPage() {
                 </select>
               </label>
               {erroresCampo.unidad_producto && <small className="ts-field-error">{erroresCampo.unidad_producto}</small>}
-              <p className="ts-empty" style={{ textAlign: "left", padding: "0 0 8px" }}>
-                Cantidad de cada material necesaria para producir 1 {formulario.unidad_producto || "unidad"}.
+              <p className="ts-field-help">
+                Cantidad por 1 {formulario.unidad_producto || "unidad"}.
               </p>
               <h3>Ingredientes *</h3>
               <label htmlFor="receta-buscar-material">Buscar material
@@ -426,7 +453,7 @@ export default function RecetasPage() {
                 const elegidos = new Set(lineas.map((l, j) => (j === i ? null : String(l.material_id))).filter(Boolean));
                 const unidad = unidadDeMaterial(materiales, linea.material_id);
                 return (
-                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-end" }}>
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
                     <label style={{ flex: 2 }} htmlFor={`receta-mat-${i}`}>Material *
                       <select
                         id={`receta-mat-${i}`}
@@ -468,7 +495,7 @@ export default function RecetasPage() {
                 <button type="button" className="ts-btn" disabled={guardando} onClick={() => setLineas((actual) => [...actual, { ...lineaVacia }])}>Agregar línea</button>
                 {puedeGestionarMateriales && (
                   <button type="button" className="ts-btn" disabled={guardando} onClick={() => { setErrorRapido(""); setMostrarMaterialRapido(lineas.length - 1); }}>
-                    ¿No encuentras el material? Créalo
+                    Crear material
                   </button>
                 )}
               </div>
@@ -485,7 +512,7 @@ export default function RecetasPage() {
       {mostrarMaterialRapido != null && (
         <div className="ts-modal-overlay">
           <div className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="material-rapido-titulo">
-            <h2 id="material-rapido-titulo">Crear material rápido</h2>
+            <h2 id="material-rapido-titulo">Crear material</h2>
             <form onSubmit={guardarMaterialRapido} noValidate>
               <label htmlFor="rapido-codigo">Código *
                 <input id="rapido-codigo" value={rapido.codigo} onChange={(e) => setRapido({ ...rapido, codigo: e.target.value })} disabled={guardandoRapido} placeholder="p. ej. MAT-001" />
@@ -503,7 +530,7 @@ export default function RecetasPage() {
               {errorRapido && <p role="alert" className="ts-modal-error">{errorRapido}</p>}
               <div className="ts-modal-actions">
                 <button type="button" className="ts-btn" disabled={guardandoRapido} onClick={() => setMostrarMaterialRapido(null)}>Cancelar</button>
-                <button type="submit" className="ts-btn ts-btn-primary" disabled={guardandoRapido}>{guardandoRapido ? "Guardando…" : "Crear y seleccionar"}</button>
+                <button type="submit" className="ts-btn ts-btn-primary" disabled={guardandoRapido}>{guardandoRapido ? "Guardando…" : "Crear material"}</button>
               </div>
             </form>
           </div>
@@ -514,13 +541,13 @@ export default function RecetasPage() {
         <div className="ts-modal-overlay">
           <div className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="desactivar-titulo">
             <h2 id="desactivar-titulo">Desactivar receta {confirmarDesactivar.producto_codigo}</h2>
-            <p>La receta dejará de estar disponible para nuevas órdenes. Esta acción no borra el historial.</p>
+            <p>La receta dejará de estar disponible para nuevas órdenes.</p>
             <p>{ordenesDe(confirmarDesactivar) > 0
               ? `Tiene ${ordenesDe(confirmarDesactivar)} orden(es) asociadas. Las órdenes existentes no se modifican.`
               : "No tiene órdenes asociadas."}</p>
             <div className="ts-modal-actions">
-              <button type="button" className="ts-btn" onClick={() => setConfirmarDesactivar(null)}>Volver</button>
-              <button type="button" className="ts-btn ts-btn-danger" onClick={confirmarDesactivacion}>Confirmar desactivación</button>
+              <button type="button" className="ts-btn" onClick={() => setConfirmarDesactivar(null)}>Cancelar</button>
+              <button type="button" className="ts-btn ts-btn-danger" onClick={confirmarDesactivacion}>Desactivar</button>
             </div>
           </div>
         </div>
@@ -546,7 +573,7 @@ export default function RecetasPage() {
               })}
             </ul>
             <div className="ts-modal-actions">
-              <button type="button" className="ts-btn" onClick={() => setVersiones(null)}>Cerrar</button>
+              <button type="button" className="ts-btn" onClick={() => setVersiones(null)}>Cancelar</button>
             </div>
           </div>
         </div>

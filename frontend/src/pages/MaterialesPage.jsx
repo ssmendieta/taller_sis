@@ -8,6 +8,8 @@ import {
 import { obtenerUnidades } from "../services/unidades.js";
 import { formatearCantidad } from "../utils/format.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import Paginacion, { paginar, totalPaginas } from "../components/ui/Paginacion.jsx";
+import { FORMATO_TITULO } from "../constants/marca.js";
 
 // Materiales (ruta /materiales, sin entrada en el menú: se gestiona desde
 // Recetas y el detalle de la orden). Unidad con select del catálogo.
@@ -22,6 +24,7 @@ export default function MaterialesPage() {
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState({ codigo: "", nombre: "", unidadMedida: "unidad" });
   const [editando, setEditando] = useState(null);
+  const [pagina, setPagina] = useState(1);
   const primerCampo = useRef(null);
 
   async function cargar() {
@@ -52,9 +55,7 @@ export default function MaterialesPage() {
     cargar();
   }, []);
 
-  useEffect(() => {
-    if (!cargando && !error && primerCampo.current) primerCampo.current.focus();
-  }, [cargando, error, editando]);
+  useEffect(() => { document.title = FORMATO_TITULO("Materiales"); }, []);
 
   function unidadDe(m) {
     return m.unidadMedida ?? m.unidad_medida ?? "unidad";
@@ -80,7 +81,7 @@ export default function MaterialesPage() {
           nombre: form.nombre.trim(),
           unidadMedida: form.unidadMedida,
         });
-        setMensaje("Material actualizado correctamente.");
+        setMensaje("Material actualizado.");
       } else {
         if (!form.codigo.trim() || !form.nombre.trim() || !form.unidadMedida) {
           setErrorForm("El código, el nombre y la unidad son obligatorios.");
@@ -92,10 +93,11 @@ export default function MaterialesPage() {
           nombre: form.nombre.trim(),
           unidadMedida: form.unidadMedida,
         });
-        setMensaje("Material creado correctamente.");
+        setMensaje("Material creado.");
       }
       setForm({ codigo: "", nombre: "", unidadMedida: "unidad" });
       setEditando(null);
+      setPagina(1);
       await cargar();
     } catch (e) {
       setErrorForm(e.message || "No se pudo guardar el material.");
@@ -108,7 +110,6 @@ export default function MaterialesPage() {
     <section className="ts-page" aria-labelledby="materiales-titulo">
       <PageHeader
         titulo="Materiales"
-        descripcion="Listado, creación y edición de materiales con su disponibilidad de inventario."
         conteo={!cargando && !error ? `${materiales.length} materiales` : null}
       />
       {mensaje && <p className="ts-success" role="status">{mensaje}</p>}
@@ -122,9 +123,9 @@ export default function MaterialesPage() {
 
       {!cargando && !error && (
         <div className="ts-panel">
-          <div className="ts-panel-title"><h2 id="materiales-titulo">Listado de materiales</h2><span>{materiales.length} resultados</span></div>
+          <div className="ts-panel-title"><h2 id="materiales-titulo">Listado</h2><span>{materiales.length} resultados</span></div>
           {materiales.length === 0 ? (
-            <p className="ts-empty">Todavía no hay materiales. Crea el primero con el formulario de abajo.</p>
+            <p className="ts-empty">Sin materiales.</p>
           ) : (
             <div className="ts-table-wrap">
               <table className="ts-table">
@@ -139,7 +140,7 @@ export default function MaterialesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {materiales.map((m) => (
+                  {paginar(materiales, pagina).map((m) => (
                     <tr key={m.id}>
                       <td className="ts-code">{m.codigo}</td>
                       <td>{m.nombre}</td>
@@ -148,7 +149,7 @@ export default function MaterialesPage() {
                       <td className="ts-actions">
                         <button
                           type="button"
-                          className="ts-btn"
+                          className="ts-btn ts-btn--sm"
                           aria-label={`Editar ${m.nombre}`}
                           onClick={() => {
                             setEditando(m);
@@ -166,6 +167,7 @@ export default function MaterialesPage() {
               </table>
             </div>
           )}
+          <Paginacion pagina={pagina} total={totalPaginas(materiales)} alCambiar={setPagina} etiqueta="Paginación de materiales" />
           <div style={{ padding: "4px 20px 16px" }}>
             <h3>{editando ? "Editar material" : "Nuevo material"}</h3>
             <form onSubmit={guardar}>
@@ -187,11 +189,11 @@ export default function MaterialesPage() {
                   </select>
                 </label>
               </div>
-              <p className="ts-empty" style={{ textAlign: "left", padding: "0 0 8px" }}>La unidad es fija: todas las recetas usan la unidad del material, sin conversiones.</p>
+              <p className="ts-field-help">La unidad no se puede cambiar después.</p>
               {errorForm && <p role="alert" className="ts-modal-error">{errorForm}</p>}
-              <div className="ts-btn-group" style={{ marginTop: 10 }}>
-                <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando}>{guardando ? "Guardando…" : "Guardar"}</button>
+              <div className="ts-btn-group ts-btn-group--end" style={{ marginTop: 10 }}>
                 {editando && <button type="button" className="ts-btn" disabled={guardando} onClick={() => { setEditando(null); setForm({ codigo: "", nombre: "", unidadMedida: "unidad" }); setErrorForm(""); }}>Cancelar</button>}
+                <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando}>{guardando ? "Guardando…" : "Guardar"}</button>
               </div>
             </form>
           </div>

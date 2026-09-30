@@ -1,4 +1,4 @@
-function RoleTable({ roles, onView, onEdit }) {
+function RoleTable({ roles, onView, onEdit, onDesactivar }) {
   return (
     <div className="roles-table-container">
       <table className="roles-table">
@@ -16,7 +16,6 @@ function RoleTable({ roles, onView, onEdit }) {
             <tr key={role.id}>
               <td>
                 <div className="role-name">
-                  <span className="role-icon">👤</span>
                   {role.name}
                 </div>
               </td>
@@ -34,24 +33,35 @@ function RoleTable({ roles, onView, onEdit }) {
               </td>
 
               <td>
-                <div className="role-actions">
+                <div className="role-actions ts-row-actions">
                   <button
-                    className="action-button"
+                    className="action-button ts-btn ts-btn--sm"
                     onClick={() => onView(role)}
-                    title="Consultar permisos"
-                    aria-label={`Consultar permisos de ${role.name}`}
+                    title="Ver permisos"
+                    aria-label={`Ver permisos de ${role.name}`}
                   >
-                    👁️
+                    Ver
                   </button>
 
                   <button
-                    className="action-button"
+                    className="action-button ts-btn ts-btn--sm"
                     onClick={() => onEdit(role)}
-                    title="Modificar permisos"
-                    aria-label={`Modificar permisos de ${role.name}`}
+                    title="Editar permisos"
+                    aria-label={`Editar permisos de ${role.name}`}
                   >
-                    ✏️
+                    Editar
                   </button>
+
+                  {role.activo !== false && (
+                    <button
+                      className="action-button ts-btn ts-btn--sm"
+                      onClick={() => onDesactivar(role)}
+                      title={`Desactivar ${role.name}`}
+                      aria-label={`Desactivar ${role.name}`}
+                    >
+                      Desactivar
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>

@@ -14,7 +14,7 @@ function RoleModal({ onClose, onCreate }) {
 
     onCreate({
       name: name.trim(),
-      description: description.trim() || "Sin descripción.",
+      description: description.trim() || "—",
       permissions: [],
     });
   };
@@ -24,8 +24,7 @@ function RoleModal({ onClose, onCreate }) {
       <div className="modal">
         <div className="modal-header">
           <div>
-            <h2>Crear nuevo rol</h2>
-            <p>Define un nuevo perfil para el sistema.</p>
+            <h2>Crear rol</h2>
           </div>
 
           <button

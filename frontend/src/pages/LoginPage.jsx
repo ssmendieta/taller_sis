@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
+import Logo from "../components/Logo.jsx";
+import { FORMATO_TITULO } from "../constants/marca.js";
 import { iniciarSesion } from "../services/auth.js";
 import "../styles/LoginPage.css";
 
@@ -14,10 +16,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
 
-  if (usuario) return <Navigate to={location.state?.from || "/"} replace />;
+  useEffect(() => { document.title = FORMATO_TITULO("Iniciar sesión"); }, []);
 
   const avisoExpirada = location.state?.sesionExpirada
-    ? "Tu sesión expiró por inactividad o vencimiento. Vuelve a ingresar; te llevaremos a tu pantalla anterior."
+    ? "Sesión expirada. Vuelve a ingresar."
     : "";
 
   async function manejarSubmit(evento) {
@@ -48,10 +50,9 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <div className="login-card">
-        <div className="login-brand"><span className="login-brand-mark" aria-hidden="true">TS</span><span>Taller SIS</span></div>
+        <div className="login-brand"><Logo /></div>
         <div className="login-header">
           <h1>Iniciar sesión</h1>
-          <p>Ingresa tus credenciales para acceder al sistema.</p>
         </div>
 
         <form onSubmit={manejarSubmit} className="login-form" noValidate>
@@ -109,14 +110,10 @@ export default function LoginPage() {
             </div>
           )}
 
-          <button type="submit" className="btn-login" disabled={cargando}>
+          <button type="submit" className="ts-btn ts-btn-primary ts-btn--login" disabled={cargando}>
             {cargando ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
-
-        <div className="login-footer">
-          <p>Taller SIS · Producción y logística</p>
-        </div>
       </div>
     </main>
   );

@@ -39,9 +39,9 @@ function PermissionsModal({ role, mode, catalogo, onClose, onSave }) {
       <div className="permissions-modal">
         <div className="modal-header">
           <div>
-            <h2>{isViewMode ? "Consultar permisos" : "Modificar permisos"}</h2>
+            <h2>{isViewMode ? "Ver permisos" : "Editar permisos"}</h2>
             <p>
-              Rol: <strong>{role.name}</strong>
+              {role.name}
             </p>
           </div>
           <button className="modal-close" onClick={onClose}>
@@ -72,11 +72,11 @@ function PermissionsModal({ role, mode, catalogo, onClose, onSave }) {
         </div>
         <div className="modal-buttons">
           <button className="cancel-button" onClick={onClose}>
-            {isViewMode ? "Cerrar" : "Cancelar"}
+            Cancelar
           </button>
           {!isViewMode && (
             <button className="primary-button" onClick={handleSave}>
-              Guardar cambios
+              Guardar
             </button>
           )}
         </div>

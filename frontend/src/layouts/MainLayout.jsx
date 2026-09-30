@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
+import Logo from "../components/Logo.jsx";
+import { NOMBRE_SISTEMA } from "../constants/marca.js";
 import { cerrarSesionServidor } from "../services/auth.js";
 import { tienePermiso } from "../services/permisos.js";
 import "../styles/layout.css";
@@ -8,7 +10,6 @@ import "../styles/layout.css";
 const iconos = {
   ordenes: <><rect x="5" y="3" width="14" height="18" rx="1" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
   recetas: <><path d="M5 4h14v12H5z" /><path d="M5 16h14v4H5zM9 8h6M9 11h6" /></>,
-  estado: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   auditoria: <><path d="M5 3h14v18H5zM9 8h6m-6 4h6m-6 4h3" /></>,
   roles: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4l5 5m0-5l-5 5" /></>,
   usuarios: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8a3 3 0 1 1 2 5M21 20c0-2.8-1.9-5.1-4.5-5.8" /></>,
@@ -29,7 +30,6 @@ export default function MainLayout({ children }) {
   const puedeRoles = tienePermiso(usuario, "roles_permisos.gestionar");
   const puedeUsuarios = tienePermiso(usuario, "usuarios.gestionar");
   const puedeAuditoria = tienePermiso(usuario, "auditoria.consultar");
-  const esAdmin = puedeUsuarios || puedeRoles || puedeAuditoria;
   const activo = (path) => {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
     return location.pathname === path ? "active" : "";
@@ -40,7 +40,7 @@ export default function MainLayout({ children }) {
     <div className="layout">
       <aside className="sidebar" data-open={abierto ? "true" : "false"} aria-label="Barra lateral">
         <div className="sidebar-top">
-          <span className="brand"><span className="brand-icon" aria-hidden="true">TS</span><span>Taller SIS<small>Producción y logística</small></span></span>
+          <Link to="/" className="brand-link" aria-label={NOMBRE_SISTEMA} style={{ textDecoration: "none" }}><Logo /></Link>
           <button type="button" className="menu-toggle" aria-expanded={abierto} aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>☰</button>
         </div>
         <nav className="navbar" aria-label="Navegación principal">
@@ -50,11 +50,6 @@ export default function MainLayout({ children }) {
           {puedeRoles && <Link className={activo("/roles")} to="/roles" onClick={() => setAbierto(false)}><IconoNavegacion nombre="roles" />Roles y permisos</Link>}
           {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria" onClick={() => setAbierto(false)}><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
         </nav>
-        {esAdmin && (
-          <p className="nav-foot">
-            <Link className={activo("/estado")} to="/estado"><IconoNavegacion nombre="estado" />Estado del sistema</Link>
-          </p>
-        )}
         {usuario && (
           <div className="nav-user">
             <p className="nav-user-name">{nombre}</p>

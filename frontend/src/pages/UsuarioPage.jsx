@@ -8,6 +8,8 @@ import {
   listarUsuarios,
 } from "../services/usuarios";
 import "../styles/UsuarioPage.css";
+import { FORMATO_TITULO } from "../constants/marca.js";
+import Paginacion, { paginar, totalPaginas } from "../components/ui/Paginacion.jsx";
 
 function prepararUsuario(usuario, roles) {
   const rolId = String(usuario.rol_id);
@@ -31,6 +33,7 @@ function UsuarioPage() {
 
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("Todos");
+  const [pagina, setPagina] = useState(1);
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [modoEdicion, setModoEdicion] = useState(false);
@@ -49,6 +52,8 @@ function UsuarioPage() {
     rol: "",
   });
 
+  useEffect(() => { document.title = FORMATO_TITULO("Usuarios"); }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     setCargando(true);
@@ -60,6 +65,7 @@ function UsuarioPage() {
       .then(([datosUsuarios, datosRoles]) => {
         setRoles(datosRoles);
         setUsuarios(datosUsuarios.map((usuario) => prepararUsuario(usuario, datosRoles)));
+        setPagina(1);
       })
       .catch((error) => {
         if (error.name !== "AbortError") setErrorCarga(error.message);
@@ -80,6 +86,9 @@ function UsuarioPage() {
 
     return coincideBusqueda && coincideEstado;
   });
+
+  const paginasUsuarios = totalPaginas(usuariosFiltrados);
+  const usuariosVisibles = paginar(usuariosFiltrados, pagina);
 
   const abrirCrear = () => {
     setModoEdicion(false);
@@ -152,7 +161,7 @@ function UsuarioPage() {
         ? actuales.map((item) => item.id === usuario.id ? usuario : item)
         : [...actuales, usuario]);
       setMostrarModal(false);
-      mostrarMensaje(modoEdicion ? "Usuario actualizado correctamente." : "Usuario creado correctamente.");
+      mostrarMensaje(modoEdicion ? "Usuario actualizado." : "Usuario creado.");
     } catch (error) {
       mostrarMensaje(error.message || "No se pudo guardar el usuario.", true);
     } finally {
@@ -180,7 +189,7 @@ function UsuarioPage() {
       }
       setMostrarConfirmacion(false);
       setAccionPendiente(null);
-      mostrarMensaje("Cambio guardado correctamente.");
+      mostrarMensaje("Cambio guardado.");
     } catch (error) {
       mostrarMensaje(error.message || "No se pudo actualizar el usuario.", true);
     } finally {
@@ -203,11 +212,7 @@ function UsuarioPage() {
     return "estado baja";
   };
 
-  const obtenerIconoEstado = (estado) => {
-    if (estado === "Activo") return "●";
-    if (estado === "Inactivo") return "●";
-    return "●";
-  };
+  const obtenerIconoEstado = () => null;
 
   return (
     <div className="usuarios-container">
@@ -215,13 +220,10 @@ function UsuarioPage() {
       <div className="usuarios-header">
         <div>
           <h1>Usuarios</h1>
-          <p>
-            Gestiona las cuentas de usuario y sus permisos de acceso al sistema.
-          </p>
         </div>
 
         <button className="btn-nuevo" onClick={abrirCrear} disabled={cargando || !!errorCarga || roles.length === 0}>
-          + Nuevo usuario
+          Nuevo usuario
         </button>
       </div>
 
@@ -235,15 +237,14 @@ function UsuarioPage() {
       <div className="usuarios-filtros">
 
         <div className="buscador">
-          <span>⌕</span>
 
           <input
             id="busqueda-usuarios"
             type="text"
-            placeholder="Buscar por nombre o correo..."
+            placeholder="Buscar por nombre o correo"
             aria-label="Buscar por nombre o correo"
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
           />
         </div>
 
@@ -253,7 +254,7 @@ function UsuarioPage() {
           <select
             id="filtro-estado-usuarios"
             value={filtroEstado}
-            onChange={(e) => setFiltroEstado(e.target.value)}
+            onChange={(e) => { setFiltroEstado(e.target.value); setPagina(1); }}
           >
             <option value="Todos">Todos</option>
             <option value="Activo">Activos</option>
@@ -279,7 +280,7 @@ function UsuarioPage() {
 
           <tbody>
             {!cargando && !errorCarga && usuariosFiltrados.length > 0 ? (
-              usuariosFiltrados.map((usuario) => (
+              usuariosVisibles.map((usuario) => (
                 <tr key={usuario.id}>
 
                   <td>
@@ -362,7 +363,7 @@ function UsuarioPage() {
             ) : !cargando && !errorCarga ? (
               <tr>
                 <td colSpan="5" className="sin-resultados">
-                  No se encontraron usuarios.
+                  Sin resultados.
                 </td>
               </tr>
             ) : null}
@@ -370,6 +371,10 @@ function UsuarioPage() {
 
         </table>
       </div>
+
+      {!cargando && !errorCarga && usuariosFiltrados.length > 0 && (
+        <Paginacion pagina={pagina} total={paginasUsuarios} alCambiar={setPagina} etiqueta="Paginación de usuarios" />
+      )}
 
       {mostrarModal && (
         <div className="modal-overlay">
@@ -381,14 +386,8 @@ function UsuarioPage() {
                 <h2>
                   {modoEdicion
                     ? "Editar usuario"
-                    : "Crear nuevo usuario"}
+                    : "Crear usuario"}
                 </h2>
-
-                <p>
-                  {modoEdicion
-                    ? "Modifica la información del usuario."
-                    : "Registra una nueva cuenta de usuario."}
-                </p>
               </div>
 
               <button
@@ -480,7 +479,7 @@ function UsuarioPage() {
 
                 <button type="submit" className="btn-guardar" disabled={guardando}>
                   {modoEdicion
-                    ? "Guardar cambios"
+                    ? "Guardar"
                     : "Crear usuario"}
                 </button>
 
@@ -498,10 +497,6 @@ function UsuarioPage() {
 
           <div className="modal modal-confirmacion">
 
-            <div className="confirmacion-icono">
-              !
-            </div>
-
             <h2>
               {accionPendiente === "activar" && "Activar usuario"}
               {accionPendiente === "desactivar" && "Desactivar usuario"}
@@ -510,13 +505,13 @@ function UsuarioPage() {
 
             <p>
               {accionPendiente === "activar" &&
-                `¿Deseas activar la cuenta de ${usuarioSeleccionado.nombre}? El usuario podrá iniciar sesión nuevamente.`}
+                `${usuarioSeleccionado.nombre} podrá iniciar sesión nuevamente.`}
 
               {accionPendiente === "desactivar" &&
-                `¿Deseas desactivar la cuenta de ${usuarioSeleccionado.nombre}? El usuario no podrá iniciar sesión.`}
+                `${usuarioSeleccionado.nombre} no podrá iniciar sesión.`}
 
               {accionPendiente === "baja" &&
-                `¿Deseas dar de baja a ${usuarioSeleccionado.nombre}? Esta acción realizará una baja lógica del usuario.`}
+                `${usuarioSeleccionado.nombre} dejará de estar disponible. Se conserva el historial.`}
             </p>
 
             <div className="modal-footer">
@@ -552,8 +547,7 @@ function UsuarioPage() {
       )}
 
       {mensaje && (
-        <div className={mensajeError ? "mensaje-exito mensaje-error" : "mensaje-exito"} role="alert">
-          <span>{mensajeError ? "!" : "✓"}</span>
+        <div className={mensajeError ? "mensaje-exito mensaje-error" : "mensaje-exito"} role="status">
           {mensaje}
         </div>
       )}

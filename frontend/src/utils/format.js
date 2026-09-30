@@ -61,6 +61,7 @@ export function mensajeHumano(fallo, respaldo = "Ocurrió un error. Intenta de n
   if (!crudo) return respaldo;
   const texto = String(crudo);
   if (/23505|duplicate|unique/i.test(texto)) return "Ese registro ya existe. Revisa el código o el nombre.";
+  if (/órdenes asociadas|ordenes asociadas|nueva versión|nueva version/i.test(texto)) return "Esta receta ya tiene órdenes asociadas. Crea una nueva versión en lugar de editarla.";
   if (/23503|foreign key|restrict/i.test(texto)) return "No se puede eliminar porque está en uso en otros registros.";
   if (/jwt|token|expir|401/i.test(texto)) return "Tu sesión expiró. Vuelve a ingresar.";
   if (texto.length > 220) return respaldo;

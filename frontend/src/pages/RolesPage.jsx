@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import RoleTable from "../components/roles/RoleTable";
 import RoleModal from "../components/roles/RoleModal";
 import PermissionsModal from "../components/roles/PermissionsModal";
+import Paginacion, { paginar, totalPaginas } from "../components/ui/Paginacion.jsx";
 import {
   actualizarRol,
   crearRol,
@@ -11,12 +12,13 @@ import {
   reemplazarPermisosRol,
 } from "../services/roles.js";
 import "../styles/RolesPage.css";
+import { FORMATO_TITULO } from "../constants/marca.js";
 
 function adaptarRol(rol) {
   return {
     id: rol.id,
     name: rol.nombre,
-    description: rol.descripcion ?? "Sin descripción.",
+    description: rol.descripcion ?? "—",
     permissions: (rol.permisos ?? []).map((p) => p.codigo),
     activo: rol.activo,
     _raw: rol,
@@ -27,6 +29,7 @@ function RolesPage() {
   const [roles, setRoles] = useState([]);
   const [catalogo, setCatalogo] = useState([]);
   const [search, setSearch] = useState("");
+  const [pagina, setPagina] = useState(1);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [errorFormulario, setErrorFormulario] = useState("");
@@ -45,12 +48,15 @@ function RolesPage() {
       ]);
       setRoles((Array.isArray(rolesBackend) ? rolesBackend : []).map(adaptarRol));
       setCatalogo(Array.isArray(permisosBackend) ? permisosBackend : []);
+      setPagina(1);
     } catch (e) {
       setError(e.message);
     } finally {
       setCargando(false);
     }
   }
+
+  useEffect(() => { document.title = FORMATO_TITULO("Roles y permisos"); }, []);
 
   useEffect(() => {
     cargar();
@@ -59,6 +65,8 @@ function RolesPage() {
   const filteredRoles = roles.filter((role) =>
     role.name.toLowerCase().includes(search.toLowerCase()),
   );
+  const paginasRoles = totalPaginas(filteredRoles);
+  const rolesVisibles = paginar(filteredRoles, pagina);
 
   const handleCreateRole = async (nuevo) => {
     setErrorFormulario("");
@@ -112,7 +120,7 @@ function RolesPage() {
   };
 
   async function desactivarRol(role) {
-    if (!window.confirm(`¿Desactivar el rol ${role.name}? Sus usuarios perderán esos permisos.`)) return;
+    if (!window.confirm(`Desactivar el rol ${role.name}? Sus usuarios perderán esos permisos.`)) return;
     setError("");
     try {
       const guardado = await actualizarRol(role.id, { activo: false });
@@ -131,9 +139,6 @@ function RolesPage() {
       <div className="roles-header">
         <div>
           <h1 className="roles-title">Roles y permisos</h1>
-          <p className="roles-subtitle">
-            Administra los perfiles y permisos de acceso al sistema.
-          </p>
         </div>
         <button
           className="primary-button"
@@ -142,7 +147,7 @@ function RolesPage() {
             setShowCreateModal(true);
           }}
         >
-          + Crear rol
+          Crear rol
         </button>
       </div>
 
@@ -154,50 +159,33 @@ function RolesPage() {
             </span>
             <input
               type="text"
-              placeholder="Buscar rol..."
+              placeholder="Buscar rol"
               aria-label="Buscar rol"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPagina(1); }}
             />
           </div>
-          <button type="button" className="cancel-button" onClick={cargar}>
-            Reintentar
-          </button>
         </div>
 
         {cargando && <p role="status">Cargando roles…</p>}
         {error && (
           <p role="alert" className="empty-state">
-            No se pudieron cargar los roles: {error}
+            No se pudieron cargar los roles: {error} <button type="button" className="cancel-button" onClick={cargar}>Reintentar</button>
           </p>
         )}
 
         {!cargando && !error && (
           <>
             <RoleTable
-              roles={filteredRoles}
+              roles={rolesVisibles}
               onView={handleViewPermissions}
               onEdit={handleEditPermissions}
+              onDesactivar={desactivarRol}
             />
             {filteredRoles.length === 0 && (
-              <div className="empty-state">No se encontraron roles.</div>
+              <div className="empty-state">Sin resultados.</div>
             )}
-            <div style={{ marginTop: 12 }}>
-              {filteredRoles
-                .filter((r) => r.activo !== false)
-                .map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    className="cancel-button"
-                    style={{ marginRight: 8 }}
-                    onClick={() => desactivarRol(r)}
-                    title={`Desactivar ${r.name}`}
-                  >
-                    Desactivar {r.name}
-                  </button>
-                ))}
-            </div>
+            <Paginacion pagina={pagina} total={paginasRoles} alCambiar={setPagina} etiqueta="Paginación de roles" />
           </>
         )}
       </div>

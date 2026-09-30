@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { obtenerAuditoria } from "../services/api.js";
+import { FORMATO_TITULO } from "../constants/marca.js";
 import { diaAuditoria, filtrarAuditoria, nombreUsuarioAuditoria, paginaAuditoria } from "../services/auditoriaFiltros.js";
 import "../styles/consulta-auditoria.css";
 
@@ -31,6 +32,8 @@ export default function ConsultaAuditoriaPage() {
   const [hasta, setHasta] = useState("");
   const [pagina, setPagina] = useState(1);
 
+  useEffect(() => { document.title = FORMATO_TITULO("Auditoría"); }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     setCargando(true);
@@ -51,7 +54,7 @@ export default function ConsultaAuditoriaPage() {
   return (
     <section className="audit-page" aria-labelledby="audit-title">
       <header className="audit-heading">
-        <div><h1 id="audit-title">Registro de auditoría</h1><p>Consulta las acciones registradas y los usuarios involucrados.</p></div>
+        <div><h1 id="audit-title">Auditoría</h1></div>
         {!cargando && !error && <span>{registros.length} registros</span>}
       </header>
 
@@ -59,18 +62,18 @@ export default function ConsultaAuditoriaPage() {
       {error && <div className="audit-feedback audit-error" role="alert">
         <p>{error}</p><button type="button" onClick={() => setIntento((actual) => actual + 1)}>Reintentar</button>
       </div>}
-      {!cargando && !error && registros.length === 0 && <p className="audit-feedback">Todavía no hay registros de auditoría.</p>}
+      {!cargando && !error && registros.length === 0 && <p className="audit-feedback">Sin registros.</p>}
 
       {!cargando && !error && registros.length > 0 && <div className="audit-panel">
-        <div className="audit-panel-title"><h2>Historial de acciones</h2><span>{filtrados.length} resultados</span></div>
+        <div className="audit-panel-title"><h2>Historial</h2><span>{filtrados.length} resultados</span></div>
         <div className="audit-filters">
-          <label>Usuario<input type="search" value={usuario} onChange={actualizar(setUsuario)} placeholder="Buscar actor o afectado" /></label>
+          <label>Usuario<input type="search" value={usuario} onChange={actualizar(setUsuario)} placeholder="Buscar usuario" /></label>
           <label>Acción<select value={accion} onChange={actualizar(setAccion)}><option value="">Todas</option>{acciones.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select></label>
           <label>Desde<input type="date" value={desde} max={hasta || undefined} onChange={actualizar(setDesde)} /></label>
           <label>Hasta<input type="date" value={hasta} min={desde || undefined} onChange={actualizar(setHasta)} /></label>
           <button type="button" className="audit-clear" onClick={() => { setUsuario(""); setAccion(""); setDesde(""); setHasta(""); setPagina(1); }}>Limpiar</button>
         </div>
-        {filtrados.length === 0 ? <p className="audit-empty">No hay registros que coincidan con los filtros.</p> : <>
+        {filtrados.length === 0 ? <p className="audit-empty">Sin resultados.</p> : <>
           <div className="audit-table-wrap"><table className="audit-table">
             <caption>Historial de auditoría</caption>
             <thead><tr><th scope="col">Usuario</th><th scope="col">Acción</th><th scope="col">Usuario afectado</th><th scope="col">Fecha</th><th scope="col">Hora</th></tr></thead>

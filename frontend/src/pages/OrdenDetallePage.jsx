@@ -30,6 +30,7 @@ import {
 import { formatearCantidad, formatearEstadoOrden, formatearFecha } from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import { FORMATO_TITULO } from "../constants/marca.js";
 
 const ETIQUETAS = {
   PLANIFICADA: { titulo: "planificación", verbo: "Planificar" },
@@ -116,6 +117,8 @@ export default function OrdenDetallePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => { document.title = FORMATO_TITULO(orden?.codigo ? `Orden ${orden.codigo}` : "Orden"); }, [orden?.codigo]);
+
   const solicitada = cantidadSolicitadaOrden(orden);
   const unidad = orden?.unidad_producto ?? orden?.unidad_medida ?? orden?.producto?.unidad_producto ?? "";
   const faltantes = useMemo(
@@ -148,8 +151,7 @@ export default function OrdenDetallePage() {
     setErrorAccion("");
     try {
       await cambiarEstadoOrden(id, accion.destino, accion.destino === "CANCELADA" ? motivo.trim() : undefined);
-      const etiqueta = ETIQUETAS[accion.destino] ?? { titulo: accion.destino };
-      setAviso(`La orden ahora está ${mostrarEstadoOrden(accion.destino).toLowerCase()} (${etiqueta.titulo}).`);
+      setAviso(`Orden ${mostrarEstadoOrden(accion.destino).toLowerCase()}.`);
       setAccion(null);
       setMotivo("");
       await cargar();
@@ -178,7 +180,7 @@ export default function OrdenDetallePage() {
     try {
       await registrarAvance(id, cantidad);
       setCantidadAvance("");
-      setAviso("Avance registrado correctamente.");
+      setAviso("Avance registrado.");
       await cargar();
     } catch (fallo) {
       setErrorAvance(fallo.message || "No se pudo registrar el avance.");
@@ -194,7 +196,7 @@ export default function OrdenDetallePage() {
         <p>{error}</p>
         <div className="ts-btn-group">
           <button type="button" className="ts-btn" onClick={cargar}>Reintentar</button>
-          <Link className="ts-btn" to="/ordenes">Volver al listado</Link>
+          <Link className="ts-btn" to="/ordenes">Volver</Link>
         </div>
       </div>
     );
@@ -207,8 +209,7 @@ export default function OrdenDetallePage() {
     <section className="ts-page" aria-labelledby="detalle-orden-titulo">
       <PageHeader
         titulo={`Orden ${orden.codigo ?? ""}`}
-        descripcion={`${nombreProductoOrden(orden)} · ${mostrarEstadoOrden(orden.estado)}`}
-        accion={<Link className="ts-btn" to="/ordenes">← Volver</Link>}
+        accion={<Link className="ts-btn" to="/ordenes">Volver</Link>}
       />
       {aviso && <p className="ts-success" role="status">{aviso}</p>}
 
@@ -231,7 +232,7 @@ export default function OrdenDetallePage() {
 
       {muestraAcciones && acciones.length > 0 && (
         <div className="ts-panel" style={{ marginBottom: 16 }}>
-          <div className="ts-panel-title"><h2>Acciones</h2><span>Según estado y tus permisos</span></div>
+          <div className="ts-panel-title"><h2>Acciones</h2></div>
           <div className="ts-filters">
             <div className="ts-btn-group">
               {acciones.map((a) => {
@@ -255,14 +256,14 @@ export default function OrdenDetallePage() {
               })}
             </div>
           </div>
-          {motivoBloqueoInicio && <p className="ts-empty" role="note">No se puede iniciar: {motivoBloqueoInicio}</p>}
+          {motivoBloqueoInicio && <p className="ts-field-help" role="note">{motivoBloqueoInicio}</p>}
         </div>
       )}
 
       <div className="ts-panel" style={{ marginBottom: 16 }}>
         <div className="ts-panel-title"><h2>Materiales requeridos</h2><span>{materiales.length} líneas</span></div>
         {materiales.length === 0 ? (
-          <p className="ts-empty">Esta orden no tiene materiales asociados.</p>
+          <p className="ts-empty">Sin materiales.</p>
         ) : (
           <div className="ts-table-wrap">
             <table className="ts-table">
@@ -290,7 +291,7 @@ export default function OrdenDetallePage() {
       </div>
 
       <div className="ts-panel" style={{ marginBottom: 16 }}>
-        <div className="ts-panel-title"><h2>Avance de producción</h2><span>Producido {formatearCantidad(total, unidad)} de {formatearCantidad(solicitada, unidad)} · Restante {formatearCantidad(Number(solicitada) - Number(total), unidad)}</span></div>
+        <div className="ts-panel-title"><h2>Avance</h2><span>{formatearCantidad(total, unidad)} de {formatearCantidad(solicitada, unidad)}</span></div>
         <div style={{ padding: "4px 20px 16px" }}>
           <BarraAvance acumulado={total} solicitada={Number(solicitada) || 0} />
           {enProduccion && permiteAvance ? (
@@ -323,15 +324,15 @@ export default function OrdenDetallePage() {
                   disabled={guardandoAvance || !(Number(solicitada) - Number(total) > 0)}
                   onClick={() => setCantidadAvance(String(Math.max(Number(solicitada) - Number(total), 0)))}
                 >
-                  Completar restante ({formatearCantidad(Number(solicitada) - Number(total), unidad)})
+                  Completar restante
                 </button>
               </div>
             </form>
           ) : (
             <p className="ts-empty">
               {enProduccion
-                ? "No tienes permiso para registrar avances."
-                : `El avance solo se registra en estado En producción (actual: ${mostrarEstadoOrden(orden.estado)}).`}
+                ? "Sin permiso para registrar avances."
+                : `Solo se registra en estado En producción (actual: ${mostrarEstadoOrden(orden.estado)}).`}
             </p>
           )}
           {Array.isArray(avances) && avances.length > 0 && (
@@ -358,9 +359,9 @@ export default function OrdenDetallePage() {
       </div>
 
       <div className="ts-panel">
-        <div className="ts-panel-title"><h2>Historial de estados</h2><span>{historial.length} movimientos</span></div>
+        <div className="ts-panel-title"><h2>Historial</h2><span>{historial.length} movimientos</span></div>
         {historial.length === 0 ? (
-          <p className="ts-empty">Todavía no hay movimientos registrados.</p>
+          <p className="ts-empty">Sin movimientos.</p>
         ) : (
           <div className="ts-table-wrap">
             <table className="ts-table">
@@ -391,8 +392,8 @@ export default function OrdenDetallePage() {
       {accion && (
         <div className="ts-modal-overlay">
           <div className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="accion-titulo">
-            <h2 id="accion-titulo">Confirmar {ETIQUETAS[accion.destino]?.titulo ?? accion.destino}</h2>
-            <p>¿Quieres {((ETIQUETAS[accion.destino]?.verbo ?? accion.destino).toLowerCase())} la orden {orden.codigo}?</p>
+            <h2 id="accion-titulo">{ETIQUETAS[accion.destino]?.verbo ?? accion.destino} orden {orden.codigo}</h2>
+            <p>{accion.destino === "CANCELADA" ? "La orden quedará cancelada y no se podrá producir." : `La orden pasará a ${mostrarEstadoOrden(accion.destino).toLowerCase()}.`}</p>
             <form onSubmit={confirmarAccion}>
               {accion.destino === "CANCELADA" && (
                 <label htmlFor="motivo-cancelacion">Motivo de cancelación *
@@ -401,9 +402,9 @@ export default function OrdenDetallePage() {
               )}
               {errorAccion && <p className="ts-modal-error" role="alert">{errorAccion}</p>}
               <div className="ts-modal-actions">
-                <button type="button" className="ts-btn" onClick={() => setAccion(null)} disabled={guardando}>Volver</button>
+                <button type="button" className="ts-btn" onClick={() => setAccion(null)} disabled={guardando}>Cancelar</button>
                 <button type="submit" className={`ts-btn${accion.destino === "CANCELADA" ? " ts-btn-danger" : " ts-btn-primary"}`} disabled={guardando}>
-                  {guardando ? "Guardando…" : `Confirmar ${ETIQUETAS[accion.destino]?.titulo ?? ""}`}
+                  {guardando ? "Guardando…" : (ETIQUETAS[accion.destino]?.verbo ?? "Confirmar")}
                 </button>
               </div>
             </form>

@@ -2,6 +2,8 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useSesion } from "../../context/SesionContext.jsx";
 import { codigosPermisos } from "../../services/permisos.js";
 
+const MENSAJE_DENEGADO = "Sin permiso para esta sección. Pide acceso al administrador.";
+
 export default function ProtectedRoute({ children, roles, permisos }) {
   const { usuario } = useSesion();
   const location = useLocation();
@@ -22,7 +24,7 @@ export default function ProtectedRoute({ children, roles, permisos }) {
       return (
         <div className="ts-denied" role="alert">
           <h1>Acceso denegado</h1>
-          <p>No tienes permisos para acceder a esta sección. Si lo necesitas, pide acceso al administrador.</p>
+          <p>{MENSAJE_DENEGADO}</p>
         </div>
       );
     }
@@ -34,7 +36,7 @@ export default function ProtectedRoute({ children, roles, permisos }) {
     return (
       <div className="ts-denied" role="alert">
         <h1>Acceso denegado</h1>
-        <p>No tienes permisos para acceder a esta sección. Si lo necesitas, pide acceso al administrador.</p>
+        <p>{MENSAJE_DENEGADO}</p>
       </div>
     );
   }

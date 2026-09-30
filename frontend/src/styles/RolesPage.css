@@ -160,14 +160,21 @@
 
 /* ACCIONES */
 
-.role-actions {
+.role-actions.ts-row-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.roles-table td:last-child {
+  white-space: nowrap;
 }
 
 .action-button {
-  width: 36px;
-  height: 36px;
+  width: auto;
+  height: auto;
   border: 1px solid #e5e7eb;
   background: white;
   border-radius: 7px;

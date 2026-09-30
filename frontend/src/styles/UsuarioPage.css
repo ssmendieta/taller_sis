@@ -182,7 +182,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  white-space: nowrap;
 }
 
 .btn-editar,
@@ -472,10 +474,5 @@
 @media (max-width: 600px) {
   .usuarios-container {
     padding: 20px;
-  }
-
-  .acciones {
-    flex-direction: column;
-    align-items: flex-start;
   }
 }

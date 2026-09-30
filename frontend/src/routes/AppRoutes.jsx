@@ -7,7 +7,6 @@ import RecetasPage from "../pages/RecetasPage.jsx";
 import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
-import SystemStatusPage from "../pages/SystemStatusPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
@@ -26,7 +25,7 @@ function InicioRedirect() {
   return (
     <section className="ts-page" aria-labelledby="sin-funciones">
       <h1 id="sin-funciones">Sin funciones asignadas</h1>
-      <p>Tu rol aún no tiene funciones en este sprint. Si necesitas acceso, contacta al administrador.</p>
+      <p>Tu rol aún no tiene funciones. Contacta al administrador.</p>
     </section>
   );
 }
@@ -37,8 +36,8 @@ function NoEncontrada() {
     <main className="login-page">
       <div className="ts-public" role="alert">
         <h1>Página no encontrada</h1>
-        <p>La dirección no existe o fue movida. Vuelve al inicio para continuar.</p>
-        <Link className="ts-btn ts-btn-primary" to={usuario ? "/" : "/login"}>Volver al inicio</Link>
+        <p>La dirección no existe o fue movida.</p>
+        <Link className="ts-btn ts-btn-primary" to={usuario ? "/" : "/login"}>Volver</Link>
       </div>
     </main>
   );
@@ -59,7 +58,6 @@ export default function AppRoutes() {
         <Route path="/usuarios" element={privada(<UsuarioPage />, ["usuarios.gestionar"])} />
         <Route path="/roles" element={privada(<RolesPage />, ["roles_permisos.gestionar"])} />
         <Route path="/auditoria" element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])} />
-        <Route path="/estado" element={privada(<SystemStatusPage />, ["usuarios.gestionar", "roles_permisos.gestionar", "auditoria.consultar"])} />
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />

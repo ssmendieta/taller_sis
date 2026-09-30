@@ -119,7 +119,7 @@ curl http://localhost:3000/health
 curl http://localhost:3000/api/auth/health
 curl http://localhost:3000/api/produccion/health
 curl http://localhost:3000/api/produccion/health/database  # debe dar database:connected
-# Frontend: abrir http://localhost:5173/estado -> debe mostrar Gateway: OK, Producción: OK, Base de datos: OK
+# Frontend: abrir http://localhost:5173/ e ingresar con el admin creado
 npm run e2e  # prueba automatizada contra el gateway (requiere ADMIN_EMAIL y ADMIN_PASSWORD)
 ```
 
@@ -193,7 +193,7 @@ cd api-gateway; npm run start:dev # :3000 proxea /api/auth|produccion|logistica 
 cd frontend; npm run dev      # :5173
 # o preview: npm run build; npm run preview -- --host 0.0.0.0 --port 5173
 ```
-Rutas: `/`, `/login`, `/produccion`, `/logistica`, `/estado` (SystemStatus).
+Rutas: `/`, `/login`, `/produccion`, `/logistica`.
 
 ## 12. Puertos
 | Componente | Puerto | URL |
@@ -211,7 +211,7 @@ curl http://localhost:3000/health
 curl http://localhost:3000/api/auth/health
 curl http://localhost:3000/api/produccion/health
 curl http://localhost:3000/api/produccion/health/database # Gateway -> Producción -> PG
-# http://localhost:5173/estado muestra estado completo
+# http://localhost:5173 muestra el inicio según el rol
 ```
 
 ## 14. Solución de Problemas Frecuentes
