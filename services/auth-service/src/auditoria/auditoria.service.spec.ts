@@ -1,7 +1,4 @@
-import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { Repository } from 'typeorm';
@@ -84,92 +81,56 @@ function eventoAuditoria(): Auditoria {
   };
 }
 
-describe('AuditoriaService', () => {
-  let service: AuditoriaService;
-
-  const mockAuditoriaRepo = {
-    create: jest.fn((dto) => dto),
-    save: jest.fn((entity: Partial<Auditoria>) =>
-      Promise.resolve({
-        id: '1',
-        ...entity,
-        fecha_hora: new Date(),
-      }),
-    ),
+describe('ABC-186: registro y consulta de auditoría', () => {
+  const registros: Auditoria[] = [];
+  const raw = [{ id: '1', accion: 'CREACION_USUARIO', usuario_actor_nombre: 'Ana',
+    usuario_afectado_nombre: 'Pedro', fecha_hora: new Date('2026-09-27T18:00:00Z') }];
+  const qb: Record<string, jest.Mock> = {};
+  for (const metodo of ['leftJoin', 'select', 'orderBy', 'addOrderBy']) {
+    qb[metodo] = jest.fn().mockReturnValue(qb);
+  }
+  qb.getRawMany = jest.fn().mockResolvedValue(raw as never);
+  const repo = {
+    create: (datos: Partial<Auditoria>) => datos as Auditoria,
+    save: async (entidad: Auditoria) => {
+      entidad.id = String(registros.length + 1);
+      entidad.fecha_hora = new Date();
+      registros.push(entidad);
+      return entidad;
+    },
+    createQueryBuilder: jest.fn().mockReturnValue(qb),
+    findOneBy: async ({ id }: { id: string }) => registros.find((registro) => registro.id === id) ?? null,
   };
+  const servicio = new AuditoriaService(repo as unknown as Repository<Auditoria>);
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuditoriaService,
-        {
-          provide: getRepositoryToken(Auditoria),
-          useValue: mockAuditoriaRepo,
-        },
-      ],
-    }).compile();
+  beforeEach(() => { registros.length = 0; jest.clearAllMocks(); });
 
-    service = module.get<AuditoriaService>(AuditoriaService);
+  it('guarda actor, afectado y diferencias con el formato de develop', async () => {
+    const evento = await servicio.registrar({
+      accion: 'CAMBIO_ESTADO', entidad: 'USUARIO', entidadId: '3',
+      usuarioId: '1', usuarioAfectadoId: '3',
+      datosAntes: { activo: true }, datosDespues: { activo: false },
+    });
+    expect(evento.usuario_actor_id).toBe('1');
+    expect(evento.usuario_afectado_id).toBe('3');
+    expect(evento.datos_antes).toEqual({ activo: true });
+    expect(evento.datos_despues).toEqual({ activo: false });
+    expect((await servicio.findOne(evento.id)).accion).toBe('CAMBIO_ESTADO');
+    await expect(servicio.findOne('999')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('debe estar definido', () => {
-    expect(service).toBeDefined();
+  it('expone nombres en la lectura legada de la pantalla', async () => {
+    expect(await servicio.findAll()).toEqual(raw);
+    expect(qb.leftJoin).toHaveBeenCalledTimes(2);
   });
 
-  it('debe registrar un evento de auditoria correctamente', async () => {
-    const fechaHora = new Date();
-    const params = {
-      usuarioId: '10',
-      accion: 'CREACION_USUARIO',
-      entidad: 'USUARIO',
-      entidadId: '20',
-      usuarioAfectadoId: '20',
-      datosDespues: { correo: 'test@example.com' },
-    };
-
-    const resultado = await service.registrar(params);
-
-    expect(mockAuditoriaRepo.create).toHaveBeenCalled();
-    expect(mockAuditoriaRepo.create).toHaveBeenCalledWith(expect.objectContaining({
-      usuario_actor_id: '10',
-      accion: 'CREACION_USUARIO',
-      entidad: 'USUARIO',
-      entidad_id: '20',
-      usuario_afectado_id: '20',
-      datos_antes: null,
-      datos_despues: { correo: 'test@example.com' },
-    }));
-    expect(mockAuditoriaRepo.save).toHaveBeenCalled();
-    expect(resultado.usuario_actor_id).toBe('10');
-    expect(resultado.accion).toBe('CREACION_USUARIO');
-    expect(resultado.entidad_id).toBe('20');
-    expect(resultado.usuario_afectado_id).toBe('20');
-    expect(resultado.fecha_hora).toBeInstanceOf(Date);
-    expect(resultado.fecha_hora.getTime()).toBeGreaterThan(0);
-    expect(fechaHora.getTime()).toBeGreaterThan(0);
-  });
-
-  it('usa el repositorio de la transacción para guardar el evento', async () => {
-    const transactionRepo = {
-      create: jest.fn((dto) => dto),
-      save: jest.fn(async (entity: Partial<Auditoria>) => entity),
-    };
-    const manager = {
-      getRepository: jest.fn().mockReturnValue(transactionRepo),
-    };
-
-    await service.registrar({
-      usuarioId: '10',
-      accion: 'CAMBIO_ESTADO',
-      entidad: 'USUARIO',
-      entidadId: '20',
-      usuarioAfectadoId: '20',
-    }, manager as any);
-
+  it('usa el repositorio de la transacción cuando se proporciona', async () => {
+    const transactionRepo = { create: jest.fn((dto: Partial<Auditoria>) => dto),
+      save: jest.fn(async (entity: Partial<Auditoria>) => entity) };
+    const manager = { getRepository: jest.fn().mockReturnValue(transactionRepo) };
+    await servicio.registrar({ accion: 'CAMBIO_ESTADO', entidad: 'USUARIO', usuarioId: 10 }, manager as any);
     expect(manager.getRepository).toHaveBeenCalledWith(Auditoria);
     expect(transactionRepo.save).toHaveBeenCalled();
-    expect(mockAuditoriaRepo.save).not.toHaveBeenCalled();
   });
 });
 

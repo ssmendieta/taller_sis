@@ -8,6 +8,7 @@ import { Inventario } from '../inventario/entities/inventario.entity';
 import { OrdenesService } from './ordenes.service';
 import { OrdenesController } from './ordenes.controller';
 import { RecetasModule } from '../recetas/recetas.module';
+import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 
 @Module({
   imports: [
@@ -19,6 +20,6 @@ import { RecetasModule } from '../recetas/recetas.module';
     RecetasModule,
   ],
   controllers: [OrdenesController],
-  providers: [OrdenesService],
+  providers: [OrdenesService, PermisoProduccionGuard],
 })
 export class OrdenesModule {}

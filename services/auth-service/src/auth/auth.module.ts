@@ -6,10 +6,12 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Rol } from '../roles/entities/role.entity';
+import { AuthzModule } from '../authz/authz.module';
 
 
 @Module({
   imports: [
+    AuthzModule,
     TypeOrmModule.forFeature([
       Usuario,
       Rol,

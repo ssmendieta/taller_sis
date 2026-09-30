@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomUUID } from 'node:crypto';
 
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
@@ -38,10 +39,9 @@ export class OrdenesService {
     private readonly recetasService: RecetasService,
   ) {}
 
-  // Alta de ordenes (aporte de develop, conservado tal cual: el DTO usa los
-  // mismos nombres de propiedad que OrdenProduccion).
   async create(createOrdenDto: CreateOrdenDto): Promise<OrdenProduccion> {
-    const codigo = `ORD-${Math.floor(Date.now() / 1000)}`;
+    
+    const codigo = `ORD-${randomUUID().replace(/-/g, '')}`;
 
     const nuevaOrden = this.ordenRepository.create({
       ...createOrdenDto,
@@ -68,7 +68,24 @@ export class OrdenesService {
     return orden;
   }
 
+  // Detalle de una orden por id (ABC-187, aporte de ramagemina).
+  async obtenerDetalle(id: number): Promise<OrdenProduccion> {
+    const orden = await this.ordenRepository.findOne({
+      where: { id },
+    });
+
+    if (!orden) {
+      throw new NotFoundException(`Orden con id ${id} no encontrada`);
+    }
+
+    return orden;
+  }
+
   async obtenerMateriales(id: number) {
+    // La receta define la cantidad por unidad; el total que necesita la
+    // orden es esa cantidad multiplicada por la cantidad solicitada
+    // (misma regla que compararDisponibilidadMateriales). Se conserva el
+    // alias 'cantidad_requerida' por compatibilidad con los consumidores.
     const resultado = await this.ordenRepository.query(`
       SELECT
         o.id AS orden_id,
@@ -76,7 +93,7 @@ export class OrdenesService {
         m.codigo,
         m.nombre,
         m.unidad_medida,
-        rm.cantidad_requerida
+        ROUND(rm.cantidad_requerida * o.cantidad_solicitada, 4) AS cantidad_requerida
       FROM ordenes_produccion o
       INNER JOIN receta_material rm ON rm.receta_id = o.receta_id
       INNER JOIN materiales m ON m.id = rm.material_id
@@ -87,23 +104,24 @@ export class OrdenesService {
   }
 
   async buscar(estado?: string, producto?: string, fecha?: string) {
-    const query = this.ordenRepository
-      .createQueryBuilder('orden')
-      .where('1=1');
 
-    if (estado) {
-      query.andWhere('orden.estado = :estado', { estado });
-    }
-
-    if (producto) {
-      query.andWhere('orden.codigo ILIKE :producto', { producto: `%${producto}%` });
-    }
-
-    if (fecha) {
-      query.andWhere('orden.fecha_programada = :fecha', { fecha });
-    }
-
-    return query.getMany();
+    return this.ordenRepository.query(`
+      SELECT o.id::text AS id,
+             o.codigo,
+             r.producto_codigo,
+             r.producto_nombre,
+             o.cantidad_solicitada::text AS cantidad_solicitada,
+             o.fecha_programada::text AS fecha_programada,
+             o.estado,
+             o.responsable_usuario_id::text AS responsable_usuario_id
+      FROM ordenes_produccion o
+      JOIN recetas r ON r.id = o.receta_id
+      WHERE ($1::text IS NULL OR o.estado = $1)
+        AND ($2::text IS NULL OR r.producto_nombre ILIKE '%' || $2 || '%'
+             OR r.producto_codigo ILIKE '%' || $2 || '%')
+        AND ($3::date IS NULL OR o.fecha_programada = $3::date)
+      ORDER BY o.fecha_programada DESC, o.id DESC
+    `, [estado?.trim() || null, producto?.trim() || null, fecha?.trim() || null]);
   }
 
   async compararDisponibilidadMateriales(id: number) {
@@ -184,6 +202,12 @@ export class OrdenesService {
     dto: CambiarEstadoOrdenDto,
     usuarioAutenticado?: UsuarioAutenticadoProduccion,
   ) {
+    if (dto.nuevoEstado === EstadoOrden.CANCELADA && !dto.motivo?.trim()) {
+      throw new BadRequestException('Debe indicar el motivo de cancelación');
+    }
+    if (!Number.isSafeInteger(dto.usuarioResponsableId) || dto.usuarioResponsableId < 1) {
+      throw new BadRequestException('Usuario responsable inválido');
+    }
 
     const esInicio = dto.nuevoEstado === EstadoOrden.EN_PRODUCCION;
     const esFinalizacion = dto.nuevoEstado === EstadoOrden.FINALIZADA;
@@ -317,7 +341,7 @@ export class OrdenesService {
             estadoAnterior: estadoActual,
             estadoNuevo: dto.nuevoEstado,
             usuarioResponsableId: dto.usuarioResponsableId,
-            motivo: dto.motivo ?? null,
+            motivo: dto.motivo?.trim() ?? null,
           }),
         );
 

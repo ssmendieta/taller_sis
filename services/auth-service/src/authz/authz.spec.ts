@@ -118,15 +118,18 @@ describe('AuthzModule (ABC-151)', () => {
     ).toThrow(UnauthorizedException);
   });
 
-  it('la estrategia expone el payload decodificado en request.user', async () => {
+  it('la estrategia consulta el estado y el rol actual del usuario', async () => {
+    const buscarUsuario = jest.fn().mockResolvedValue({
+      id: '5', correo: 'actual@x.y', activo: true, eliminado_en: null, rol_id: '3',
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const strategy = new JwtStrategy({ get: () => 'test-secret' } as any);
+    const strategy = new JwtStrategy({ get: () => 'test-secret' } as any, { findOne: buscarUsuario } as any);
 
-    await expect(
-      strategy.validate({ sub: 5, correo: 'u@x.y', rolId: 2 }),
-    ).resolves.toEqual({ sub: 5, correo: 'u@x.y', rolId: 2 });
-    await expect(
-      strategy.validate({ sub: 5, correo: 'u@x.y' }),
-    ).resolves.toEqual({ sub: 5, correo: 'u@x.y' });
+    await expect(strategy.validate({ sub: 5, correo: 'anterior@x.y', rolId: 2 }))
+      .resolves.toEqual({ sub: '5', correo: 'actual@x.y', rolId: '3' });
+    expect(buscarUsuario).toHaveBeenCalledWith({ where: { id: '5' } });
+    buscarUsuario.mockResolvedValueOnce({ id: '5', correo: 'actual@x.y', activo: false, eliminado_en: null, rol_id: '3' });
+    await expect(strategy.validate({ sub: 5, correo: 'anterior@x.y', rolId: 2 }))
+      .rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

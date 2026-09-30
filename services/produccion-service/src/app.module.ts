@@ -7,17 +7,22 @@ import { OrdenesModule } from './ordenes/ordenes.module';
 import { RecetasModule } from './recetas/recetas.module';
 import { MaterialesModule } from './materiales/materiales.module';
 import { InventarioModule } from './inventario/inventario.module';
+import { MaterialCalculationService } from './material-calculation/material-calculation.service';
+import { MaterialCalculationController } from './material-calculation/material-calculation.controller';
 
 @Module({
   imports: [
-    DatabaseModule, 
-    HealthModule, 
-    AvancesProduccionModule, 
-    OrdenesModule, 
-    RecetasModule, 
-    MaterialesModule, 
-    InventarioModule
+    DatabaseModule,
+    HealthModule,
+    AvancesProduccionModule,
+    OrdenesModule,
+    RecetasModule,
+    MaterialesModule,
+    InventarioModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController, MaterialCalculationController],
+  providers: [
+    MaterialCalculationService,
+  ],
 })
 export class AppModule {}

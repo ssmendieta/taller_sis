@@ -14,7 +14,6 @@ import { EstadoOrden } from '../ordenes/estado-orden.enum';
 import type { UsuarioAutenticadoProduccion } from '../ordenes/ordenes.service';
 import { AvancesProduccion } from './entities/avances_produccion.entity';
 import { CreateAvancesProduccionDto } from './dto/create-avances_produccion.dto';
-import { UpdateAvancesProduccionDto } from './dto/update-avances_produccion.dto';
 
 export interface RegistroAvanceResponse {
   avance: AvancesProduccion;
@@ -144,18 +143,54 @@ export class AvancesProduccionService {
   }
 
   findAll() {
-    return `This action returns all avancesProduccion`;
+    return this.ordenRepository.manager.query(`
+      SELECT id::text AS id, orden_id::text AS orden_id,
+             cantidad_producida::text AS cantidad_producida, fecha_hora,
+             usuario_responsable_id::text AS usuario_responsable_id
+      FROM avances_produccion ORDER BY fecha_hora DESC, id DESC
+    `);
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} avancesProduccion`;
+  async findOne(id: number) {
+    const [avance] = await this.ordenRepository.manager.query(
+      `
+      SELECT id::text AS id, orden_id::text AS orden_id,
+             cantidad_producida::text AS cantidad_producida, fecha_hora,
+             usuario_responsable_id::text AS usuario_responsable_id
+      FROM avances_produccion WHERE id = $1
+    `,
+      [id],
+    );
+    if (!avance) throw new NotFoundException('Avance no encontrado');
+    return avance;
   }
 
-  update(id: number, updateAvancesProduccionDto: UpdateAvancesProduccionDto) {
-    return `This action updates a #${id} avancesProduccion`;
+  // Avances de una orden (aporte de ramagemina, ABC-195/ABC-196).
+  listarPorOrden(ordenId: number) {
+    return this.ordenRepository.manager.query(
+      `
+      SELECT id::text AS id, orden_id::text AS orden_id,
+             cantidad_producida::text AS cantidad_producida, fecha_hora,
+             usuario_responsable_id::text AS usuario_responsable_id
+      FROM avances_produccion
+      WHERE orden_id = $1
+      ORDER BY fecha_hora DESC, id DESC
+    `,
+      [ordenId],
+    );
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} avancesProduccion`;
+  // Total producido de una orden (aporte de ramagemina, ABC-195/ABC-196).
+  async totalProducido(ordenId: number) {
+    const [fila] = (await this.ordenRepository.manager.query(
+      `
+      SELECT COALESCE(SUM(cantidad_producida), 0) AS total
+      FROM avances_produccion
+      WHERE orden_id = $1
+    `,
+      [ordenId],
+    )) as Array<{ total: string | number }>;
+
+    return Number(fila?.total ?? 0);
   }
 }

@@ -532,25 +532,15 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   });
 
   it('conserva la búsqueda existente por estado, producto y fecha', async () => {
-    const getMany = jest.fn().mockResolvedValue([]);
-    const andWhere = jest.fn();
-    const where = jest.fn().mockReturnValue({ andWhere, getMany });
-    andWhere.mockReturnValue({ andWhere, getMany });
-    createQueryBuilder.mockReturnValue({ where });
+    const filas: unknown[] = [];
+    (repositorioMock.query as jest.Mock).mockResolvedValue(filas);
 
-    await expect(service.buscar('PLANIFICADA', 'OP-00', '2026-10-01')).resolves.toEqual([]);
+    await expect(service.buscar('PLANIFICADA', 'OP-00', '2026-10-01')).resolves.toBe(filas);
 
-    expect(where).toHaveBeenCalledWith('1=1');
-    expect(andWhere).toHaveBeenNthCalledWith(1, 'orden.estado = :estado', {
-      estado: 'PLANIFICADA',
-    });
-    expect(andWhere).toHaveBeenNthCalledWith(2, 'orden.codigo ILIKE :producto', {
-      producto: '%OP-00%',
-    });
-    expect(andWhere).toHaveBeenNthCalledWith(3, 'orden.fecha_programada = :fecha', {
-      fecha: '2026-10-01',
-    });
-    expect(getMany).toHaveBeenCalledTimes(1);
+    expect(repositorioMock.query).toHaveBeenCalledWith(
+      expect.stringContaining('FROM ordenes_produccion'),
+      ['PLANIFICADA', 'OP-00', '2026-10-01'],
+    );
   });
 
 
@@ -645,6 +635,29 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     await expect(
       service.compararDisponibilidadMateriales(999),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('obtenerMateriales multiplica la cantidad requerida por la cantidad solicitada de la orden', async () => {
+    repositorioMock.query = jest.fn().mockResolvedValue([
+      {
+        orden_id: 1,
+        orden_codigo: 'OP-001',
+        codigo: 'MAT-001',
+        nombre: 'Acero',
+        unidad_medida: 'kg',
+        cantidad_requerida: 20,
+      },
+    ]);
+
+    const resultado = await service.obtenerMateriales(1);
+
+    const [sql, parametros] = repositorioMock.query.mock.calls[0];
+    expect(sql).toMatch(
+      /ROUND\(rm\.cantidad_requerida \* o\.cantidad_solicitada,\s*4\)/,
+    );
+    expect(sql).toContain('FROM ordenes_produccion');
+    expect(parametros).toEqual([1]);
+    expect(resultado[0].cantidad_requerida).toBe(20);
   });
 
 });

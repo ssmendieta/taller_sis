@@ -2,12 +2,15 @@ import {
   Controller,
   Get,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 
 import { InventarioService } from './inventario.service';
+import { SesionGuard } from '../auth/sesion.guard';
 
 
 
+@UseGuards(SesionGuard)
 @Controller('inventario')
 export class InventarioController {
 

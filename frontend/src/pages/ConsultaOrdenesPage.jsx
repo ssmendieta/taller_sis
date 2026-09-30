@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { obtenerOrdenesProduccion } from "../services/api.js";
+import { cambiarEstadoOrdenProduccion, obtenerOrdenesProduccion } from "../services/api.js";
 import "../styles/consulta-ordenes.css";
 
 const esDemostracion = import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo") === "1";
@@ -33,6 +33,39 @@ function mostrarResponsable(orden) {
     (orden.responsable_usuario_id ?? orden.responsableUsuarioId ? `Usuario ${orden.responsable_usuario_id ?? orden.responsableUsuarioId}` : "—");
 }
 
+function leerSesionProduccion() {
+  try {
+    const token = sessionStorage.getItem("accessToken") || localStorage.getItem("accessToken");
+    const guardado = sessionStorage.getItem("usuario") || localStorage.getItem("usuario");
+    if (!token || !guardado) return null;
+
+    const usuario = JSON.parse(guardado);
+    const nombreRol = typeof usuario?.rol === "string" ? usuario.rol : usuario?.rol?.nombre;
+    const rol = nombreRol?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const id = Number(usuario?.id);
+    if (rol !== "encargado de produccion" || !Number.isSafeInteger(id) || id < 1) return null;
+    return { id };
+  } catch {
+    return null;
+  }
+}
+
+// Etiquetas del modal de confirmación por estado de destino (ABC-189: el
+// inicio de producción comparte el mismo flujo de confirmación que
+// finalizar y cancelar).
+const ETIQUETAS_ACCION = {
+  CANCELADA: { titulo: "cancelación", frase: (codigo) => `¿Quieres cancelar la orden ${codigo}?` },
+  EN_PRODUCCION: {
+    titulo: "inicio de producción",
+    frase: (codigo) => `¿Quieres iniciar la producción de la orden ${codigo}?`,
+  },
+  FINALIZADA: { titulo: "finalización", frase: (codigo) => `¿Quieres finalizar la orden ${codigo}?` },
+};
+
+function etiquetaAccion(nuevoEstado) {
+  return ETIQUETAS_ACCION[nuevoEstado] ?? ETIQUETAS_ACCION.FINALIZADA;
+}
+
 export default function ConsultaOrdenesPage() {
   const [ordenes, setOrdenes] = useState(esDemostracion ? ordenesEjemplo : []);
   const [cargando, setCargando] = useState(!esDemostracion);
@@ -42,6 +75,58 @@ export default function ConsultaOrdenesPage() {
   const [estado, setEstado] = useState("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
+  const [accion, setAccion] = useState(null);
+  const [motivo, setMotivo] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [errorCambio, setErrorCambio] = useState("");
+  const [aviso, setAviso] = useState("");
+  const puedeCerrarOrdenes = !esDemostracion && Boolean(leerSesionProduccion());
+
+  function abrirAccion(orden, nuevoEstado) {
+    setAccion({ orden, nuevoEstado });
+    setMotivo("");
+    setErrorCambio("");
+    setAviso("");
+  }
+
+  async function confirmarAccion(event) {
+    event.preventDefault();
+    if (!accion || guardando) return;
+
+    const usuario = leerSesionProduccion();
+    if (!usuario) {
+      setErrorCambio("Tu sesión no permite cambiar el estado de las órdenes.");
+      return;
+    }
+    if (accion.nuevoEstado === "CANCELADA" && !motivo.trim()) {
+      setErrorCambio("Indica el motivo de cancelación.");
+      return;
+    }
+
+    setGuardando(true);
+    setErrorCambio("");
+    try {
+      await cambiarEstadoOrdenProduccion(
+        accion.orden.id,
+        accion.nuevoEstado,
+        accion.nuevoEstado === "CANCELADA" ? motivo.trim() : undefined,
+      );
+    } catch (fallo) {
+      setErrorCambio(fallo.message || "No se pudo cambiar el estado de la orden.");
+      setGuardando(false);
+      return;
+    }
+
+    setAccion(null);
+    setAviso(`La orden ${accion.orden.codigo} ahora está ${mostrarEstado(accion.nuevoEstado).toLowerCase()}.`);
+    try {
+      setOrdenes(await obtenerOrdenesProduccion());
+    } catch {
+      setErrorCambio("El cambio se guardó, pero no se pudo actualizar el listado. Pulsa Reintentar para ver el estado actual.");
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   useEffect(() => {
     if (esDemostracion) return;
@@ -80,7 +165,14 @@ export default function ConsultaOrdenesPage() {
         {!cargando && !error && <span className="orders-count">{ordenes.length} órdenes registradas</span>}
       </header>
 
-      {esDemostracion && <p className="orders-notice">Vista de ejemplo: uso de datos ficticiosnun.</p>}
+      {esDemostracion && <p className="orders-notice">Vista de ejemplo: estos datos son ficticios.</p>}
+      {aviso && <p className="orders-notice" role="status">{aviso}</p>}
+      {errorCambio && !accion && (
+        <div className="orders-feedback orders-error" role="alert">
+          <p>{errorCambio}</p>
+          <button type="button" onClick={() => { setErrorCambio(""); setIntento((actual) => actual + 1); }}>Reintentar</button>
+        </div>
+      )}
 
       {!cargando && !error && (
         <div className="orders-summary" aria-label="Resumen de órdenes">
@@ -115,7 +207,7 @@ export default function ConsultaOrdenesPage() {
           <div className="orders-table-wrap">
           <table className="orders-table">
             <caption>Listado de órdenes de producción</caption>
-            <thead><tr><th scope="col">Código</th><th scope="col">Producto</th><th scope="col">Cantidad</th><th scope="col">Fecha programada</th><th scope="col">Estado</th><th scope="col">Responsable</th></tr></thead>
+            <thead><tr><th scope="col">Código</th><th scope="col">Producto</th><th scope="col">Cantidad</th><th scope="col">Fecha programada</th><th scope="col">Estado</th><th scope="col">Responsable</th>{puedeCerrarOrdenes && <th scope="col">Acciones</th>}</tr></thead>
             <tbody>
               {ordenesVisibles.map((orden) => (
                 <tr key={orden.id ?? orden.codigo}>
@@ -125,12 +217,48 @@ export default function ConsultaOrdenesPage() {
                   <td>{mostrarFecha(orden.fecha_programada ?? orden.fechaProgramada)}</td>
                   <td><span className={`orders-status orders-status--${orden.estado ?? "DESCONOCIDO"}`}>{mostrarEstado(orden.estado)}</span></td>
                   <td>{mostrarResponsable(orden)}</td>
+                  {puedeCerrarOrdenes && (
+                    <td className="orders-actions">
+                      {orden.estado === "PLANIFICADA" && (
+                        <button type="button" disabled={guardando} onClick={() => abrirAccion(orden, "EN_PRODUCCION")}>Iniciar producción</button>
+                      )}
+                      {orden.estado === "EN_PRODUCCION" && (
+                        <button type="button" disabled={guardando} onClick={() => abrirAccion(orden, "FINALIZADA")}>Finalizar</button>
+                      )}
+                      {["PENDIENTE", "PLANIFICADA", "EN_PRODUCCION"].includes(orden.estado) && (
+                        <button type="button" disabled={guardando} onClick={() => abrirAccion(orden, "CANCELADA")}>Cancelar</button>
+                      )}
+                      {["FINALIZADA", "CANCELADA"].includes(orden.estado) && "—"}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
           </div>
           )}
+        </div>
+      )}
+      {accion && (
+        <div className="orders-modal-overlay">
+          <div className="orders-modal" role="dialog" aria-modal="true" aria-labelledby="orders-action-title">
+            <h2 id="orders-action-title">Confirmar {etiquetaAccion(accion.nuevoEstado).titulo}</h2>
+            <p>{etiquetaAccion(accion.nuevoEstado).frase(accion.orden.codigo)}</p>
+            <form onSubmit={confirmarAccion}>
+              {accion.nuevoEstado === "CANCELADA" && (
+                <label>Motivo de cancelación
+                  <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={500} required disabled={guardando} />
+                </label>
+              )}
+              {errorCambio && <p className="orders-modal-error" role="alert">{errorCambio}</p>}
+              <div className="orders-modal-actions">
+                <button type="button" onClick={() => setAccion(null)} disabled={guardando}>Volver</button>
+                <button type="submit" className="orders-modal-confirm" disabled={guardando}>
+                  {guardando ? "Guardando…" : `Confirmar ${etiquetaAccion(accion.nuevoEstado).titulo}`}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </section>

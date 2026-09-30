@@ -35,7 +35,7 @@ export class UsuariosService {
     throw error;
   }
 
-  async create(dto: CreateUsuarioDto, actorId?: number): Promise<Usuario> {
+  async create(dto: CreateUsuarioDto, actorId?: string | number): Promise<Usuario> {
     await this.validarRolActivo(dto.rol_id);
     const correo = dto.correo.trim().toLowerCase();
     if (await this.usuarios.createQueryBuilder('usuario')
@@ -59,7 +59,7 @@ export class UsuariosService {
         if (!creado) throw new NotFoundException('Usuario no encontrado');
 
         await this.auditoriaService.registrar({
-          usuarioId: actorId ? String(actorId) : null,
+          usuarioId: actorId != null ? String(actorId) : null,
           accion: 'CREACION_USUARIO',
           entidad: 'USUARIO',
           entidadId: creado.id,
@@ -97,7 +97,7 @@ export class UsuariosService {
     return usuario;
   }
 
-  async update(id: string, dto: UpdateUsuarioDto, actorId?: number): Promise<Usuario> {
+  async update(id: string, dto: UpdateUsuarioDto, actorId?: string | number): Promise<Usuario> {
     const usuario = await this.findOne(id);
     const datosAntes = {
       nombre_completo: usuario.nombre_completo,
@@ -139,7 +139,7 @@ export class UsuariosService {
 
         if (cambioRol) {
           await this.auditoriaService.registrar({
-            usuarioId: actorId ? String(actorId) : null,
+            usuarioId: actorId != null ? String(actorId) : null,
             accion: 'CAMBIO_ROL',
             entidad: 'USUARIO',
             entidadId: id,
@@ -151,7 +151,7 @@ export class UsuariosService {
 
         if (dto.nombre_completo !== undefined || dto.correo !== undefined || dto.password !== undefined) {
           await this.auditoriaService.registrar({
-            usuarioId: actorId ? String(actorId) : null,
+            usuarioId: actorId != null ? String(actorId) : null,
             accion: 'MODIFICACION_USUARIO',
             entidad: 'USUARIO',
             entidadId: id,
@@ -168,7 +168,7 @@ export class UsuariosService {
     }
   }
 
-  async changeStatus(id: string, activo: boolean, actorId?: number): Promise<Usuario> {
+  async changeStatus(id: string, activo: boolean, actorId?: string | number): Promise<Usuario> {
     if (typeof activo !== 'boolean') throw new BadRequestException('activo debe ser booleano');
     const usuario = await this.findOne(id);
     const estadoAntes = usuario.activo;
@@ -183,7 +183,7 @@ export class UsuariosService {
       if (!actualizado) throw new NotFoundException('Usuario no encontrado');
 
       await this.auditoriaService.registrar({
-        usuarioId: actorId ? String(actorId) : null,
+        usuarioId: actorId != null ? String(actorId) : null,
         accion: 'CAMBIO_ESTADO',
         entidad: 'USUARIO',
         entidadId: id,
@@ -196,7 +196,7 @@ export class UsuariosService {
     });
   }
 
-  async softDelete(id: string, actorId?: number): Promise<void> {
+  async softDelete(id: string, actorId?: string | number): Promise<void> {
     const usuario = await this.findOne(id);
     const fechaBaja = new Date();
     const estadoAntes = usuario.activo; 
@@ -208,7 +208,7 @@ export class UsuariosService {
       await usuarios.save(usuario);
 
       await this.auditoriaService.registrar({
-        usuarioId: actorId ? String(actorId) : null,
+        usuarioId: actorId != null ? String(actorId) : null,
         accion: 'ELIMINACION_LOGICA',
         entidad: 'USUARIO',
         entidadId: id,

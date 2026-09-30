@@ -1,15 +1,14 @@
-import { Type } from 'class-transformer';
 import {
   IsEnum,
-  IsInt,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
 } from 'class-validator';
 import { EstadoOrden } from './estado-orden.enum';
 
 export class CambiarEstadoOrdenDto {
+  // Lo establece el controlador a partir de la sesión verificada, no el cliente.
+  usuarioResponsableId?: number;
   @IsEnum(EstadoOrden)
   nuevoEstado: EstadoOrden;
 
@@ -18,10 +17,4 @@ export class CambiarEstadoOrdenDto {
   @MaxLength(500)
   motivo?: string;
 
-  // TODO: reemplazar por el id del usuario autenticado cuando el
-  // PermisosGuard de ABC-151 esté disponible.
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  usuarioResponsableId: number;
 }

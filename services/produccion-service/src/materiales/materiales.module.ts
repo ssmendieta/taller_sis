@@ -8,6 +8,8 @@ import { MaterialesService } from './materiales.service';
 
 import { MaterialesController } from './materiales.controller';
 
+import { SesionGuard } from '../auth/sesion.guard';
+
 
 
 @Module({
@@ -26,6 +28,7 @@ import { MaterialesController } from './materiales.controller';
 
   providers: [
     MaterialesService,
+    SesionGuard,
   ],
 
 

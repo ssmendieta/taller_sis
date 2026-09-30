@@ -2,7 +2,10 @@ import {Entity, PrimaryGeneratedColumn, Column} from 'typeorm';
 
 @Entity('avances_produccion')
 export class AvancesProduccion {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('identity', {
+    type: 'bigint',
+    generatedIdentity: 'ALWAYS',
+  })
   id!: string;
 
   @Column({type: 'bigint'})

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PermisosController } from './permisos.controller';
 import { PermisosService } from './permisos.service';
+import { PermisosGuard } from '../authz/permisos.guard';
 
 describe('PermisosController', () => {
   let controller: PermisosController;
@@ -9,7 +10,10 @@ describe('PermisosController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PermisosController],
       providers: [PermisosService],
-    }).compile();
+    })
+      .overrideGuard(PermisosGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<PermisosController>(PermisosController);
   });
