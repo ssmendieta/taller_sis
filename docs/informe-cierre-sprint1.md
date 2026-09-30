@@ -5,22 +5,21 @@ Revisar con: `git diff origin/develop..feature/cierre-sprint1 --stat`.
 
 ## Paquetes y commits
 
-| Paquete | Commit | Claves ABC |
-| --- | --- | --- |
-| WP1 autorización por permisos | `feat(WP1): autorizacion por permisos y contrato login/me con codigo` | ABC-151, 153, 166, 134 |
-| WP2 roles y permisos reales | `feat(WP2): CRUD real de roles y permisos con auditoria y UI conectada` | ABC-87, 150, 152, 151 |
-| WP3 seeds | `feat(WP3): seed idempotente de admin y demo sin endpoints de inventario` | ABC-182, 179, 139, 143 |
-| WP4 sesión en servidor | `feat(WP4): sesion en servidor con jti, logout y expiracion deslizante` | ABC-177, 176 |
-| WP5 usuarios | `feat(WP5): protege ultimo admin y alinea filtro de bajas` | ABC-88, 156, 157, 180, 181 |
-| WP6 auditoría | `feat(WP6): auditoria con nombres, filtros, trigger inmutable y sin demos` | ABC-90, 164, 183, 184, 185, 186 |
-| WP7 órdenes backend | `feat(WP7): ordenes con codigo secuencial, validaciones, snapshots y busqueda por rangos` | ABC-116, 117, 118, 119, 147, 148, 149, 141 |
-| WP9 recetas y materiales | `feat(WP9): recetas completas con versiones, materiales con disponibilidad y bloqueo 409` | ABC-135, 136, 137, 138, 139 |
-| WP10 e2e + trazabilidad | `feat(WP10): e2e sprint1, trazabilidad y arranque real` | ABC-165–171, 186, 190, 193, 197 |
-| WP11 docs e infra | `feat(WP11): readme ejecutable, compose estricto, higiene de build` | ABC-159–163, 198, 173 |
+| Paquete | Commit |
+| --- | --- |
+| WP1 autorización por permisos | `autorizacion por permisos` |
+| WP2 roles y permisos reales | `roles y permisos reales` |
+| WP3 seeds | `seed de admin y datos demo` |
+| WP4 sesión en servidor | `sesion en servidor con logout` |
+| WP5 usuarios | `proteccion de usuarios administradores` |
+| WP6 auditoría | `auditoria con filtros e inmutable` |
+| WP7 órdenes backend | `ordenes con validaciones y codigos secuenciales` |
+| WP9 recetas y materiales | `recetas con versiones y materiales` |
+| WP10 e2e + trazabilidad y WP11 docs e infra (mismo commit) | `pruebas e2e, trazabilidad y documentacion` |
 
-Además: `fix(WP3): seed:admin transaccional` (el primer intento dejaba el
-usuario sin auditoría si fallaba el insert) y `fix(WP10): permiso
-ordenes.consultar para Encargado` — ver "Bloqueante" abajo.
+Además, dentro de ese commit van dos fixes: `seed:admin` transaccional (el
+primer intento dejaba el usuario sin auditoría si fallaba el insert) y el
+permiso `ordenes.consultar` para Encargado — ver "Bloqueante" abajo.
 
 ## Verificaciones (evidencia resumida)
 
