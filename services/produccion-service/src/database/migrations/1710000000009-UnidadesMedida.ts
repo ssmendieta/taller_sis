@@ -70,8 +70,11 @@ export class UnidadesMedida1710000000009 implements MigrationInterface {
     `);
 
     // Vistas: exponen la unidad del producto junto a las cantidades.
+    // DROP + CREATE (no OR REPLACE): PG no permite agregar una columna en
+    // medio de la vista con OR REPLACE (error 42P16).
+    await queryRunner.query(`DROP VIEW IF EXISTS vw_orden_materiales_requeridos;`);
     await queryRunner.query(`
-      CREATE OR REPLACE VIEW vw_orden_materiales_requeridos AS
+      CREATE VIEW vw_orden_materiales_requeridos AS
       SELECT
           o.id AS orden_id,
           o.codigo AS orden_codigo,
@@ -105,8 +108,9 @@ export class UnidadesMedida1710000000009 implements MigrationInterface {
       END $$;
     `);
     await queryRunner.query(`ALTER TABLE recetas DROP COLUMN IF EXISTS unidad_producto;`);
+    await queryRunner.query(`DROP VIEW IF EXISTS vw_orden_materiales_requeridos;`);
     await queryRunner.query(`
-      CREATE OR REPLACE VIEW vw_orden_materiales_requeridos AS
+      CREATE VIEW vw_orden_materiales_requeridos AS
       SELECT
           o.id AS orden_id,
           o.codigo AS orden_codigo,
