@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 
 import { Material } from './entities/material.entity';
 import { CreateMaterialDto } from './dto/create-material.dto';
+import { UpdateMaterialDto } from './dto/update-material.dto';
 
 
 @Injectable()
@@ -49,7 +50,7 @@ export class MaterialesService {
 
 
   // Actualizar material
-  async update(id: number, data: Partial<CreateMaterialDto>) {
+  async update(id: number, data: UpdateMaterialDto) {
 
     await this.materialRepository.update(
       id,

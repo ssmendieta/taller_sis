@@ -11,6 +11,7 @@ import {
 
 import { MaterialesService } from './materiales.service';
 import { CreateMaterialDto } from './dto/create-material.dto';
+import { UpdateMaterialDto } from './dto/update-material.dto';
 
 
 
@@ -52,7 +53,7 @@ export class MaterialesController {
   @Put(':id')
   update(
     @Param('id') id: string,
-    @Body() data: Partial<CreateMaterialDto>,
+    @Body() data: UpdateMaterialDto,
   ) {
     return this.materialesService.update(Number(id), data);
   }
