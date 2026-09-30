@@ -637,4 +637,27 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it('obtenerMateriales multiplica la cantidad requerida por la cantidad solicitada de la orden', async () => {
+    repositorioMock.query = jest.fn().mockResolvedValue([
+      {
+        orden_id: 1,
+        orden_codigo: 'OP-001',
+        codigo: 'MAT-001',
+        nombre: 'Acero',
+        unidad_medida: 'kg',
+        cantidad_requerida: 20,
+      },
+    ]);
+
+    const resultado = await service.obtenerMateriales(1);
+
+    const [sql, parametros] = repositorioMock.query.mock.calls[0];
+    expect(sql).toMatch(
+      /ROUND\(rm\.cantidad_requerida \* o\.cantidad_solicitada,\s*4\)/,
+    );
+    expect(sql).toContain('FROM ordenes_produccion');
+    expect(parametros).toEqual([1]);
+    expect(resultado[0].cantidad_requerida).toBe(20);
+  });
+
 });

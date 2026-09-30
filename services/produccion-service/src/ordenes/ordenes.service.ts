@@ -82,6 +82,10 @@ export class OrdenesService {
   }
 
   async obtenerMateriales(id: number) {
+    // La receta define la cantidad por unidad; el total que necesita la
+    // orden es esa cantidad multiplicada por la cantidad solicitada
+    // (misma regla que compararDisponibilidadMateriales). Se conserva el
+    // alias 'cantidad_requerida' por compatibilidad con los consumidores.
     const resultado = await this.ordenRepository.query(`
       SELECT
         o.id AS orden_id,
@@ -89,7 +93,7 @@ export class OrdenesService {
         m.codigo,
         m.nombre,
         m.unidad_medida,
-        rm.cantidad_requerida
+        ROUND(rm.cantidad_requerida * o.cantidad_solicitada, 4) AS cantidad_requerida
       FROM ordenes_produccion o
       INNER JOIN receta_material rm ON rm.receta_id = o.receta_id
       INNER JOIN materiales m ON m.id = rm.material_id
