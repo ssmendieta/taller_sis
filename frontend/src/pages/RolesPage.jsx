@@ -154,6 +154,7 @@ function RolesPage() {
             <input
               type="text"
               placeholder="Buscar rol..."
+              aria-label="Buscar rol"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />

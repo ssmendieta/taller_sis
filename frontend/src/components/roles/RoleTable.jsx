@@ -4,10 +4,10 @@ function RoleTable({ roles, onView, onEdit }) {
       <table className="roles-table">
         <thead>
           <tr>
-            <th>Rol</th>
-            <th>Descripción</th>
-            <th>Permisos</th>
-            <th>Acciones</th>
+            <th scope="col">Rol</th>
+            <th scope="col">Descripción</th>
+            <th scope="col">Permisos</th>
+            <th scope="col">Acciones</th>
           </tr>
         </thead>
 
@@ -39,6 +39,7 @@ function RoleTable({ roles, onView, onEdit }) {
                     className="action-button"
                     onClick={() => onView(role)}
                     title="Consultar permisos"
+                    aria-label={`Consultar permisos de ${role.name}`}
                   >
                     👁️
                   </button>
@@ -47,6 +48,7 @@ function RoleTable({ roles, onView, onEdit }) {
                     className="action-button"
                     onClick={() => onEdit(role)}
                     title="Modificar permisos"
+                    aria-label={`Modificar permisos de ${role.name}`}
                   >
                     ✏️
                   </button>

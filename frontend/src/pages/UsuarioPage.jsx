@@ -238,17 +238,20 @@ function UsuarioPage() {
           <span>⌕</span>
 
           <input
+            id="busqueda-usuarios"
             type="text"
             placeholder="Buscar por nombre o correo..."
+            aria-label="Buscar por nombre o correo"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
           />
         </div>
 
         <div className="filtro">
-          <label>Estado:</label>
+          <label htmlFor="filtro-estado-usuarios">Estado:</label>
 
           <select
+            id="filtro-estado-usuarios"
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
           >
@@ -266,11 +269,11 @@ function UsuarioPage() {
 
           <thead>
             <tr>
-              <th>Nombre</th>
-              <th>Correo</th>
-              <th>Rol</th>
-              <th>Estado</th>
-              <th>Acciones</th>
+              <th scope="col">Nombre</th>
+              <th scope="col">Correo</th>
+              <th scope="col">Rol</th>
+              <th scope="col">Estado</th>
+              <th scope="col">Acciones</th>
             </tr>
           </thead>
 

@@ -5,7 +5,11 @@ import {
   crearMaterial,
   listarMateriales,
 } from "../services/materiales";
+import PageHeader from "../components/ui/PageHeader.jsx";
 
+// Lógica intacta; solo cambia la presentación al sistema común (ts-*).
+// Sin entrada en el menú: se gestiona desde Recetas y el detalle de la orden;
+// la ruta /materiales sigue protegida y funcional.
 export default function MaterialesPage() {
   const [materiales, setMateriales] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState({});
@@ -73,61 +77,90 @@ export default function MaterialesPage() {
   }
 
   return (
-    <div>
-      <h1>Materiales</h1>
-      <p>Listado, creación y edición de materiales con su disponibilidad de inventario.</p>
-      <button type="button" onClick={cargar}>Reintentar</button>
-      {cargando && <p role="status">Cargando materiales…</p>}
-      {error && <p role="alert">{error}</p>}
-      {mensaje && <p role="status">{mensaje}</p>}
-
-      {!cargando && !error && materiales.length === 0 && <p>Todavía no hay materiales.</p>}
-      {!cargando && !error && materiales.length > 0 && (
-        <table border="1">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Nombre</th>
-              <th>Unidad</th>
-              <th>Disponible</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {materiales.map((m) => (
-              <tr key={m.id}>
-                <td>{m.codigo}</td>
-                <td>{m.nombre}</td>
-                <td>{m.unidadMedida ?? m.unidad_medida}</td>
-                <td>{disponibilidad[m.id]?.cantidadDisponible ?? "—"}</td>
-                <td>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditando(m);
-                      setForm({ codigo: m.codigo, nombre: m.nombre, unidadMedida: m.unidadMedida ?? m.unidad_medida ?? "" });
-                    }}
-                  >
-                    Editar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <section className="ts-page" aria-labelledby="materiales-titulo">
+      <PageHeader
+        titulo="Materiales"
+        descripcion="Listado, creación y edición de materiales con su disponibilidad de inventario."
+        conteo={!cargando && !error ? `${materiales.length} materiales` : null}
+      />
+      {mensaje && <p className="ts-success" role="status">{mensaje}</p>}
+      {cargando && <p className="ts-feedback" role="status">Cargando materiales…</p>}
+      {error && (
+        <div className="ts-feedback ts-error" role="alert">
+          <p>{error}</p>
+          <button type="button" className="ts-btn" onClick={cargar}>Reintentar</button>
+        </div>
       )}
 
-      <h2>{editando ? "Editar material" : "Nuevo material"}</h2>
-      <form onSubmit={guardar}>
-        {!editando && (
-          <input placeholder="Código" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
-        )}
-        <input placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
-        <input placeholder="Unidad (kg, unidad...)" value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} />
-        {errorForm && <p role="alert">{errorForm}</p>}
-        <button type="submit">Guardar</button>
-        {editando && <button type="button" onClick={() => { setEditando(null); setForm({ codigo: "", nombre: "", unidadMedida: "" }); }}>Cancelar</button>}
-      </form>
-    </div>
+      {!cargando && !error && (
+        <div className="ts-panel">
+          <div className="ts-panel-title"><h2 id="materiales-titulo">Listado de materiales</h2><span>{materiales.length} resultados</span></div>
+          {materiales.length === 0 ? (
+            <p className="ts-empty">Todavía no hay materiales.</p>
+          ) : (
+            <div className="ts-table-wrap">
+              <table className="ts-table">
+                <caption>Materiales e inventario</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Código</th>
+                    <th scope="col">Nombre</th>
+                    <th scope="col">Unidad</th>
+                    <th scope="col">Disponible</th>
+                    <th scope="col">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {materiales.map((m) => (
+                    <tr key={m.id}>
+                      <td className="ts-code">{m.codigo}</td>
+                      <td>{m.nombre}</td>
+                      <td>{m.unidadMedida ?? m.unidad_medida}</td>
+                      <td>{disponibilidad[m.id]?.cantidadDisponible ?? "—"}</td>
+                      <td className="ts-actions">
+                        <button
+                          type="button"
+                          className="ts-btn"
+                          aria-label={`Editar ${m.nombre}`}
+                          onClick={() => {
+                            setEditando(m);
+                            setForm({ codigo: m.codigo, nombre: m.nombre, unidadMedida: m.unidadMedida ?? m.unidad_medida ?? "" });
+                          }}
+                        >
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ padding: "4px 20px 16px" }}>
+            <h3>{editando ? "Editar material" : "Nuevo material"}</h3>
+            <form onSubmit={guardar}>
+              <div className="ts-filters" style={{ padding: 0 }}>
+                {!editando && (
+                  <label htmlFor="material-codigo">Código *
+                    <input id="material-codigo" placeholder="Código" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
+                  </label>
+                )}
+                <label htmlFor="material-nombre">Nombre *
+                  <input id="material-nombre" placeholder="Nombre" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+                </label>
+                <label htmlFor="material-unidad">Unidad (kg, unidad…) *
+                  <input id="material-unidad" placeholder="Unidad (kg, unidad...)" value={form.unidadMedida} onChange={(e) => setForm({ ...form, unidadMedida: e.target.value })} />
+                </label>
+              </div>
+              {errorForm && <p role="alert" className="ts-modal-error">{errorForm}</p>}
+              <div className="ts-btn-group" style={{ marginTop: 10 }}>
+                <button type="submit" className="ts-btn ts-btn-primary">Guardar</button>
+                {editando && <button type="button" className="ts-btn" onClick={() => { setEditando(null); setForm({ codigo: "", nombre: "", unidadMedida: "" }); }}>Cancelar</button>}
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

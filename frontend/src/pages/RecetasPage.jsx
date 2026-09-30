@@ -8,9 +8,12 @@ import {
   obtenerRecetas,
 } from "../services/recetasService";
 import { listarMateriales } from "../services/materiales";
+import PageHeader from "../components/ui/PageHeader.jsx";
+import { BadgeActivo } from "../components/ui/Badges.jsx";
 
 const lineaVacia = { material_id: "", cantidad_requerida: "" };
 
+// Lógica intacta; solo cambia la presentación al sistema común (ts-*).
 export default function RecetasPage() {
   const [recetas, setRecetas] = useState([]);
   const [materiales, setMateriales] = useState([]);
@@ -169,118 +172,150 @@ export default function RecetasPage() {
   const visibles = recetas.filter((r) => (verInactivas ? true : r.activa));
 
   return (
-    <div>
-      <h1>Recetas</h1>
-      <p>Gestión de recetas de productos y sus materiales.</p>
-      <div>
-        <button type="button" onClick={abrirCrear}>Nueva receta</button>
-        <label>
-          <input type="checkbox" checked={verInactivas} onChange={(e) => setVerInactivas(e.target.checked)} />
-          Ver inactivas (versiones anteriores)
-        </label>
-        <button type="button" onClick={cargar}>Reintentar</button>
-      </div>
+    <section className="ts-page" aria-labelledby="recetas-titulo">
+      <PageHeader
+        titulo="Recetas"
+        descripcion="Gestión de recetas de productos y sus materiales."
+        conteo={!cargando && !error ? `${visibles.length} recetas` : null}
+        accion={<button type="button" className="ts-btn ts-btn-primary" onClick={abrirCrear}>+ Nueva receta</button>}
+      />
 
-      {cargando && <p role="status">Cargando recetas…</p>}
-      {error && <p role="alert">{error}</p>}
-      {mensaje && <p role="status">{mensaje}</p>}
+      {mensaje && <p className="ts-success" role="status">{mensaje}</p>}
+      {cargando && <p className="ts-feedback" role="status">Cargando recetas…</p>}
+      {error && (
+        <div className="ts-feedback ts-error" role="alert">
+          <p>{error}</p>
+          <button type="button" className="ts-btn" onClick={cargar}>Reintentar</button>
+        </div>
+      )}
 
-      {!cargando && !error && visibles.length === 0 && <p>Todavía no hay recetas.</p>}
-      {!cargando && !error && visibles.length > 0 && (
-        <table border="1">
-          <thead>
-            <tr>
-              <th>Código</th>
-              <th>Producto</th>
-              <th>Estado</th>
-              <th>Materiales</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.map((receta) => (
-              <tr key={receta.id}>
-                <td>{receta.producto_codigo}</td>
-                <td>{receta.producto_nombre}</td>
-                <td>{receta.activa ? "Activa" : "Inactiva"}</td>
-                <td>
-                  {(receta.materiales ?? []).map((m) => (
-                    <div key={m.material_id}>
-                      {m.nombre ?? m.codigo ?? `Material ${m.material_id}`} — {m.cantidad_requerida} {m.unidad_medida ?? ""}
-                    </div>
+      {!cargando && !error && (
+        <div className="ts-panel">
+          <div className="ts-panel-title"><h2 id="recetas-titulo">Listado de recetas</h2><span>{visibles.length} resultados</span></div>
+          <div className="ts-filters">
+            <label htmlFor="recetas-ver-inactivas" style={{ flex: "0 0 auto", flexDirection: "row", alignItems: "center" }}>
+              <input id="recetas-ver-inactivas" type="checkbox" checked={verInactivas} onChange={(e) => setVerInactivas(e.target.checked)} />
+              Ver inactivas (versiones anteriores)
+            </label>
+          </div>
+          {visibles.length === 0 ? (
+            <p className="ts-empty">Todavía no hay recetas.</p>
+          ) : (
+            <div className="ts-table-wrap">
+              <table className="ts-table">
+                <caption>Recetas de productos</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Código</th>
+                    <th scope="col">Producto</th>
+                    <th scope="col">Estado</th>
+                    <th scope="col">Materiales</th>
+                    <th scope="col">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map((receta) => (
+                    <tr key={receta.id}>
+                      <td className="ts-code">{receta.producto_codigo}</td>
+                      <td>{receta.producto_nombre}</td>
+                      <td><BadgeActivo activo={receta.activa} /></td>
+                      <td>
+                        {(receta.materiales ?? []).map((m) => (
+                          <div key={m.material_id}>
+                            {m.nombre ?? m.codigo ?? `Material ${m.material_id}`} — {m.cantidad_requerida} {m.unidad_medida ?? ""}
+                          </div>
+                        ))}
+                      </td>
+                      <td className="ts-actions">
+                        <button type="button" className="ts-btn" onClick={() => abrirEditar(receta)}>Editar</button>
+                        {receta.activa && <button type="button" className="ts-btn" onClick={() => desactivar(receta)}>Desactivar</button>}
+                        <button type="button" className="ts-btn" onClick={() => abrirVersion(receta)}>Nueva versión</button>
+                        <button type="button" className="ts-btn" onClick={() => verVersiones(receta)}>Ver versiones</button>
+                      </td>
+                    </tr>
                   ))}
-                </td>
-                <td>
-                  <button type="button" onClick={() => abrirEditar(receta)}>Editar</button>
-                  {receta.activa && <button type="button" onClick={() => desactivar(receta)}>Desactivar</button>}
-                  <button type="button" onClick={() => abrirVersion(receta)}>Nueva versión</button>
-                  <button type="button" onClick={() => verVersiones(receta)}>Ver versiones</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
       {mostrarFormulario && (
-        <div>
-          <h2>{versionando ? `Nueva versión de ${versionando.producto_codigo}` : editando ? "Editar receta" : "Registrar receta"}</h2>
-          <form onSubmit={guardar}>
-            {!editando && !versionando && (
-              <input
-                placeholder="Código producto"
-                value={formulario.producto_codigo}
-                onChange={(e) => setFormulario({ ...formulario, producto_codigo: e.target.value })}
-              />
-            )}
-            <input
-              placeholder="Nombre producto"
-              value={formulario.producto_nombre}
-              onChange={(e) => setFormulario({ ...formulario, producto_nombre: e.target.value })}
-            />
-            <h3>Materiales</h3>
-            {lineas.map((linea, i) => (
-              <div key={i}>
-                <select value={linea.material_id} onChange={(e) => actualizarLinea(i, "material_id", e.target.value)}>
-                  <option value="">Selecciona material</option>
-                  {materiales.map((m) => (
-                    <option key={m.id} value={m.id}>{m.nombre} ({m.codigo})</option>
-                  ))}
-                </select>
+        <div className="ts-modal-overlay">
+          <div className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="receta-form-titulo">
+            <h2 id="receta-form-titulo">{versionando ? `Nueva versión de ${versionando.producto_codigo}` : editando ? "Editar receta" : "Registrar receta"}</h2>
+            <form onSubmit={guardar}>
+              {!editando && !versionando && (
+                <label htmlFor="receta-codigo">Código de producto *
+                  <input
+                    id="receta-codigo"
+                    placeholder="Código producto"
+                    value={formulario.producto_codigo}
+                    onChange={(e) => setFormulario({ ...formulario, producto_codigo: e.target.value })}
+                  />
+                </label>
+              )}
+              <label htmlFor="receta-nombre">Nombre de producto *
                 <input
-                  type="number"
-                  min="0.0001"
-                  step="0.0001"
-                  placeholder="Cantidad"
-                  value={linea.cantidad_requerida}
-                  onChange={(e) => actualizarLinea(i, "cantidad_requerida", e.target.value)}
+                  id="receta-nombre"
+                  placeholder="Nombre producto"
+                  value={formulario.producto_nombre}
+                  onChange={(e) => setFormulario({ ...formulario, producto_nombre: e.target.value })}
                 />
-                <button type="button" onClick={() => setLineas((actual) => actual.filter((_, j) => j !== i))}>Quitar</button>
+              </label>
+              <h3>Materiales</h3>
+              {lineas.map((linea, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <label style={{ flex: 2 }}>Material
+                    <select value={linea.material_id} onChange={(e) => actualizarLinea(i, "material_id", e.target.value)}>
+                      <option value="">Selecciona material</option>
+                      {materiales.map((m) => (
+                        <option key={m.id} value={m.id}>{m.nombre} ({m.codigo})</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label style={{ flex: 1 }}>Cantidad
+                    <input
+                      type="number"
+                      min="0.0001"
+                      step="0.0001"
+                      placeholder="Cantidad"
+                      value={linea.cantidad_requerida}
+                      onChange={(e) => actualizarLinea(i, "cantidad_requerida", e.target.value)}
+                    />
+                  </label>
+                  <button type="button" className="ts-btn" onClick={() => setLineas((actual) => actual.filter((_, j) => j !== i))}>Quitar</button>
+                </div>
+              ))}
+              <button type="button" className="ts-btn" onClick={() => setLineas((actual) => [...actual, { ...lineaVacia }])}>Agregar línea</button>
+              {errorForm && <p role="alert" className="ts-modal-error">{errorForm}</p>}
+              <div className="ts-modal-actions">
+                <button type="button" className="ts-btn" onClick={() => setMostrarFormulario(false)}>Cancelar</button>
+                <button type="submit" className="ts-btn ts-btn-primary">Guardar</button>
               </div>
-            ))}
-            <button type="button" onClick={() => setLineas((actual) => [...actual, { ...lineaVacia }])}>Agregar línea</button>
-            {errorForm && <p role="alert">{errorForm}</p>}
-            <div>
-              <button type="button" onClick={() => setMostrarFormulario(false)}>Cancelar</button>
-              <button type="submit">Guardar</button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
       {versiones && (
-        <div>
-          <h2>Versiones de {versiones.receta.producto_codigo}</h2>
-          <ul>
-            {(versiones.lista ?? []).map((v) => (
-              <li key={v.id}>
-                v{v.id} — {v.producto_nombre} — {v.activa ? "activa" : "inactiva"} — {(v.materiales ?? []).length} materiales
-              </li>
-            ))}
-          </ul>
-          <button type="button" onClick={() => setVersiones(null)}>Cerrar</button>
+        <div className="ts-modal-overlay">
+          <div className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="receta-versiones-titulo">
+            <h2 id="receta-versiones-titulo">Versiones de {versiones.receta.producto_codigo}</h2>
+            <ul>
+              {(versiones.lista ?? []).map((v) => (
+                <li key={v.id}>
+                  v{v.id} — {v.producto_nombre} — {v.activa ? "activa" : "inactiva"} — {(v.materiales ?? []).length} materiales
+                </li>
+              ))}
+            </ul>
+            <div className="ts-modal-actions">
+              <button type="button" className="ts-btn" onClick={() => setVersiones(null)}>Cerrar</button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

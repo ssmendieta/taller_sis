@@ -12,6 +12,9 @@
 .nav-logout:focus-visible { outline: 2px solid #164777; }
 .navbar a:focus-visible { outline: 2px solid #164777; outline-offset: 1px; }
 .nav-icon { width: 15px; height: 15px; flex: 0 0 15px; }
+.nav-foot { margin: 18px 9px 0; padding-top: 12px; border-top: 1px solid #eee; font-size: .74rem; }
+.nav-foot a { display: flex; align-items: center; gap: 8px; color: #8a8f96; text-decoration: none; }
+.nav-foot a:hover, .nav-foot a.active { color: #272a31; }
 .layout-main { display: flex; flex: 1; flex-direction: column; min-width: 0; }
 .layout-topbar { display: flex; align-items: center; justify-content: space-between; height: 50px; padding: 0 23px; box-sizing: border-box; border-bottom: 1px solid #e8e8e8; background: #fff; }
 .topbar-mark { color: #2a2d33; font-size: 1rem; }
