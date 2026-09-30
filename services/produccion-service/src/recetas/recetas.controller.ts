@@ -22,7 +22,9 @@ import {
   PermisoProduccionGuard,
   PERMISO_PRODUCCION,
 } from '../auth/permiso-produccion.guard';
+import { SesionGuard } from '../auth/sesion.guard';
 
+@UseGuards(SesionGuard)
 @UsePipes(
   new ValidationPipe({
     whitelist: true,
@@ -37,6 +39,8 @@ export class RecetasController {
     private readonly recetasVersionService: RecetasVersionService,
   ) {}
 
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'recetas.gestionar')
   @Post()
   create(@Body() dto: CreateRecetaDto) {
     return this.recetasService.create(dto);
@@ -66,6 +70,8 @@ export class RecetasController {
     return this.recetasService.findOne(id);
   }
 
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'recetas.gestionar')
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -74,6 +80,8 @@ export class RecetasController {
     return this.recetasService.update(id, dto);
   }
 
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'recetas.gestionar')
   @Patch(':id/desactivar')
   desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.recetasService.desactivar(id);

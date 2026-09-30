@@ -8,6 +8,8 @@ import { InventarioService } from './inventario.service';
 
 import { InventarioController } from './inventario.controller';
 
+import { SesionGuard } from '../auth/sesion.guard';
+
 
 
 @Module({
@@ -26,6 +28,7 @@ import { InventarioController } from './inventario.controller';
 
   providers: [
     InventarioService,
+    SesionGuard,
   ],
 
 })

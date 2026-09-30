@@ -6,15 +6,18 @@ import {
   Delete,
   Body,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 
 
 import { MaterialesService } from './materiales.service';
 import { CreateMaterialDto } from './dto/create-material.dto';
 import { UpdateMaterialDto } from './dto/update-material.dto';
+import { SesionGuard } from '../auth/sesion.guard';
 
 
 
+@UseGuards(SesionGuard)
 @Controller('materiales')
 export class MaterialesController {
 

@@ -1,8 +1,17 @@
 import { apiConfig } from "./api";
 
+function encabezados(extra = {}) {
+  const token = sessionStorage.getItem("accessToken");
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 export async function obtenerRecetas() {
   const response = await fetch(
-    `${apiConfig.apiUrl}/api/produccion/recetas`
+    `${apiConfig.apiUrl}/api/produccion/recetas`,
+    { headers: encabezados() }
   );
 
   if (!response.ok) {
@@ -18,9 +27,7 @@ export async function crearReceta(receta) {
     `${apiConfig.apiUrl}/api/produccion/recetas`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: encabezados({ "Content-Type": "application/json" }),
       body: JSON.stringify(receta),
     }
   );
