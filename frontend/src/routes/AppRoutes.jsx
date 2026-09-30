@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import LoginPage from "../pages/LoginPage.jsx";
 import OrdenesPage from "../pages/OrdenesPage.jsx";
 import OrdenDetallePage from "../pages/OrdenDetallePage.jsx";
@@ -8,16 +8,13 @@ import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
+import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 
 const privada = (pagina, permisos) => <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>;
 
-// Aterrizaje por rol (Sprint 1):
-// - Administrador -> /usuarios
-// - Encargado de Producción y Supervisor -> /ordenes
-// - Encargado de Logística (sin funciones en el Sprint 1) -> mensaje, sin menú.
 function InicioRedirect() {
   const { usuario } = useSesion();
   const location = useLocation();
@@ -34,25 +31,42 @@ function InicioRedirect() {
   );
 }
 
+function NoEncontrada() {
+  const { usuario } = useSesion();
+  return (
+    <main className="login-page">
+      <div className="ts-public" role="alert">
+        <h1>Página no encontrada</h1>
+        <p>La dirección no existe o fue movida. Vuelve al inicio para continuar.</p>
+        <Link className="ts-btn ts-btn-primary" to={usuario ? "/" : "/login"}>Volver al inicio</Link>
+      </div>
+    </main>
+  );
+}
+
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<InicioRedirect />} />
+      {/* Pública: sin barra lateral ni cabecera del sistema */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/ordenes" element={privada(<OrdenesPage />, ["ordenes.consultar"])} />
-      <Route path="/ordenes/:id" element={privada(<OrdenDetallePage />, ["ordenes.consultar"])} />
-      <Route path="/recetas" element={privada(<RecetasPage />, ["recetas.gestionar"])} />
-      <Route path="/materiales" element={privada(<MaterialesPage />, ["materiales.consultar_disponibilidad", "recetas.gestionar"])} />
-      <Route path="/usuarios" element={privada(<UsuarioPage />, ["usuarios.gestionar"])} />
-      <Route path="/roles" element={privada(<RolesPage />, ["roles_permisos.gestionar"])} />
-      <Route path="/auditoria" element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])} />
-      <Route path="/estado" element={privada(<SystemStatusPage />, ["usuarios.gestionar", "roles_permisos.gestionar", "auditoria.consultar"])} />
-      {/* Compatibilidad con rutas anteriores del Sprint 1 */}
-      <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
-      <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
-      <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
-      <Route path="/logistica" element={<Navigate to="/" replace />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Autenticadas: solo aquí se monta el layout con barra lateral */}
+      <Route element={<MainLayout><Outlet /></MainLayout>}>
+        <Route path="/" element={<InicioRedirect />} />
+        <Route path="/ordenes" element={privada(<OrdenesPage />, ["ordenes.consultar"])} />
+        <Route path="/ordenes/:id" element={privada(<OrdenDetallePage />, ["ordenes.consultar"])} />
+        <Route path="/recetas" element={privada(<RecetasPage />, ["recetas.gestionar"])} />
+        <Route path="/materiales" element={privada(<MaterialesPage />, ["materiales.consultar_disponibilidad", "recetas.gestionar"])} />
+        <Route path="/usuarios" element={privada(<UsuarioPage />, ["usuarios.gestionar"])} />
+        <Route path="/roles" element={privada(<RolesPage />, ["roles_permisos.gestionar"])} />
+        <Route path="/auditoria" element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])} />
+        <Route path="/estado" element={privada(<SystemStatusPage />, ["usuarios.gestionar", "roles_permisos.gestionar", "auditoria.consultar"])} />
+        <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
+        <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
+        <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
+        <Route path="/logistica" element={<Navigate to="/" replace />} />
+      </Route>
+      {/* 404 público: tampoco monta el layout */}
+      <Route path="*" element={<NoEncontrada />} />
     </Routes>
   );
 }

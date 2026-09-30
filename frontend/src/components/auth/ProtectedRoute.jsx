@@ -5,8 +5,6 @@ import { codigosPermisos } from "../../services/permisos.js";
 export default function ProtectedRoute({ children, roles, permisos }) {
   const { usuario } = useSesion();
   const location = useLocation();
-  // Sin sesión (incluye expiración por inactividad o JWT): al login con
-  // mensaje explicativo y retorno a la pantalla previa tras ingresar.
   if (!usuario) {
     return (
       <Navigate
@@ -21,18 +19,24 @@ export default function ProtectedRoute({ children, roles, permisos }) {
     const propios = codigosPermisos(usuario);
     const autorizado = permisos.some((p) => propios.includes(p));
     if (!autorizado) {
-      return <div role="alert" style={{ padding: "30px" }}>
-        <h2>Acceso denegado</h2><p>No tienes permisos para acceder a esta sección.</p>
-      </div>;
+      return (
+        <div className="ts-denied" role="alert">
+          <h1>Acceso denegado</h1>
+          <p>No tienes permisos para acceder a esta sección. Si lo necesitas, pide acceso al administrador.</p>
+        </div>
+      );
     }
     return children;
   }
 
   const nombreRol = typeof usuario.rol === "string" ? usuario.rol : usuario.rol?.nombre;
   if (roles && !roles.includes(nombreRol)) {
-    return <div role="alert" style={{ padding: "30px" }}>
-      <h2>Acceso denegado</h2><p>No tienes permisos para acceder a esta sección.</p>
-    </div>;
+    return (
+      <div className="ts-denied" role="alert">
+        <h1>Acceso denegado</h1>
+        <p>No tienes permisos para acceder a esta sección. Si lo necesitas, pide acceso al administrador.</p>
+      </div>
+    );
   }
   return children;
 }

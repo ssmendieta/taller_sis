@@ -4,10 +4,6 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { iniciarSesion } from "../services/auth.js";
 import "../styles/LoginPage.css";
 
-// El diseño visual (tarjeta, mostrar/ocultar contraseña, pie) es el aportado
-// por RamaTats (ABC-133). La sesión es la de develop+Andrea (ABC-176):
-// iniciarSesion() devuelve { accessToken, usuario } y SesionContext lo guarda
-// en sessionStorage con expiración por inactividad y por JWT (sesion.js).
 export default function LoginPage() {
   const { usuario, ingresar } = useSesion();
   const location = useLocation();
@@ -30,11 +26,11 @@ export default function LoginPage() {
     setError("");
 
     if (!correo.trim()) {
-      setError("Ingresa tu correo electrónico.");
+      setError("Ingresa tu correo electrónico para continuar.");
       return;
     }
-    if (!password.trim()) {
-      setError("Ingresa tu contraseña.");
+    if (!password) {
+      setError("Ingresa tu contraseña para continuar.");
       return;
     }
 
@@ -43,32 +39,33 @@ export default function LoginPage() {
       ingresar(await iniciarSesion(correo, password));
       navigate(location.state?.from || "/", { replace: true });
     } catch (fallo) {
-      setError(fallo.message || "No se pudo iniciar sesión. Inténtalo nuevamente.");
+      setError(fallo.message || "No se pudo iniciar sesión. Revisa tu correo y contraseña e inténtalo nuevamente.");
     } finally {
       setCargando(false);
     }
   }
 
   return (
-    <div className="login-page">
+    <main className="login-page">
       <div className="login-card">
-
+        <div className="login-brand"><span className="login-brand-mark" aria-hidden="true">TS</span><span>Taller SIS</span></div>
         <div className="login-header">
-          <div className="login-icon"></div>
           <h1>Iniciar sesión</h1>
           <p>Ingresa tus credenciales para acceder al sistema.</p>
         </div>
 
         <form onSubmit={manejarSubmit} className="login-form" noValidate>
-          {avisoExpirada && <p role="status" className="login-error">{avisoExpirada}</p>}
+          {avisoExpirada && <p role="status" className="login-notice">{avisoExpirada}</p>}
           <div className="login-form-group">
             <label htmlFor="correo">Correo electrónico</label>
             <input
               id="correo"
+              name="correo"
               type="email"
               placeholder="ejemplo@correo.com"
               autoComplete="username"
               autoFocus
+              required
               value={correo}
               disabled={cargando}
               onChange={(e) => {
@@ -83,9 +80,11 @@ export default function LoginPage() {
             <div className="password-container">
               <input
                 id="password"
+                name="password"
                 type={mostrarPassword ? "text" : "password"}
                 placeholder="Ingresa tu contraseña"
                 autoComplete="current-password"
+                required
                 value={password}
                 disabled={cargando}
                 onChange={(e) => {
@@ -96,6 +95,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="btn-mostrar-password"
+                aria-pressed={mostrarPassword}
                 onClick={() => setMostrarPassword(!mostrarPassword)}
               >
                 {mostrarPassword ? "Ocultar" : "Mostrar"}
@@ -110,15 +110,14 @@ export default function LoginPage() {
           )}
 
           <button type="submit" className="btn-login" disabled={cargando}>
-            {cargando ? "Ingresando..." : "Ingresar"}
+            {cargando ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
 
         <div className="login-footer">
-          <p>Acceso exclusivo para usuarios registrados.</p>
+          <p>Taller SIS · Producción y logística</p>
         </div>
-
       </div>
-    </div>
+    </main>
   );
 }

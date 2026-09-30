@@ -1,0 +1,68 @@
+/* Tokens del sistema de diseño Taller SIS.
+ * Dirección: sobria y silenciosa (Apple + calidez editorial de Anthropic).
+ * Un solo acento, superficies limpias, jerarquía por tamaño y peso. */
+
+:root {
+  --ts-bg: #f5f5f7;
+  --ts-surface: #ffffff;
+  --ts-surface-soft: #fafafa;
+  --ts-text: #1d1d1f;
+  --ts-title: #1d1d1f;
+  --ts-secondary: #6e6e73;
+  --ts-muted: #86868b;
+  --ts-border: #e5e5ea;
+  --ts-border-soft: #ececf0;
+  --ts-row-hover: #f5f5f7;
+  --ts-field-bg: #f5f5f7;
+  --ts-accent: #0071e3;
+  --ts-accent-hover: #0068d1;
+  --ts-accent-soft: #e8f1fc;
+  --ts-danger: #b42318;
+  --ts-danger-bg: #fef3f2;
+  --ts-danger-border: #e5b8b3;
+  --ts-success: #1f6b3a;
+  --ts-success-bg: #edf7f0;
+  --ts-success-border: #bcd8c5;
+  --ts-warning: #8a5a00;
+  --ts-warning-bg: #fff8e1;
+  --ts-warning-border: #e6d199;
+  --ts-info: #164777;
+  --ts-info-bg: #eaf1f8;
+  --ts-info-border: #c3d5e8;
+  --ts-font: -apple-system, blinkmacfont, "SF Pro Text", inter, "Segoe UI", roboto, sans-serif;
+  --ts-radius-control: 8px;
+  --ts-radius-card: 12px;
+  --ts-radius-modal: 14px;
+  --ts-shadow-rest: 0 1px 2px rgb(0 0 0 / 0.05);
+  --ts-shadow-raised: 0 12px 32px rgb(0 0 0 / 0.14);
+  --ts-ease: 160ms ease;
+  --ts-content-max: 1120px;
+
+  /* Compatibilidad con variables anteriores */
+  --ts-fondo: var(--ts-bg);
+  --ts-superficie: var(--ts-surface);
+  --ts-texto: var(--ts-text);
+  --ts-titulo: var(--ts-title);
+  --ts-secundario: var(--ts-secondary);
+  --ts-apagado: var(--ts-muted);
+  --ts-borde: var(--ts-border);
+  --ts-borde-suave: var(--ts-border-soft);
+  --ts-fila-hover: var(--ts-row-hover);
+  --ts-campo-fondo: var(--ts-field-bg);
+  --ts-primario: var(--ts-accent);
+  --ts-primario-hover: var(--ts-accent-hover);
+  --ts-peligro: var(--ts-danger);
+  --ts-peligro-borde: var(--ts-danger-border);
+  --ts-exito: var(--ts-success);
+  --ts-aviso: var(--ts-warning);
+  --ts-radio: var(--ts-radius-card);
+  --ts-radio-sm: var(--ts-radius-control);
+  --ts-espaciado: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

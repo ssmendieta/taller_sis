@@ -1,4 +1,5 @@
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import { cerrarSesionServidor } from "../services/auth.js";
 import { tienePermiso } from "../services/permisos.js";
@@ -8,7 +9,6 @@ const iconos = {
   ordenes: <><rect x="5" y="3" width="14" height="18" rx="1" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
   recetas: <><path d="M5 4h14v12H5z" /><path d="M5 16h14v4H5zM9 8h6M9 11h6" /></>,
   estado: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
-  ingresar: <><path d="M13 4h7v16h-7M3 12h13m-4-4 4 4-4 4" /></>,
   auditoria: <><path d="M5 3h14v18H5zM9 8h6m-6 4h6m-6 4h3" /></>,
   roles: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4l5 5m0-5l-5 5" /></>,
   usuarios: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8a3 3 0 1 1 2 5M21 20c0-2.8-1.9-5.1-4.5-5.8" /></>,
@@ -18,16 +18,12 @@ function IconoNavegacion({ nombre }) {
   return <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconos[nombre]}</svg>;
 }
 
-// Menú por rol (Sprint 1):
-// - Administrador: Usuarios, Roles y permisos, Auditoría.
-// - Encargado de Producción: Órdenes y Recetas (materiales vive dentro de
-//   Recetas y del detalle de la orden, sin entrada propia).
-// - Supervisor: solo Órdenes (lectura; las acciones se ocultan en la UI).
-// - Sin sesión: solo Ingresar.
+// Solo se monta dentro de rutas autenticadas. /login y 404 quedan fuera.
 export default function MainLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { usuario, salir } = useSesion();
+  const [abierto, setAbierto] = useState(false);
   const puedeOrdenes = tienePermiso(usuario, "ordenes.consultar");
   const puedeRecetas = tienePermiso(usuario, "recetas.gestionar");
   const puedeRoles = tienePermiso(usuario, "roles_permisos.gestionar");
@@ -38,34 +34,37 @@ export default function MainLayout({ children }) {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
     return location.pathname === path ? "active" : "";
   };
+  const nombre = usuario?.nombre_completo ?? usuario?.nombre ?? usuario?.correo ?? "";
+  const rol = typeof usuario?.rol === "string" ? usuario.rol : (usuario?.rol?.nombre ?? "");
   return (
     <div className="layout">
-      <aside className="sidebar">
-        <div className="brand"><span className="brand-icon" aria-hidden="true">TS</span><span>Taller SIS<small>Producción y logística</small></span></div>
-        {usuario && (
-          <p className="nav-label" aria-live="polite">
-            {usuario.nombre_completo ?? usuario.nombre ?? usuario.correo} · {usuario.rol?.nombre ?? usuario.rol ?? ""}
-          </p>
-        )}
-        <p className="nav-label">Navegación</p>
+      <aside className="sidebar" data-open={abierto ? "true" : "false"} aria-label="Barra lateral">
+        <div className="sidebar-top">
+          <span className="brand"><span className="brand-icon" aria-hidden="true">TS</span><span>Taller SIS<small>Producción y logística</small></span></span>
+          <button type="button" className="menu-toggle" aria-expanded={abierto} aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>☰</button>
+        </div>
         <nav className="navbar" aria-label="Navegación principal">
-          {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes"><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
-          {puedeRecetas && <Link className={activo("/recetas")} to="/recetas"><IconoNavegacion nombre="recetas" />Recetas</Link>}
-          {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios"><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
-          {puedeRoles && <Link className={activo("/roles")} to="/roles"><IconoNavegacion nombre="roles" />Roles y permisos</Link>}
-          {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria"><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
-          {usuario ? <button type="button" className="nav-logout" aria-label={`Cerrar sesión de ${usuario.nombre_completo ?? usuario.correo ?? ""}`} onClick={async () => { await cerrarSesionServidor(); salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
-            : <Link className={activo("/login")} to="/login"><IconoNavegacion nombre="ingresar" />Ingresar</Link>}
+          {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
+          {puedeRecetas && <Link className={activo("/recetas")} to="/recetas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recetas" />Recetas</Link>}
+          {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios" onClick={() => setAbierto(false)}><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
+          {puedeRoles && <Link className={activo("/roles")} to="/roles" onClick={() => setAbierto(false)}><IconoNavegacion nombre="roles" />Roles y permisos</Link>}
+          {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria" onClick={() => setAbierto(false)}><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
         </nav>
         {esAdmin && (
           <p className="nav-foot">
             <Link className={activo("/estado")} to="/estado"><IconoNavegacion nombre="estado" />Estado del sistema</Link>
           </p>
         )}
+        {usuario && (
+          <div className="nav-user">
+            <p className="nav-user-name">{nombre}</p>
+            {rol && <p className="nav-user-role">{rol}</p>}
+            <button type="button" className="nav-logout" aria-label={`Cerrar sesión de ${nombre}`} onClick={async () => { await cerrarSesionServidor(); salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
+          </div>
+        )}
       </aside>
       <div className="layout-main">
-        <header className="layout-topbar"><span className="topbar-mark" aria-hidden="true">▣</span><span className="topbar-section">Gestión de operaciones</span></header>
-        <main className="content">{children}</main>
+        <main className="content"><div className="content-inner">{children ?? <Outlet />}</div></main>
       </div>
     </div>
   );
