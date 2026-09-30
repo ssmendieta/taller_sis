@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryFailedError, Repository } from 'typeorm';
 
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
@@ -18,6 +18,8 @@ import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { Inventario } from '../inventario/entities/inventario.entity';
 import { RecetasService } from '../recetas/recetas.service';
+
+const ORDEN_CODIGO_UNIQUE_CONSTRAINT = 'ordenes_produccion_codigo_key';
 
 // Este principal debe provenir de autenticación verificada; el controlador
 // actual no lo proporciona hasta que ABC-151 integre Production Service.
@@ -41,15 +43,47 @@ export class OrdenesService {
   // Alta de ordenes (aporte de develop, conservado tal cual: el DTO usa los
   // mismos nombres de propiedad que OrdenProduccion).
   async create(createOrdenDto: CreateOrdenDto): Promise<OrdenProduccion> {
-    const codigo = `ORD-${Math.floor(Date.now() / 1000)}`;
+    for (let intento = 0; intento < 5; intento += 1) {
+      const codigo = await this.generarCodigoOrden();
+      const nuevaOrden = this.ordenRepository.create({
+        ...createOrdenDto,
+        codigo,
+        estado: 'PENDIENTE',
+      });
 
-    const nuevaOrden = this.ordenRepository.create({
-      ...createOrdenDto,
-      codigo,
-      estado: 'PENDIENTE',
-    });
+      try {
+        return await this.ordenRepository.save(nuevaOrden);
+      } catch (error) {
+        if (!this.esColisionCodigo(error) || intento === 4) throw error;
+      }
+    }
 
-    return await this.ordenRepository.save(nuevaOrden);
+    throw new ConflictException('No fue posible generar un código único para la orden');
+  }
+
+  private async generarCodigoOrden(): Promise<string> {
+    const rows = await this.ordenRepository.query(
+      "SELECT nextval(pg_get_serial_sequence('ordenes_produccion', 'id'))::text AS value",
+    ) as Array<{ value: string }>;
+    const siguienteId = rows[0]?.value;
+
+    if (!siguienteId) {
+      throw new ConflictException('No fue posible generar un código único para la orden');
+    }
+
+    return `ORD-${siguienteId}`;
+  }
+
+  private esColisionCodigo(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) return false;
+
+    const driverError = error.driverError as Error & {
+      code?: string;
+      constraint?: string;
+    };
+
+    return driverError.code === '23505'
+      && driverError.constraint === ORDEN_CODIGO_UNIQUE_CONSTRAINT;
   }
 
   async findAll(): Promise<OrdenProduccion[]> {

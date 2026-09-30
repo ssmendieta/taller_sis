@@ -9,6 +9,7 @@ import { OrdenesService } from './ordenes.service';
 import { EstadoOrden } from './estado-orden.enum';
 import { RecetasService } from '../recetas/recetas.service';
 import { UsuarioAutenticadoProduccion } from './ordenes.service';
+import { QueryFailedError } from 'typeorm';
 
 describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   let service: OrdenesService;
@@ -16,6 +17,9 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   const findOne = jest.fn();
   const find = jest.fn();
   const createQueryBuilder = jest.fn();
+  const query = jest.fn();
+  const ordenCreate = jest.fn();
+  const ordenSave = jest.fn();
   const managerSave = jest.fn();
   const managerCreate = jest.fn();
   const managerFindOne = jest.fn();
@@ -27,7 +31,9 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     find,
     findOne,
     createQueryBuilder,
-    query: jest.fn(),
+    query,
+    create: ordenCreate,
+    save: ordenSave,
     manager: {
       transaction,
     },
@@ -46,6 +52,9 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
+    ordenCreate.mockImplementation((orden: unknown) => orden);
+    ordenSave.mockImplementation(async (orden: unknown) => ({ id: 1, ...(orden as object) }));
+
     managerCreate.mockImplementation((_clase: unknown, objeto: unknown) => objeto);
     managerSave.mockImplementation(async (...args: unknown[]) => args[1] ?? args[0]);
     transaction.mockImplementation(async (cb: (m: unknown) => unknown) =>
@@ -63,6 +72,117 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       inventarioRepositorioMock as any,
       recetasServiceMock as unknown as RecetasService,
     );
+  });
+
+  describe('ABC-117: creación de órdenes', () => {
+    const datosOrden = {
+      producto_id: 1,
+      cantidad: 2,
+      fecha_programada: '2026-10-10',
+      responsable_id: 4,
+    };
+
+    function errorPostgres(code: string, constraint: string): QueryFailedError {
+      const driverError = Object.assign(new Error('PostgreSQL query failed'), {
+        code,
+        constraint,
+      });
+      return new QueryFailedError('INSERT INTO ordenes_produccion', undefined, driverError);
+    }
+
+    it('crea una orden válida, genera código ORD- único y persiste estado inicial', async () => {
+      query.mockResolvedValueOnce([{ value: '501' }]);
+      const datos = {
+        producto_id: 9,
+        cantidad: 12,
+        fecha_programada: '2026-10-10',
+        responsable_id: 17,
+      };
+
+      const resultado = await service.create(datos);
+
+      expect(query).toHaveBeenCalledWith(
+        "SELECT nextval(pg_get_serial_sequence('ordenes_produccion', 'id'))::text AS value",
+      );
+      expect(ordenCreate).toHaveBeenCalledWith({
+        ...datos,
+        codigo: 'ORD-501',
+        estado: 'PENDIENTE',
+      });
+      expect(ordenSave).toHaveBeenCalledWith(expect.objectContaining({
+        ...datos,
+        codigo: 'ORD-501',
+        estado: 'PENDIENTE',
+      }));
+      expect(resultado).toEqual(expect.objectContaining({
+        ...datos,
+        id: 1,
+        codigo: 'ORD-501',
+        estado: 'PENDIENTE',
+      }));
+    });
+
+    it('usa valores consecutivos distintos para órdenes consecutivas', async () => {
+      query
+        .mockResolvedValueOnce([{ value: '700' }])
+        .mockResolvedValueOnce([{ value: '701' }]);
+
+      const primera = await service.create({
+        producto_id: 1,
+        cantidad: 2,
+        fecha_programada: '2026-10-10',
+        responsable_id: 4,
+      });
+      const segunda = await service.create({
+        producto_id: 2,
+        cantidad: 3,
+        fecha_programada: '2026-10-11',
+        responsable_id: 5,
+      });
+
+      expect(primera.codigo).toBe('ORD-700');
+      expect(segunda.codigo).toBe('ORD-701');
+      expect(segunda.codigo).not.toBe(primera.codigo);
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(ordenSave).toHaveBeenCalledTimes(2);
+    });
+
+    it('obtiene otro código si la base de datos rechaza un código duplicado', async () => {
+      query
+        .mockResolvedValueOnce([{ value: '900' }])
+        .mockResolvedValueOnce([{ value: '901' }]);
+      ordenSave
+        .mockRejectedValueOnce(errorPostgres('23505', 'ordenes_produccion_codigo_key'))
+        .mockImplementationOnce(async (orden: unknown) => ({ id: 2, ...(orden as object) }));
+
+      const resultado = await service.create(datosOrden);
+
+      expect(resultado.codigo).toBe('ORD-901');
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(ordenSave).toHaveBeenCalledTimes(2);
+    });
+
+    it('propaga una violación UNIQUE ajena a codigo sin reintentar', async () => {
+      query.mockResolvedValueOnce([{ value: '910' }]);
+      const error = errorPostgres('23505', 'ordenes_produccion_pkey');
+      ordenSave.mockRejectedValueOnce(error);
+
+      await expect(service.create(datosOrden)).rejects.toBe(error);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(ordenSave).toHaveBeenCalledTimes(1);
+    });
+
+    it('propaga un error distinto de 23505 sin reintentar', async () => {
+      query.mockResolvedValueOnce([{ value: '920' }]);
+      const error = errorPostgres('23503', 'ordenes_produccion_codigo_key');
+      ordenSave.mockRejectedValueOnce(error);
+
+      await expect(service.create(datosOrden)).rejects.toBe(error);
+
+      expect(query).toHaveBeenCalledTimes(1);
+      expect(ordenSave).toHaveBeenCalledTimes(1);
+    });
   });
 
   function ordenBase(estado: string) {
