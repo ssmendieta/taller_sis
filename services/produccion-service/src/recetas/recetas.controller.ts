@@ -46,6 +46,8 @@ export class RecetasController {
     return this.recetasService.create(dto);
   }
 
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'recetas.gestionar')
   @Get()
   findAll(@Query('activa') activa?: string) {
     if (activa === undefined) {
@@ -65,6 +67,8 @@ export class RecetasController {
     );
   }
 
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'recetas.gestionar')
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.recetasService.findOne(id);

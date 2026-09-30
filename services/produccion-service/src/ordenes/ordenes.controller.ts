@@ -35,11 +35,15 @@ export class OrdenesController {
   }
 
   @Get()
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   findAll() {
     return this.ordenesService.findAll();
   }
 
   @Get('buscar')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   buscar(
     @Query('estado') estado?: string,
     @Query('producto') producto?: string,
@@ -49,6 +53,8 @@ export class OrdenesController {
   }
 
   @Get('codigo/:codigo')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   findByCodigo(@Param('codigo') codigo: string) {
     return this.ordenesService.findByCodigo(codigo);
   }
@@ -56,11 +62,15 @@ export class OrdenesController {
   // Detalle de una orden (ABC-187, aporte de ramagemina).
   // Debe declararse despues de rutas literales como 'buscar'.
   @Get(':id')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   obtenerDetalle(@Param('id', ParseIntPipe) id: number) {
     return this.ordenesService.obtenerDetalle(id);
   }
 
   @Get(':id/disponibilidad-materiales')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   compararDisponibilidadMateriales(
     @Param('id', ParseIntPipe) id: number,
   ) {
@@ -68,6 +78,8 @@ export class OrdenesController {
   }
 
   @Get(':id/materiales')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   obtenerMateriales(@Param('id') id: string) {
     return this.ordenesService.obtenerMateriales(Number(id));
   }
@@ -76,6 +88,8 @@ export class OrdenesController {
 
   // Historial de estados de una orden (ABC-149, lectura).
   @Get(':id/historial')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   obtenerHistorial(
 
     @Param('id', ParseIntPipe) id: number,

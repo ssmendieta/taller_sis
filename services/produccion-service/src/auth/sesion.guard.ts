@@ -41,6 +41,9 @@ export class SesionGuard implements CanActivate {
     if (respuesta.status === 401) {
       throw new UnauthorizedException('La sesión no es válida');
     }
+    if (respuesta.status === 403) {
+      throw new UnauthorizedException('La sesión no es válida');
+    }
     if (!respuesta.ok) {
       throw new ServiceUnavailableException(
         'Auth no pudo comprobar la sesión',

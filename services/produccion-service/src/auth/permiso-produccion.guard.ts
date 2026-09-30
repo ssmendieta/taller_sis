@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-type IdentidadAuth = { id: string; rol: string; permisos: string[] };
+type PermisoAuth = string | { codigo: string };
+type IdentidadAuth = { id: string; rol: string; permisos: PermisoAuth[] };
 export const PERMISO_PRODUCCION = 'permiso_produccion';
 
 @Injectable()
@@ -49,10 +50,12 @@ export class PermisoProduccionGuard implements CanActivate {
     }
     const usuarioId = Number(identidad?.id);
     if (!Number.isSafeInteger(usuarioId) || usuarioId < 1 ||
-        identidad?.rol !== 'Encargado de Producción' ||
         !Array.isArray(identidad.permisos)) {
       throw new ForbiddenException('No tiene permisos para esta operación');
     }
+    const codigos = identidad.permisos.map((p) =>
+      typeof p === 'string' ? p : p?.codigo,
+    );
 
     let permiso = this.reflector.get<string>(PERMISO_PRODUCCION, context.getHandler());
     if (!permiso) throw new ForbiddenException('No hay permiso configurado para esta ruta');
@@ -62,7 +65,7 @@ export class PermisoProduccionGuard implements CanActivate {
         permiso = 'ordenes.finalizar_cancelar';
       }
     }
-    if (!identidad.permisos.includes(permiso)) {
+    if (!codigos.includes(permiso)) {
       throw new ForbiddenException('No tiene permisos para esta operación');
     }
     request.usuarioId = usuarioId;

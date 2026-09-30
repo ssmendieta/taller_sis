@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
+import { tieneAlgunPermiso, tienePermiso } from "../services/permisos.js";
 import "../styles/layout.css";
 
 const iconos = {
@@ -25,9 +26,14 @@ export default function MainLayout({ children }) {
   const navigate = useNavigate();
   const { usuario, salir } = useSesion();
   const nombreRol = typeof usuario?.rol === "string" ? usuario.rol : usuario?.rol?.nombre;
-  const esAdministrador = nombreRol === "Administrador";
-  const esProduccion = nombreRol === "Encargado de Producción";
-  const esSupervisor = nombreRol === "Supervisor";
+  const puedeConsultarOrdenes = tienePermiso(usuario, "ordenes.consultar");
+  const puedeCrearOrdenes = tienePermiso(usuario, "ordenes.crear");
+  const puedeAvances = tienePermiso(usuario, "ordenes.registrar_avance");
+  const puedeRecetas = tienePermiso(usuario, "recetas.gestionar");
+  const puedeRoles = tienePermiso(usuario, "roles_permisos.gestionar");
+  const puedeUsuarios = tienePermiso(usuario, "usuarios.gestionar");
+  const puedeAuditoria = tienePermiso(usuario, "auditoria.consultar");
+  const puedeProduccion = tieneAlgunPermiso(usuario, ["ordenes.crear", "ordenes.consultar", "ordenes.registrar_avance"]);
   const isActive = (path) => (location.pathname === path ? "active" : "");
   return (
     <div className="layout">
@@ -36,16 +42,16 @@ export default function MainLayout({ children }) {
         <p className="nav-label">Navegación</p>
         <nav className="navbar" aria-label="Navegación principal">
           <Link className={isActive("/")} to="/"><IconoNavegacion nombre="inicio" />Inicio</Link>
-          {esProduccion && <Link className={isActive("/produccion")} to="/produccion"><IconoNavegacion nombre="produccion" />Producción</Link>}
-          {(esSupervisor || esProduccion) && <Link className={isActive("/produccion/ordenes")} to="/produccion/ordenes"><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
-          {esProduccion && <Link className={isActive("/ordenes")} to="/ordenes"><IconoNavegacion nombre="ordenes" />Nueva orden</Link>}
-          {esProduccion && <Link className={isActive("/produccion/avances")} to="/produccion/avances"><IconoNavegacion nombre="avances" />Avances</Link>}
-          {esProduccion && <Link className={isActive("/recetas")} to="/recetas"><IconoNavegacion nombre="recetas" />Recetas</Link>}
-          {esAdministrador && <Link className={isActive("/roles")} to="/roles"><IconoNavegacion nombre="roles" />Roles</Link>}
-          {esAdministrador && <Link className={isActive("/usuarios")} to="/usuarios"><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
+          {puedeProduccion && <Link className={isActive("/produccion")} to="/produccion"><IconoNavegacion nombre="produccion" />Producción</Link>}
+          {puedeConsultarOrdenes && <Link className={isActive("/produccion/ordenes")} to="/produccion/ordenes"><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
+          {puedeCrearOrdenes && <Link className={isActive("/ordenes")} to="/ordenes"><IconoNavegacion nombre="ordenes" />Nueva orden</Link>}
+          {puedeAvances && <Link className={isActive("/produccion/avances")} to="/produccion/avances"><IconoNavegacion nombre="avances" />Avances</Link>}
+          {puedeRecetas && <Link className={isActive("/recetas")} to="/recetas"><IconoNavegacion nombre="recetas" />Recetas</Link>}
+          {puedeRoles && <Link className={isActive("/roles")} to="/roles"><IconoNavegacion nombre="roles" />Roles</Link>}
+          {puedeUsuarios && <Link className={isActive("/usuarios")} to="/usuarios"><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
           {nombreRol === "Encargado de Logística" && <Link className={isActive("/logistica")} to="/logistica"><IconoNavegacion nombre="logistica" />Logística</Link>}
           <Link className={isActive("/estado")} to="/estado"><IconoNavegacion nombre="estado" />Estado</Link>
-          {esAdministrador && <Link className={isActive("/auditoria")} to="/auditoria"><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
+          {puedeAuditoria && <Link className={isActive("/auditoria")} to="/auditoria"><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
           {usuario ? <button type="button" className="nav-logout" onClick={() => { salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
             : <Link className={isActive("/login")} to="/login"><IconoNavegacion nombre="ingresar" />Ingresar</Link>}
         </nav>

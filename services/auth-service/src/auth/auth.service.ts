@@ -95,6 +95,7 @@ export class AuthService {
         },
         permisos: permisos.map((permiso) => ({
           id: permiso.id,
+          codigo: permiso.codigo,
           nombre: permiso.nombre,
         })),
       },
@@ -111,12 +112,21 @@ export class AuthService {
     if (!rol || !rol.activo) {
       throw new ForbiddenException('El rol asignado ya no está disponible');
     }
+    const titular = await this.usuarios.findOne({
+      where: { id: String(usuario.sub) },
+    });
     return {
       id: String(usuario.sub),
+      correo: titular?.correo ?? String(usuario.correo ?? ''),
+      nombre_completo: titular?.nombre_completo ?? null,
       rol: rol.nombre,
       permisos: (rol.permisos ?? [])
         .filter((permiso) => permiso.activo)
-        .map((permiso) => permiso.codigo),
+        .map((permiso) => ({
+          id: permiso.id,
+          codigo: permiso.codigo,
+          nombre: permiso.nombre,
+        })),
     };
   }
 

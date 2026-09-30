@@ -24,6 +24,8 @@ function preparar(usuarios: UsuarioPrueba[]) {
         }),
       }),
     }),
+    findOne: async ({ where }: { where: { id: string } }) =>
+      usuarios.find((u) => String(u.id) === String(where.id)) ?? null,
   } as unknown as Repository<Usuario>;
   const repositorioRoles = {
     findOne: async ({ where }: { where: { id: string } }) =>
@@ -65,7 +67,7 @@ describe('ABC-167: pruebas del servicio de autenticación', () => {
     assert.deepEqual(respuesta.usuario, {
       id: '3', correo: 'ana@example.com', nombre_completo: 'Ana',
       rol: { id: '1', nombre: 'Administrador' },
-      permisos: [{ id: '7', nombre: 'Gestionar usuarios' }],
+      permisos: [{ id: '7', codigo: 'usuarios.gestionar', nombre: 'Gestionar usuarios' }],
     });
     assert.equal('password_hash' in respuesta.usuario, false);
   });
@@ -120,7 +122,11 @@ describe('ABC-167: pruebas del servicio de autenticación', () => {
     const { servicio } = preparar([await usuarioDePrueba()]);
     const respuesta = await servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '1' });
     assert.deepEqual(respuesta, {
-      id: '3', rol: 'Administrador', permisos: ['usuarios.gestionar'],
+      id: '3',
+      correo: 'ana@example.com',
+      nombre_completo: 'Ana',
+      rol: 'Administrador',
+      permisos: [{ id: '7', codigo: 'usuarios.gestionar', nombre: 'Gestionar usuarios' }],
     });
     await assert.rejects(
       () => servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '999' }),
