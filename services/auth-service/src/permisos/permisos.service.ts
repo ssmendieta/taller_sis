@@ -1,26 +1,36 @@
-import { Injectable } from '@nestjs/common';
-import { CreatePermisoDto } from './dto/create-permiso.dto';
-import { UpdatePermisoDto } from './dto/update-permiso.dto';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Permisos } from './entities/permiso.entity';
 
 @Injectable()
 export class PermisosService {
-  create(createPermisoDto: CreatePermisoDto) {
-    return 'This action adds a new permiso';
-  }
+  constructor(
+    @InjectRepository(Permisos)
+    private readonly permisos: Repository<Permisos>,
+  ) {}
 
   findAll() {
-    return `This action returns all permisos`;
+    return this.permisos.find({ order: { codigo: 'ASC' } });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} permiso`;
+  async findOne(id: number) {
+    const permiso = await this.permisos.findOne({
+      where: { id: String(id) },
+    });
+    if (!permiso) throw new NotFoundException('Permiso no encontrado');
+    return permiso;
   }
 
-  update(id: number, updatePermisoDto: UpdatePermisoDto) {
-    return `This action updates a #${id} permiso`;
+  create() {
+    throw new NotFoundException('El catálogo de permisos no admite altas manuales');
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} permiso`;
+  update() {
+    throw new NotFoundException('El catálogo de permisos no admite cambios manuales');
+  }
+
+  remove() {
+    throw new NotFoundException('El catálogo de permisos no admite bajas');
   }
 }

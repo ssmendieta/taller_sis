@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PermisosController } from './permisos.controller';
 import { PermisosService } from './permisos.service';
+import { JwtAuthGuard } from '../authz/jwt-auth.guard';
 import { PermisosGuard } from '../authz/permisos.guard';
 
 describe('PermisosController', () => {
@@ -9,8 +10,10 @@ describe('PermisosController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PermisosController],
-      providers: [PermisosService],
+      providers: [{ provide: PermisosService, useValue: {} }],
     })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
       .overrideGuard(PermisosGuard)
       .useValue({ canActivate: () => true })
       .compile();
