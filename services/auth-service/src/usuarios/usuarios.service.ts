@@ -35,7 +35,16 @@ export class UsuariosService {
     throw error;
   }
 
+  private normalizarNombreCompleto(nombre: string): string {
+    const nombreNormalizado = nombre.trim();
+    if (!nombreNormalizado) {
+      throw new BadRequestException('El nombre completo es obligatorio');
+    }
+    return nombreNormalizado;
+  }
+
   async create(dto: CreateUsuarioDto, actorId?: number): Promise<Usuario> {
+    const nombreCompleto = this.normalizarNombreCompleto(dto.nombre_completo);
     await this.validarRolActivo(dto.rol_id);
     const correo = dto.correo.trim().toLowerCase();
     if (await this.usuarios.createQueryBuilder('usuario')
@@ -43,7 +52,7 @@ export class UsuariosService {
       throw new ConflictException('El correo ya está registrado');
     }
     const usuario = this.usuarios.create({
-      nombre_completo: dto.nombre_completo.trim(),
+      nombre_completo: nombreCompleto,
       correo,
       rol_id: String(dto.rol_id),
       password_hash: await bcrypt.hash(dto.password, 10),
@@ -111,7 +120,9 @@ export class UsuariosService {
       await this.validarRolActivo(dto.rol_id);
       usuario.rol_id = String(dto.rol_id);
     }
-    if (dto.nombre_completo !== undefined) usuario.nombre_completo = dto.nombre_completo.trim();
+    if (dto.nombre_completo !== undefined) {
+      usuario.nombre_completo = this.normalizarNombreCompleto(dto.nombre_completo);
+    }
     if (dto.correo !== undefined) {
       const correo = dto.correo.trim().toLowerCase();
       const repetido = await this.usuarios.createQueryBuilder('usuario')
