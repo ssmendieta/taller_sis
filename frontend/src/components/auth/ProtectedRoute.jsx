@@ -5,7 +5,17 @@ import { codigosPermisos } from "../../services/permisos.js";
 export default function ProtectedRoute({ children, roles, permisos }) {
   const { usuario } = useSesion();
   const location = useLocation();
-  if (!usuario) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  // Sin sesión (incluye expiración por inactividad o JWT): al login con
+  // mensaje explicativo y retorno a la pantalla previa tras ingresar.
+  if (!usuario) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname, sesionExpirada: true }}
+        replace
+      />
+    );
+  }
 
   if (permisos?.length) {
     const propios = codigosPermisos(usuario);

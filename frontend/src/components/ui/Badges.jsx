@@ -1,10 +1,10 @@
-import { mostrarEstadoOrden } from "../../utils/formato.js";
+import { formatearDisponibilidad, formatearEstadoOrden, formatearNumero } from "../../utils/format.js";
 
 export function BadgeEstadoOrden({ estado }) {
   const clave = estado ?? "DESCONOCIDO";
   return (
     <span className={`ts-badge ts-badge--${clave}`}>
-      {mostrarEstadoOrden(estado)}
+      {formatearEstadoOrden(estado)}
     </span>
   );
 }
@@ -19,7 +19,7 @@ export function BadgeActivo({ activo }) {
 
 export function BadgeDisponibilidad({ estado }) {
   if (!estado) return <span>—</span>;
-  return <span className={`ts-badge ts-badge--${estado}`}>{String(estado).replaceAll("_", " ")}</span>;
+  return <span className={`ts-badge ts-badge--${estado}`}>{formatearDisponibilidad(estado)}</span>;
 }
 
 export function BarraAvance({ acumulado = 0, solicitada = 0 }) {
@@ -36,7 +36,7 @@ export function BarraAvance({ acumulado = 0, solicitada = 0 }) {
           style={{ width: `${porcentaje}%` }}
         />
       </span>
-      <span>{hecho} / {total}</span>
+      <span>{formatearNumero(hecho)} / {formatearNumero(total)}</span>
     </span>
   );
 }

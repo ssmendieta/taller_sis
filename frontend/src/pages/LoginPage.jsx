@@ -20,6 +20,10 @@ export default function LoginPage() {
 
   if (usuario) return <Navigate to={location.state?.from || "/"} replace />;
 
+  const avisoExpirada = location.state?.sesionExpirada
+    ? "Tu sesión expiró por inactividad o vencimiento. Vuelve a ingresar; te llevaremos a tu pantalla anterior."
+    : "";
+
   async function manejarSubmit(evento) {
     evento.preventDefault();
     if (cargando) return;
@@ -56,6 +60,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={manejarSubmit} className="login-form" noValidate>
+          {avisoExpirada && <p role="status" className="login-error">{avisoExpirada}</p>}
           <div className="login-form-group">
             <label htmlFor="correo">Correo electrónico</label>
             <input
@@ -63,6 +68,7 @@ export default function LoginPage() {
               type="email"
               placeholder="ejemplo@correo.com"
               autoComplete="username"
+              autoFocus
               value={correo}
               disabled={cargando}
               onChange={(e) => {

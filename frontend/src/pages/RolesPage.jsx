@@ -112,6 +112,7 @@ function RolesPage() {
   };
 
   async function desactivarRol(role) {
+    if (!window.confirm(`¿Desactivar el rol ${role.name}? Sus usuarios perderán esos permisos.`)) return;
     setError("");
     try {
       const guardado = await actualizarRol(role.id, { activo: false });

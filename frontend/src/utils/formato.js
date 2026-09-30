@@ -20,7 +20,15 @@ export function mostrarFechaHora(valor, zona = "America/La_Paz") {
 }
 
 export function mostrarEstadoOrden(valor) {
-  return valor ? String(valor).replaceAll("_", " ") : "—";
+  const mapa = {
+    PENDIENTE: "Pendiente",
+    PLANIFICADA: "Planificada",
+    EN_PRODUCCION: "En producción",
+    FINALIZADA: "Finalizada",
+    CANCELADA: "Cancelada",
+  };
+  if (!valor) return "—";
+  return mapa[valor] ?? String(valor).replaceAll("_", " ");
 }
 
 export function nombreProductoOrden(orden) {

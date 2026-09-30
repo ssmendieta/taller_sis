@@ -42,6 +42,11 @@ export default function MainLayout({ children }) {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand"><span className="brand-icon" aria-hidden="true">TS</span><span>Taller SIS<small>Producción y logística</small></span></div>
+        {usuario && (
+          <p className="nav-label" aria-live="polite">
+            {usuario.nombre_completo ?? usuario.nombre ?? usuario.correo} · {usuario.rol?.nombre ?? usuario.rol ?? ""}
+          </p>
+        )}
         <p className="nav-label">Navegación</p>
         <nav className="navbar" aria-label="Navegación principal">
           {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes"><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
@@ -49,7 +54,7 @@ export default function MainLayout({ children }) {
           {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios"><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
           {puedeRoles && <Link className={activo("/roles")} to="/roles"><IconoNavegacion nombre="roles" />Roles y permisos</Link>}
           {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria"><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
-          {usuario ? <button type="button" className="nav-logout" onClick={async () => { await cerrarSesionServidor(); salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
+          {usuario ? <button type="button" className="nav-logout" aria-label={`Cerrar sesión de ${usuario.nombre_completo ?? usuario.correo ?? ""}`} onClick={async () => { await cerrarSesionServidor(); salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
             : <Link className={activo("/login")} to="/login"><IconoNavegacion nombre="ingresar" />Ingresar</Link>}
         </nav>
         {esAdmin && (

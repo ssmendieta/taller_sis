@@ -12,6 +12,7 @@ import {
   responsableOrden,
   totalProducidoDe,
 } from "../utils/formato.js";
+import { formatearCantidad, formatearFecha } from "../utils/format.js";
 import { BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import CrearOrdenModal from "../components/ordenes/CrearOrdenModal.jsx";
@@ -84,6 +85,10 @@ export default function OrdenesPage() {
       (!hasta || fecha <= hasta)
     );
   }), [ordenes, producto, estado, desde, hasta]);
+
+  function unidadDe(orden) {
+    return orden?.unidad_producto ?? orden?.unidad_medida ?? "";
+  }
 
   const resumen = useMemo(() => ({
     total: ordenes.length,
@@ -197,8 +202,8 @@ export default function OrdenesPage() {
                       >
                         <td className="ts-code">{orden.codigo ?? "—"}</td>
                         <td>{nombreProductoOrden(orden)}</td>
-                        <td>{mostrarCantidad(solicitada)}</td>
-                        <td>{mostrarFecha(fechaProgramadaOrden(orden))}</td>
+                        <td>{formatearCantidad(solicitada, unidadDe(orden))}</td>
+                        <td>{formatearFecha(fechaProgramadaOrden(orden))}</td>
                         <td><BadgeEstadoOrden estado={orden.estado} /></td>
                         <td>{responsableOrden(orden)}</td>
                         <td>
@@ -223,7 +228,9 @@ export default function OrdenesPage() {
         alCerrar={() => setMostrarCrear(false)}
         alCrear={(creada) => {
           setAviso(`Orden ${creada.codigo ?? creada.id} registrada correctamente.`);
-          setIntento((actual) => actual + 1);
+          setMostrarCrear(false);
+          if (creada?.id) navigate(`/ordenes/${creada.id}`, { state: { exito: `Orden ${creada.codigo ?? creada.id} creada correctamente.` } });
+          else setIntento((actual) => actual + 1);
         }}
       />
     </section>

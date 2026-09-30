@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import {
   cambiarEstadoOrden,
@@ -27,6 +27,7 @@ import {
   responsableOrden,
   totalProducidoDe,
 } from "../utils/formato.js";
+import { formatearCantidad, formatearEstadoOrden, formatearFecha } from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 
@@ -42,6 +43,7 @@ const ETIQUETAS = {
 export default function OrdenDetallePage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { usuario } = useSesion();
   const [orden, setOrden] = useState(null);
   const [materiales, setMateriales] = useState([]);
@@ -107,10 +109,15 @@ export default function OrdenDetallePage() {
 
   useEffect(() => {
     cargar();
+    if (location.state?.exito) {
+      setAviso(location.state.exito);
+      navigate(location.pathname, { replace: true });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const solicitada = cantidadSolicitadaOrden(orden);
+  const unidad = orden?.unidad_producto ?? orden?.unidad_medida ?? orden?.producto?.unidad_producto ?? "";
   const faltantes = useMemo(
     () => disponibilidad.filter((m) => m.estado === "INSUFICIENTE" || m.estado === "FALTANTE"),
     [disponibilidad],
@@ -164,7 +171,7 @@ export default function OrdenDetallePage() {
     }
     const restante = Number(solicitada) - Number(total);
     if (Number.isFinite(restante) && cantidad > restante) {
-      setErrorAvance(`La cantidad supera lo solicitado. Restan ${mostrarCantidad(restante)}.`);
+      setErrorAvance(`La cantidad supera lo solicitado. Restan ${formatearCantidad(restante, unidad)}.`);
       return;
     }
     setGuardandoAvance(true);
@@ -213,8 +220,8 @@ export default function OrdenDetallePage() {
             <tbody>
               <tr><th scope="row">Código</th><td className="ts-code">{orden.codigo ?? "—"}</td></tr>
               <tr><th scope="row">Producto</th><td>{nombreProductoOrden(orden)}</td></tr>
-              <tr><th scope="row">Cantidad solicitada</th><td>{mostrarCantidad(solicitada)}</td></tr>
-              <tr><th scope="row">Fecha programada</th><td>{mostrarFecha(fechaProgramadaOrden(orden))}</td></tr>
+              <tr><th scope="row">Cantidad solicitada</th><td>{formatearCantidad(solicitada, unidad)}</td></tr>
+              <tr><th scope="row">Fecha programada</th><td>{formatearFecha(fechaProgramadaOrden(orden))}</td></tr>
               <tr><th scope="row">Responsable</th><td>{responsableOrden(orden)}</td></tr>
               <tr><th scope="row">Avance</th><td><BarraAvance acumulado={total} solicitada={Number(solicitada) || 0} /></td></tr>
             </tbody>
@@ -271,7 +278,7 @@ export default function OrdenDetallePage() {
                       <td className="ts-code">{m.codigo}</td>
                       <td>{m.nombre}</td>
                       <td>{mostrarCantidad(m.requerida)} {m.unidad}</td>
-                      <td>{disp?.disponible == null ? "—" : `${mostrarCantidad(disp.disponible)} ${disp.unidad || m.unidad}`}</td>
+                      <td>{disp?.disponible == null ? "—" : formatearCantidad(disp.disponible, disp.unidad || m.unidad)}</td>
                       <td>{disp?.estado ? <BadgeDisponibilidad estado={disp.estado} /> : <span>—</span>}</td>
                     </tr>
                   );
@@ -283,28 +290,40 @@ export default function OrdenDetallePage() {
       </div>
 
       <div className="ts-panel" style={{ marginBottom: 16 }}>
-        <div className="ts-panel-title"><h2>Avance de producción</h2><span>Acumulado {mostrarCantidad(total)} de {mostrarCantidad(solicitada)}</span></div>
+        <div className="ts-panel-title"><h2>Avance de producción</h2><span>Producido {formatearCantidad(total, unidad)} de {formatearCantidad(solicitada, unidad)} · Restante {formatearCantidad(Number(solicitada) - Number(total), unidad)}</span></div>
         <div style={{ padding: "4px 20px 16px" }}>
           <BarraAvance acumulado={total} solicitada={Number(solicitada) || 0} />
           {enProduccion && permiteAvance ? (
             <form onSubmit={guardarAvance} style={{ marginTop: 12 }}>
               <label htmlFor="avance-cantidad" style={{ display: "flex", flexDirection: "column", gap: 5, maxWidth: 320, color: "#535860", fontSize: ".76rem" }}>
-                Cantidad producida
-                <input
-                  id="avance-cantidad"
-                  type="number"
-                  min="0.0001"
-                  step="0.0001"
-                  value={cantidadAvance}
-                  onChange={(e) => setCantidadAvance(e.target.value)}
-                  disabled={guardandoAvance}
-                  style={{ minHeight: 36, padding: "7px 10px", border: "1px solid #e0e0e2", borderRadius: 5, background: "#f4f4f5" }}
-                />
+                Cantidad producida{unidad ? ` (en ${unidad})` : ""}
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <input
+                    id="avance-cantidad"
+                    type="number"
+                    min="0.0001"
+                    step="0.0001"
+                    max={Math.max(Number(solicitada) - Number(total), 0) || undefined}
+                    value={cantidadAvance}
+                    onChange={(e) => setCantidadAvance(e.target.value)}
+                    disabled={guardandoAvance}
+                    style={{ minHeight: 36, padding: "7px 10px", border: "1px solid #e0e0e2", borderRadius: 5, background: "#f4f4f5", flex: 1 }}
+                  />
+                  {unidad && <span aria-hidden="true">{unidad}</span>}
+                </div>
               </label>
               {errorAvance && <p className="ts-modal-error" role="alert">{errorAvance}</p>}
               <div className="ts-btn-group" style={{ marginTop: 10 }}>
                 <button type="submit" className="ts-btn ts-btn-primary" disabled={guardandoAvance}>
                   {guardandoAvance ? "Registrando…" : "Registrar avance"}
+                </button>
+                <button
+                  type="button"
+                  className="ts-btn"
+                  disabled={guardandoAvance || !(Number(solicitada) - Number(total) > 0)}
+                  onClick={() => setCantidadAvance(String(Math.max(Number(solicitada) - Number(total), 0)))}
+                >
+                  Completar restante ({formatearCantidad(Number(solicitada) - Number(total), unidad)})
                 </button>
               </div>
             </form>
@@ -325,7 +344,7 @@ export default function OrdenDetallePage() {
                     const { fecha, hora } = mostrarFechaHora(a.fecha_hora ?? a.fechaHora ?? a.creado_en ?? a.createdAt);
                     return (
                       <tr key={a.id ?? i}>
-                        <td>{mostrarCantidad(a.cantidad ?? a.cantidad_producida ?? a.cantidadProducida)}</td>
+                        <td>{formatearCantidad(a.cantidad ?? a.cantidad_producida ?? a.cantidadProducida, unidad)}</td>
                         <td>{fecha}</td>
                         <td>{hora}</td>
                       </tr>
