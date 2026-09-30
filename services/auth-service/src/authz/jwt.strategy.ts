@@ -6,10 +6,15 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { JwtPayload } from './jwt-payload.interface';
+import { SesionesService } from '../sesiones/sesiones.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(config: ConfigService, @InjectRepository(Usuario) private readonly usuarios: Repository<Usuario>) {
+  constructor(
+    config: ConfigService,
+    @InjectRepository(Usuario) private readonly usuarios: Repository<Usuario>,
+    private readonly sesiones: SesionesService,
+  ) {
     const secret = config.get<string>('JWT_SECRET');
     if (!secret) {
       throw new Error(
@@ -26,14 +31,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<JwtPayload> {
     const id = String(payload.sub);
     if (!/^[1-9]\d*$/.test(id)) throw new UnauthorizedException();
+    if (!payload.jti || typeof payload.jti !== 'string') {
+      throw new UnauthorizedException('La sesión no es válida');
+    }
     const usuario = await this.usuarios.findOne({ where: { id } });
     if (!usuario || !usuario.activo || usuario.eliminado_en || !usuario.rol_id) {
       throw new UnauthorizedException('La sesión ya no está activa');
     }
+    await this.sesiones.validarYRefrescar(payload.jti, usuario.id);
     return {
       sub: usuario.id,
       correo: usuario.correo,
       rolId: usuario.rol_id,
+      jti: payload.jti,
     };
   }
 }

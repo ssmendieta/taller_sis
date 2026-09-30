@@ -19,4 +19,11 @@ export class AuthController {
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
+
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  logout(@Req() request: { user: JwtPayload }) {
+    return this.authService.logout(request.user);
+  }
 }

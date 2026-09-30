@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
+import { cerrarSesionServidor } from "../services/auth.js";
 import { tieneAlgunPermiso, tienePermiso } from "../services/permisos.js";
 import "../styles/layout.css";
 
@@ -52,7 +53,7 @@ export default function MainLayout({ children }) {
           {nombreRol === "Encargado de Logística" && <Link className={isActive("/logistica")} to="/logistica"><IconoNavegacion nombre="logistica" />Logística</Link>}
           <Link className={isActive("/estado")} to="/estado"><IconoNavegacion nombre="estado" />Estado</Link>
           {puedeAuditoria && <Link className={isActive("/auditoria")} to="/auditoria"><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
-          {usuario ? <button type="button" className="nav-logout" onClick={() => { salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
+          {usuario ? <button type="button" className="nav-logout" onClick={async () => { await cerrarSesionServidor(); salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
             : <Link className={isActive("/login")} to="/login"><IconoNavegacion nombre="ingresar" />Ingresar</Link>}
         </nav>
       </aside>
