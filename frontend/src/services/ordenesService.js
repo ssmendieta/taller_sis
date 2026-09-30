@@ -89,6 +89,54 @@ export async function obtenerHistorialOrden(id) {
 
 
 
+export async function obtenerDisponibilidadOrden(id) {
+  const response = await fetch(
+    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}/disponibilidad-materiales`,
+    { headers: encabezados() }
+  );
+
+  await exigirOk(response, "Error al obtener disponibilidad de materiales");
+
+  return await response.json();
+}
+
+
+
+export async function cambiarEstadoOrden(id, nuevoEstado, motivo) {
+  const response = await fetch(
+    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}/estado`,
+    {
+      method: "PATCH",
+      headers: encabezados({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ nuevoEstado, ...(motivo ? { motivo } : {}) }),
+    }
+  );
+
+  await exigirOk(response, "No se pudo cambiar el estado de la orden.");
+
+  return response.json().catch(() => null);
+}
+
+
+
+export async function crearOrden(datos) {
+  const response = await fetch(`${apiConfig.apiUrl}/api/produccion/ordenes`, {
+    method: "POST",
+    headers: encabezados({ "Content-Type": "application/json" }),
+    body: JSON.stringify(datos),
+  });
+
+  await exigirOk(response, "No se pudo registrar la orden.");
+
+  const contenido = await response.json().catch(() => null);
+  if (!contenido?.id) {
+    throw new Error("El servicio no confirmó el registro de la orden. Revisa el listado antes de intentarlo otra vez.");
+  }
+  return contenido;
+}
+
+
+
 // ================================
 // ABC-196 AVANCES
 // ================================
