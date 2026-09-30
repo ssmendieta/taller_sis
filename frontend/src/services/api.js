@@ -51,7 +51,11 @@ export async function crearOrdenProduccion(datos) {
 }
 
 export async function obtenerOrdenesProduccion(signal) {
-  const respuesta = await fetch(`${API_GATEWAY_URL}/api/produccion/ordenes/buscar`, { signal });
+  const token = sessionStorage.getItem("accessToken") || localStorage.getItem("accessToken");
+  const respuesta = await fetch(`${API_GATEWAY_URL}/api/produccion/ordenes/buscar`, {
+    signal,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!respuesta.ok) {
     throw new Error("No se pudieron cargar las órdenes. Intenta de nuevo.");
   }

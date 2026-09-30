@@ -29,6 +29,17 @@ export class QueryAuditoriaDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^[1-9]\d*$/)
+  usuario_afectado_id?: string;
+
+  // Filtro general: actor o afectado.
+  @IsOptional()
+  @IsString()
+  @Matches(/^[1-9]\d*$/)
+  usuario?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(120)
   accion?: string;
 

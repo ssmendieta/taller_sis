@@ -7,7 +7,6 @@ const formularioVacio = {
   producto_id: "",
   cantidad: "",
   fecha_programada: "",
-  responsable_id: "",
 };
 
 export default function OrdenPage() {
@@ -66,7 +65,6 @@ export default function OrdenPage() {
 
     const nuevosErrores = {};
     const recetaId = Number(formulario.producto_id);
-    const responsableId = Number(formulario.responsable_id);
     const cantidad = Number(formulario.cantidad);
 
     if (!Number.isSafeInteger(recetaId) || recetaId <= 0 || !recetas.some((receta) => Number(receta.id) === recetaId)) {
@@ -77,9 +75,8 @@ export default function OrdenPage() {
     }
     if (!formulario.fecha_programada) {
       nuevosErrores.fecha_programada = "La fecha programada es obligatoria.";
-    }
-    if (!/^\d+$/.test(formulario.responsable_id) || !Number.isSafeInteger(responsableId) || responsableId <= 0) {
-      nuevosErrores.responsable_id = "Ingresa un ID de usuario válido.";
+    } else if (formulario.fecha_programada < new Date().toISOString().slice(0, 10)) {
+      nuevosErrores.fecha_programada = "La fecha programada no puede ser anterior a hoy.";
     }
     if (Object.keys(nuevosErrores).length) {
       setErrores(nuevosErrores);
@@ -93,7 +90,6 @@ export default function OrdenPage() {
         producto_id: recetaId,
         cantidad,
         fecha_programada: formulario.fecha_programada,
-        responsable_id: responsableId,
       });
       setMostrarFormulario(false);
       setMensaje(`Orden ${creada.codigo ?? creada.id} registrada correctamente.`);
@@ -174,14 +170,10 @@ export default function OrdenPage() {
               </div>
               <div className="orden-form-group">
                 <label htmlFor="fecha_programada">Fecha programada <span>*</span></label>
-                <input id="fecha_programada" type="date" name="fecha_programada" value={formulario.fecha_programada} onChange={manejarCambio} />
+                <input id="fecha_programada" type="date" name="fecha_programada" min={new Date().toISOString().slice(0, 10)} value={formulario.fecha_programada} onChange={manejarCambio} />
                 {errores.fecha_programada && <small className="mensaje-error">{errores.fecha_programada}</small>}
               </div>
-              <div className="orden-form-group">
-                <label htmlFor="responsable_id">ID del responsable <span>*</span></label>
-                <input id="responsable_id" type="number" name="responsable_id" min="1" step="1" placeholder="ID de un usuario existente" value={formulario.responsable_id} onChange={manejarCambio} />
-                {errores.responsable_id && <small className="mensaje-error">{errores.responsable_id}</small>}
-              </div>
+              <p>El responsable será tu usuario autenticado.</p>
               {errorGuardado && <p role="alert" className="mensaje-error">{errorGuardado}</p>}
               <div className="orden-modal-footer">
                 <button type="button" className="orden-btn-cancelar" disabled={guardando} onClick={() => setMostrarFormulario(false)}>Cancelar</button>

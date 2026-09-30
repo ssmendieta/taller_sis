@@ -10,6 +10,7 @@ import { DataSource, In, Repository } from 'typeorm';
 import { Receta } from './entities/receta.entity';
 import { RecetaMaterial } from './entities/receta-material.entity';
 import { Material } from '../materiales/entities/material.entity';
+import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import {
   CreateRecetaDto,
   RecetaMaterialItemDto,
@@ -25,6 +26,8 @@ export class RecetasService {
     private readonly recetaMaterialRepository: Repository<RecetaMaterial>,
     @InjectRepository(Material)
     private readonly materialRepository: Repository<Material>,
+    @InjectRepository(OrdenProduccion)
+    private readonly ordenRepository: Repository<OrdenProduccion>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -119,6 +122,10 @@ export class RecetasService {
 
   // PATCH /recetas/:id — actualiza producto_nombre y/o reemplaza la lista
   // de materiales (borra e inserta las filas de receta_material).
+  // Versionado real: si la receta tiene órdenes asociadas, el cambio de
+  // materiales se bloquea con 409 para no alterar el historial de las
+  // órdenes existentes. En ese caso cree una nueva versión con
+  // POST /recetas/:id/versiones.
   async update(id: number, dto: UpdateRecetaDto) {
     const receta = await this.recetaRepository.findOne({
       where: { id },
@@ -130,6 +137,14 @@ export class RecetasService {
 
     if (dto.materiales !== undefined) {
       await this.assertMaterialesExisten(dto.materiales);
+      const ordenes = await this.ordenRepository.count({
+        where: { producto_id: id },
+      });
+      if (ordenes > 0) {
+        throw new ConflictException(
+          'La receta tiene órdenes asociadas y sus materiales no pueden modificarse. Cree una nueva versión con POST /recetas/:id/versiones.',
+        );
+      }
     }
 
     await this.dataSource.transaction(async (manager) => {
@@ -177,6 +192,21 @@ export class RecetasService {
     await this.recetaRepository.save(receta);
 
     return this.findOne(id);
+  }
+
+  // GET /recetas/:id/versiones — todas las versiones del mismo
+  // producto_codigo, incluida la activa y las anteriores inactivas.
+  async listarVersiones(id: number) {
+    const receta = await this.recetaRepository.findOne({ where: { id } });
+    if (!receta) {
+      throw new NotFoundException(`Receta con id ${id} no encontrada`);
+    }
+    const versiones = await this.recetaRepository.find({
+      where: { productoCodigo: receta.productoCodigo },
+      relations: { items: { material: true } },
+      order: { id: 'ASC' },
+    });
+    return versiones.map((version) => this.toResponse(version));
   }
 
   // Valida que cada material_id exista en la tabla materiales antes de insertar.

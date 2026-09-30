@@ -1,0 +1,12 @@
+{
+  "name": "taller-sis",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo Taller SIS (NestJS + React/Vite)",
+  "scripts": {
+    "e2e": "node scripts/e2e/e2e-sprint1.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -5,6 +5,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PermisosGuard } from './permisos.guard';
+import { SesionesModule } from '../sesiones/sesiones.module';
 
 // Módulo reutilizable de autorización (ABC-151).
 //
@@ -28,7 +29,7 @@ import { PermisosGuard } from './permisos.guard';
 // 'ordenes.cambiar_estado' con el endpoint de ABC-148 es una tarea aparte
 // de coordinación entre servicios.
 @Module({
-  imports: [TypeOrmModule.forFeature([Rol, Usuario])],
+  imports: [TypeOrmModule.forFeature([Rol, Usuario]), SesionesModule],
   providers: [JwtStrategy, JwtAuthGuard, PermisosGuard],
   exports: [JwtAuthGuard, PermisosGuard],
 })

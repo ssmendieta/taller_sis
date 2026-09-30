@@ -50,12 +50,20 @@ Todo HTTP/REST. Cada MS solo ve su DB, sin FK entre DBs.
 git clone https://github.com/ssmendieta/taller_sis.git
 cd taller_sis
 Copy-Item .env.example .env   # en Git Bash/Linux: cp .env.example .env
+# Edita .env: define JWT_SECRET (obligatorio), DB_USERNAME, DB_PASSWORD
+# y ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NOMBRE para el administrador inicial.
 ```
 
 **Paso 2 - Instalar dependencias:**
 ```powershell
-.\scripts\install-all.ps1   # en Linux/macOS: bash scripts/install-all.ps1
-# Si falla, instalar manual: cd frontend && npm install; cd ../api-gateway && npm install; cd ../services/auth-service && npm install; etc.
+# En cada paquete (frontend, api-gateway, services/*):
+npm install
+# Ejemplo:
+cd frontend; npm install; cd ..
+cd api-gateway; npm install; cd ..
+cd services/auth-service; npm install; cd ../..
+cd services/produccion-service; npm install; cd ../..
+cd services/logistica-service; npm install; cd ../..
 ```
 
 **Paso 3 - Levantar PostgreSQL (1 instancia con 3 DBs):**
@@ -63,7 +71,8 @@ Copy-Item .env.example .env   # en Git Bash/Linux: cp .env.example .env
 docker compose --profile db up -d
 docker ps                 # debe aparecer taller_postgres Up (healthy) unos segundos después
 docker logs taller_postgres --tail 20  # debe decir "database system is ready to accept connections"
-docker exec taller_postgres psql -U postgres -c "\l"  # debe listar auth_db, produccion_db, logistica_db
+# Usa el usuario de tu .env (DB_USERNAME), no necesariamente "postgres":
+docker exec taller_postgres psql -U postgres_user -d auth_db -c "\l"  # debe listar auth_db, produccion_db, logistica_db
 # Si no aparecen, esperar 5s y repetir. Si persiste error, ver sección 14.
 ```
 
@@ -71,14 +80,29 @@ docker exec taller_postgres psql -U postgres -c "\l"  # debe listar auth_db, pro
 ```powershell
 cd services/auth-service; npm run migration:run; cd ../..
 cd services/produccion-service; npm run migration:run; cd ../..
+# Ejecutar migration:run una segunda vez debe decir "No migrations are pending" (idempotente).
 # Verificar:
-docker exec taller_postgres psql -U postgres_user -d auth_db -c "\dt"              # debe mostrar roles, permisos, usuarios, etc.
-docker exec taller_postgres psql -U postgres_user -d produccion_db -c "\dt; \dv"  # debe mostrar 6 tablas + 2 vistas
+docker exec taller_postgres psql -U postgres_user -d auth_db -c "\dt"              # debe mostrar roles, permisos, usuarios, sesiones, auditoria
+docker exec taller_postgres psql -U postgres_user -d produccion_db -c "\dt; \dv"  # debe mostrar 7 tablas + 2 vistas + secuencia_codigo_orden
 docker exec taller_postgres psql -U postgres_user -d logistica_db -c "\dt"         # debe estar vacío (correcto)
 ```
 
-**Paso 5 - Levantar todo y probar:**
+**Paso 5 - Crear el administrador inicial y los datos demo:**
 ```powershell
+# Requiere ADMIN_EMAIL, ADMIN_PASSWORD y ADMIN_NOMBRE en el entorno o .env.
+# Sin esas variables no crea nada y avisa. Ejecutarlo dos veces no duplica.
+cd services/auth-service; npm run seed:admin; cd ../..
+cd services/produccion-service; npm run seed:demo; cd ../..
+# seed:demo deja materiales (HAR-001, AZU-001, MAN-001), inventario y la receta
+# PAN-001 con AZU-001 insuficiente, para demostrar disponibilidad y faltantes.
+# Login del admin:
+curl -X POST http://localhost:3001/login -H "Content-Type: application/json" -d '{"correo":"<ADMIN_EMAIL>","password":"<ADMIN_PASSWORD>"}'
+```
+
+**Paso 6 - Levantar todo y probar:**
+```powershell
+# Orden de arranque: auth (:3001) antes que producción (:3002),
+# porque producción valida la sesión contra GET {AUTH_SERVICE_URL}/me.
 # Opción A - local (4 terminales separadas, recomendado para ver logs):
 # Terminal 1: cd services/auth-service; npm run start:dev       # :3001
 # Terminal 2: cd services/produccion-service; npm run start:dev # :3002
@@ -86,7 +110,7 @@ docker exec taller_postgres psql -U postgres_user -d logistica_db -c "\dt"      
 # Terminal 4: cd api-gateway; npm run start:dev                  # :3000
 # Terminal 5: cd frontend; npm run dev                           # :5173
 
-# Opción B - todo con Docker (1 comando):
+# Opción B - todo con Docker (1 comando, requiere JWT_SECRET en .env):
 docker compose --profile full up -d --build
 docker ps  # deben aparecer 5 contenedores Up
 
@@ -96,7 +120,7 @@ curl http://localhost:3000/api/auth/health
 curl http://localhost:3000/api/produccion/health
 curl http://localhost:3000/api/produccion/health/database  # debe dar database:connected
 # Frontend: abrir http://localhost:5173/estado -> debe mostrar Gateway: OK, Producción: OK, Base de datos: OK
-.\scripts\test-e2e.ps1  # prueba automatizada de todo el flujo
+npm run e2e  # prueba automatizada contra el gateway (requiere ADMIN_EMAIL y ADMIN_PASSWORD)
 ```
 
 ## 5. Variables de Entorno
@@ -107,9 +131,30 @@ AUTH_SERVICE_URL=http://localhost:3001, PRODUCCION_SERVICE_URL=http://localhost:
 VITE_API_URL=http://localhost:3000  # frontend SOLO conoce gateway
 DB_HOST=localhost (fuera de docker) / postgres (dentro de docker), DB_PORT=5432, DB_USERNAME, DB_PASSWORD
 DB_AUTH_DATABASE=auth_db, DB_PRODUCCION_DATABASE=produccion_db, DB_LOGISTICA_DATABASE=logistica_db
+JWT_SECRET=<obligatorio, sin valor por defecto>  # auth no arranca sin él; fuera de docker va en .env, en docker lo exige compose
+JWT_EXPIRES_IN=1h  # expiración del JWT
+SESION_INACTIVIDAD_MINUTOS=15  # expiración deslizante por inactividad (parametrizable para tests)
+ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NOMBRE  # administrador inicial para npm run seed:admin (nunca versionar)
 SKIP_DB=false  # true solo para probar sin PG (database:skipped)
 ```
 No versionar `.env`.
+
+## 5.1 Roles y permisos
+Matriz vigente: `docs/matriz-permisos-sprint-1.md` (única fuente de verdad,
+alineada con los permisos sembrados en BD). Administrador gestiona usuarios,
+roles y auditoría; Encargado de Producción opera recetas, órdenes, avances y
+cálculos; Supervisor solo consulta órdenes; Encargado de Logística no tiene
+funciones en Sprint 1. Los menús y rutas del frontend se deciden por permiso
+(`frontend/src/services/permisos.js`), así un rol personalizado funciona sin
+tocar código.
+
+## 5.2 Tests y e2e
+```powershell
+cd services/auth-service; npm test       # jest (incluye roles, sesiones, seed, usuarios, auditoría)
+cd ../produccion-service; npm test       # jest (incluye órdenes, avances, recetas, materiales)
+cd ../../frontend; npm run test:session; npm run test:audit  # tests del frontend
+cd ../..; npm run e2e                    # e2e contra el gateway (requiere servicios + ADMIN_* + seed:demo)
+```
 
 ## 6. PostgreSQL
 - 1 instancia `postgres:15-alpine` `taller_postgres` con `healthcheck pg_isready` (`docker-compose.yml:3`).

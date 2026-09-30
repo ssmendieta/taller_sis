@@ -1,5 +1,4 @@
-﻿version: "3.8"
-services:
+﻿services:
   postgres:
     image: postgres:15-alpine
     container_name: taller_postgres
@@ -51,8 +50,12 @@ services:
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_DATABASE=${DB_AUTH_DATABASE:-auth_db}
       - SKIP_DB=${SKIP_DB:-false}
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET es obligatorio. Defínelo en .env (ver .env.example)}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-1h}
+      - SESION_INACTIVIDAD_MINUTOS=${SESION_INACTIVIDAD_MINUTOS:-15}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_NOMBRE=${ADMIN_NOMBRE:-}
     depends_on:
       postgres:
         condition: service_healthy

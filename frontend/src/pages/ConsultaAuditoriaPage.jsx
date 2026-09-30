@@ -4,19 +4,6 @@ import { diaAuditoria, filtrarAuditoria, nombreUsuarioAuditoria, paginaAuditoria
 import "../styles/consulta-auditoria.css";
 
 const TAMANO_PAGINA = 8;
-const esDemostracion = import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo") === "1";
-const auditoriaEjemplo = [
-  { id: "1", usuario_actor_nombre: "Ana Pérez", accion: "CREAR_USUARIO", usuario_afectado_nombre: "Pedro Rojas", fecha_hora: "2026-09-25T13:20:00Z" },
-  { id: "2", usuario_actor_nombre: "Ana Pérez", accion: "CAMBIAR_ROL", usuario_afectado_nombre: "Lucía Vargas", fecha_hora: "2026-09-25T15:12:00Z" },
-  { id: "3", usuario_actor_nombre: "José Flores", accion: "DESACTIVAR_USUARIO", usuario_afectado_nombre: "Pedro Rojas", fecha_hora: "2026-09-26T18:45:00Z" },
-  { id: "4", usuario_actor_nombre: "Ana Pérez", accion: "ACTIVAR_USUARIO", usuario_afectado_nombre: "Pedro Rojas", fecha_hora: "2026-09-26T19:05:00Z" },
-  { id: "5", usuario_actor_nombre: "Ana Pérez", accion: "CREAR_USUARIO", usuario_afectado_nombre: "María Soto", fecha_hora: "2026-09-26T19:10:00Z" },
-  { id: "6", usuario_actor_nombre: "José Flores", accion: "CAMBIAR_ROL", usuario_afectado_nombre: "María Soto", fecha_hora: "2026-09-26T19:25:00Z" },
-  { id: "7", usuario_actor_nombre: "Ana Pérez", accion: "ACTIVAR_USUARIO", usuario_afectado_nombre: "Lucía Vargas", fecha_hora: "2026-09-26T20:15:00Z" },
-  { id: "8", usuario_actor_nombre: "José Flores", accion: "CAMBIAR_ROL", usuario_afectado_nombre: "Pedro Rojas", fecha_hora: "2026-09-26T20:50:00Z" },
-  { id: "9", usuario_actor_nombre: "Ana Pérez", accion: "DESACTIVAR_USUARIO", usuario_afectado_nombre: "Lucía Vargas", fecha_hora: "2026-09-26T21:10:00Z" },
-  { id: "10", usuario_actor_nombre: "Ana Pérez", accion: "CREAR_USUARIO", usuario_afectado_nombre: "Carla Mendoza", fecha_hora: "2026-09-26T22:10:00Z" },
-];
 
 function nombreUsuario(registro, tipo) {
   return nombreUsuarioAuditoria(registro, tipo);
@@ -34,8 +21,8 @@ function fechaRegistro(valor) {
 }
 
 export default function ConsultaAuditoriaPage() {
-  const [registros, setRegistros] = useState(esDemostracion ? auditoriaEjemplo : []);
-  const [cargando, setCargando] = useState(!esDemostracion);
+  const [registros, setRegistros] = useState([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [intento, setIntento] = useState(0);
   const [usuario, setUsuario] = useState("");
@@ -45,7 +32,6 @@ export default function ConsultaAuditoriaPage() {
   const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
-    if (esDemostracion) return;
     const controller = new AbortController();
     setCargando(true);
     setError("");
@@ -69,15 +55,11 @@ export default function ConsultaAuditoriaPage() {
         {!cargando && !error && <span>{registros.length} registros</span>}
       </header>
 
-      {esDemostracion && <p className="audit-notice">Vista de ejemplo: estos registros son ficticios.</p>}
       {cargando && <p className="audit-feedback" role="status">Cargando auditoría…</p>}
       {error && <div className="audit-feedback audit-error" role="alert">
         <p>{error}</p><button type="button" onClick={() => setIntento((actual) => actual + 1)}>Reintentar</button>
-        {import.meta.env.DEV && <a href="?demo=1">Ver pantalla con datos de ejemplo</a>}
       </div>}
-      {!cargando && !error && registros.length === 0 && <p className="audit-feedback">Todavía no hay registros de auditoría.
-        {import.meta.env.DEV && <a href="?demo=1">Ver pantalla con datos de ejemplo</a>}
-      </p>}
+      {!cargando && !error && registros.length === 0 && <p className="audit-feedback">Todavía no hay registros de auditoría.</p>}
 
       {!cargando && !error && registros.length > 0 && <div className="audit-panel">
         <div className="audit-panel-title"><h2>Historial de acciones</h2><span>{filtrados.length} resultados</span></div>

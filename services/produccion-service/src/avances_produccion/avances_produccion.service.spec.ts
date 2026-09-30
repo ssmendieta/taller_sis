@@ -1,9 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   NotFoundException,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
@@ -73,19 +71,22 @@ describe('AvancesProduccionService.create (ABC-195)', () => {
     expect(transaction).not.toHaveBeenCalled();
   });
 
-  it('rechaza el registro cuando no hay identidad autenticada', async () => {
-    await expect(service.create(dto(1))).rejects.toBeInstanceOf(
-      ServiceUnavailableException,
+  it('rechaza el registro cuando no hay identidad ni responsable válido', async () => {
+    await expect(service.create(dto(1) as any)).rejects.toBeInstanceOf(
+      UnauthorizedException,
     );
     expect(transaction).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
   });
 
-  it('rechaza un rol distinto a Encargado de Producción', async () => {
-    await expect(
-      service.create(dto(1), { sub: 9, rolNombre: 'Supervisor' }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(transaction).not.toHaveBeenCalled();
+  it('acepta cualquier rol verificado: el permiso lo decide el guard', async () => {
+    const resultado = await service.create(dto(1), { sub: 9, rolNombre: 'Supervisor' });
+    expect(transaction).toHaveBeenCalled();
+    expect(save).toHaveBeenCalledWith(
+      AvancesProduccion,
+      expect.objectContaining({ usuario_responsable_id: '9' }),
+    );
+    expect(resultado.cantidad_producida_acumulada).toBe(1);
   });
 
   it('rechaza una identidad autenticada con ID inválido', async () => {

@@ -8,7 +8,13 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-type IdentidadAuth = { id: string; rol: string; permisos: string[] };
+type PermisoAuth = string | { codigo: string };
+type IdentidadAuth = {
+  id: string;
+  rol: string;
+  nombre_completo?: string | null;
+  permisos: PermisoAuth[];
+};
 export const PERMISO_PRODUCCION = 'permiso_produccion';
 
 @Injectable()
@@ -20,7 +26,8 @@ export class PermisoProduccionGuard implements CanActivate {
       headers: { authorization?: string };
       body?: { nuevoEstado?: string };
       usuarioId?: number;
-      usuarioAutenticado?: { sub: number; rolNombre: string };
+      usuarioNombre?: string | null;
+      usuarioAutenticado?: { sub: number; rolNombre: string; nombre?: string | null };
     }>();
     const authorization = request.headers.authorization;
     if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) {
@@ -49,10 +56,12 @@ export class PermisoProduccionGuard implements CanActivate {
     }
     const usuarioId = Number(identidad?.id);
     if (!Number.isSafeInteger(usuarioId) || usuarioId < 1 ||
-        identidad?.rol !== 'Encargado de Producción' ||
         !Array.isArray(identidad.permisos)) {
       throw new ForbiddenException('No tiene permisos para esta operación');
     }
+    const codigos = identidad.permisos.map((p) =>
+      typeof p === 'string' ? p : p?.codigo,
+    );
 
     let permiso = this.reflector.get<string>(PERMISO_PRODUCCION, context.getHandler());
     if (!permiso) throw new ForbiddenException('No hay permiso configurado para esta ruta');
@@ -62,11 +71,15 @@ export class PermisoProduccionGuard implements CanActivate {
         permiso = 'ordenes.finalizar_cancelar';
       }
     }
-    if (!identidad.permisos.includes(permiso)) {
+    if (!codigos.includes(permiso)) {
       throw new ForbiddenException('No tiene permisos para esta operación');
     }
     request.usuarioId = usuarioId;
-    request.usuarioAutenticado = { sub: usuarioId, rolNombre: identidad.rol };
+    const nombre = typeof identidad.nombre_completo === 'string' && identidad.nombre_completo.trim()
+      ? identidad.nombre_completo.trim()
+      : null;
+    request.usuarioNombre = nombre;
+    request.usuarioAutenticado = { sub: usuarioId, rolNombre: identidad.rol, nombre };
     return true;
   }
 }

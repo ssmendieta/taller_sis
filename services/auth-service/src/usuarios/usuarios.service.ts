@@ -94,6 +94,49 @@ export class UsuariosService {
     return this.usuarios.find({ where: { eliminado_en: IsNull() } });
   }
 
+  findAllIncluyendoBajas(): Promise<Usuario[]> {
+    return this.usuarios.find({ order: { id: 'ASC' } });
+  }
+
+  private async nombreRolDe(rolId: string | number): Promise<string | null> {
+    const rol = await this.roles.findOne({ where: { id: String(rolId) } });
+    return rol?.nombre ?? null;
+  }
+
+  private async contarAdminsActivos(excluirId?: string | number): Promise<number> {
+    const qb = this.usuarios
+      .createQueryBuilder('u')
+      .innerJoin(Rol, 'r', 'r.id = u.rol_id')
+      .where('r.nombre = :admin', { admin: 'Administrador' })
+      .andWhere('u.activo = TRUE')
+      .andWhere('u.eliminado_en IS NULL');
+    if (excluirId !== undefined) {
+      qb.andWhere('u.id != :excluir', { excluir: String(excluirId) });
+    }
+    return qb.getCount();
+  }
+
+  private async protegerAdmin(
+    objetivoId: string | number,
+    actorId?: string | number,
+  ): Promise<void> {
+    const objetivo = await this.usuarios.findOne({
+      where: { id: String(objetivoId) },
+    });
+    if (!objetivo) return;
+    const esAdmin = (await this.nombreRolDe(objetivo.rol_id)) === 'Administrador';
+    if (!esAdmin) return;
+    if (actorId !== undefined && String(actorId) === String(objetivoId)) {
+      throw new ConflictException('No puedes desactivar ni dar de baja tu propia cuenta');
+    }
+    const otros = await this.contarAdminsActivos(objetivoId);
+    if (otros < 1) {
+      throw new ConflictException(
+        'No se puede dejar el sistema sin un Administrador activo',
+      );
+    }
+  }
+
   async rolesDisponibles(): Promise<Array<{ id: string; nombre: string }>> {
     const roles = await this.roles.find({ where: { activo: true }, order: { nombre: 'ASC' } });
     return roles.map(({ id, nombre }) => ({ id, nombre }));
@@ -118,6 +161,13 @@ export class UsuariosService {
 
     if (dto.rol_id !== undefined) {
       await this.validarRolActivo(dto.rol_id);
+      if (cambioRol) {
+        const rolActual = await this.nombreRolDe(usuario.rol_id);
+        const rolNuevo = await this.nombreRolDe(dto.rol_id);
+        if (rolActual === 'Administrador' && rolNuevo !== 'Administrador') {
+          await this.protegerAdmin(id, actorId);
+        }
+      }
       usuario.rol_id = String(dto.rol_id);
     }
     if (dto.nombre_completo !== undefined) {
@@ -182,6 +232,9 @@ export class UsuariosService {
   async changeStatus(id: string, activo: boolean, actorId?: string | number): Promise<Usuario> {
     if (typeof activo !== 'boolean') throw new BadRequestException('activo debe ser booleano');
     const usuario = await this.findOne(id);
+    if (activo === false) {
+      await this.protegerAdmin(id, actorId);
+    }
     const estadoAntes = usuario.activo;
 
     return this.dataSource.transaction(async (manager) => {
@@ -209,6 +262,7 @@ export class UsuariosService {
 
   async softDelete(id: string, actorId?: string | number): Promise<void> {
     const usuario = await this.findOne(id);
+    await this.protegerAdmin(id, actorId);
     const fechaBaja = new Date();
     const estadoAntes = usuario.activo; 
 

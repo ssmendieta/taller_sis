@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Material } from '../materiales/entities/material.entity';
+import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { Receta } from './entities/receta.entity';
 import { RecetaMaterial } from './entities/receta-material.entity';
 import { RecetasController } from './recetas.controller';
@@ -12,7 +13,7 @@ import { SesionGuard } from '../auth/sesion.guard';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Receta, RecetaMaterial, Material]),
+    TypeOrmModule.forFeature([Receta, RecetaMaterial, Material, OrdenProduccion]),
   ],
   controllers: [RecetasController],
   providers: [

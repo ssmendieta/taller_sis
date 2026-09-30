@@ -2,13 +2,6 @@ import { useEffect, useState } from "react";
 import { cambiarEstadoOrdenProduccion, obtenerOrdenesProduccion } from "../services/api.js";
 import "../styles/consulta-ordenes.css";
 
-const esDemostracion = import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo") === "1";
-const ordenesEjemplo = [
-  { id: "1", codigo: "OP-2026-001", producto_nombre: "Pan de molde integral", cantidad_solicitada: "240", fecha_programada: "2026-10-02", estado: "PLANIFICADA", responsable_nombre: "María Vargas" },
-  { id: "2", codigo: "OP-2026-002", producto_nombre: "Fiambre de pollo", cantidad_solicitada: "80", fecha_programada: "2026-10-04", estado: "EN_PRODUCCION", responsable_nombre: "José Rojas" },
-  { id: "3", codigo: "OP-2026-003", producto_nombre: "Empanadas", cantidad_solicitada: "120", fecha_programada: "2026-10-08", estado: "PENDIENTE", responsable_nombre: "María Vargas" },
-];
-
 function nombreProducto(orden) {
   return orden.producto_nombre ?? orden.receta?.producto_nombre ?? orden.codigo ?? "—";
 }
@@ -40,10 +33,14 @@ function leerSesionProduccion() {
     if (!token || !guardado) return null;
 
     const usuario = JSON.parse(guardado);
-    const nombreRol = typeof usuario?.rol === "string" ? usuario.rol : usuario?.rol?.nombre;
-    const rol = nombreRol?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const permisos = (usuario?.permisos ?? []).map((p) =>
+      typeof p === "string" ? p : p?.codigo,
+    );
+    const puede = ["ordenes.cambiar_estado", "ordenes.iniciar", "ordenes.finalizar_cancelar"].some((c) =>
+      permisos.includes(c),
+    );
     const id = Number(usuario?.id);
-    if (rol !== "encargado de produccion" || !Number.isSafeInteger(id) || id < 1) return null;
+    if (!puede || !Number.isSafeInteger(id) || id < 1) return null;
     return { id };
   } catch {
     return null;
@@ -67,8 +64,8 @@ function etiquetaAccion(nuevoEstado) {
 }
 
 export default function ConsultaOrdenesPage() {
-  const [ordenes, setOrdenes] = useState(esDemostracion ? ordenesEjemplo : []);
-  const [cargando, setCargando] = useState(!esDemostracion);
+  const [ordenes, setOrdenes] = useState([]);
+  const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [intento, setIntento] = useState(0);
   const [producto, setProducto] = useState("");
@@ -80,7 +77,7 @@ export default function ConsultaOrdenesPage() {
   const [guardando, setGuardando] = useState(false);
   const [errorCambio, setErrorCambio] = useState("");
   const [aviso, setAviso] = useState("");
-  const puedeCerrarOrdenes = !esDemostracion && Boolean(leerSesionProduccion());
+  const puedeCerrarOrdenes = Boolean(leerSesionProduccion());
 
   function abrirAccion(orden, nuevoEstado) {
     setAccion({ orden, nuevoEstado });
@@ -129,7 +126,6 @@ export default function ConsultaOrdenesPage() {
   }
 
   useEffect(() => {
-    if (esDemostracion) return;
     const controller = new AbortController();
     setCargando(true);
     setError("");
@@ -165,7 +161,6 @@ export default function ConsultaOrdenesPage() {
         {!cargando && !error && <span className="orders-count">{ordenes.length} órdenes registradas</span>}
       </header>
 
-      {esDemostracion && <p className="orders-notice">Vista de ejemplo: estos datos son ficticios.</p>}
       {aviso && <p className="orders-notice" role="status">{aviso}</p>}
       {errorCambio && !accion && (
         <div className="orders-feedback orders-error" role="alert">

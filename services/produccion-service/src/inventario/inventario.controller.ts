@@ -2,11 +2,16 @@ import {
   Controller,
   Get,
   Param,
+  SetMetadata,
   UseGuards,
 } from '@nestjs/common';
 
 import { InventarioService } from './inventario.service';
 import { SesionGuard } from '../auth/sesion.guard';
+import {
+  PermisoProduccionGuard,
+  PERMISO_PRODUCCION,
+} from '../auth/permiso-produccion.guard';
 
 
 
@@ -22,6 +27,8 @@ export class InventarioController {
 
 
   @Get('material/:id')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'materiales.consultar_disponibilidad')
   consultarDisponibilidad(
     @Param('id') id: string,
   ) {

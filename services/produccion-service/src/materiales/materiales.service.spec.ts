@@ -39,9 +39,28 @@ describe('MaterialesService', () => {
     });
 
     it('descarta los campos undefined del DTO', async () => {
+      repository.findOne.mockResolvedValue({ id: 1, codigo: 'MAT-02' });
+
       await service.update(1, { codigo: 'MAT-02', nombre: undefined });
 
       expect(repository.update).toHaveBeenCalledWith(1, { codigo: 'MAT-02' });
+    });
+
+    it('responde 404 cuando el material no existe', async () => {
+      repository.findOne.mockResolvedValue(null);
+
+      await expect(service.update(1, { nombre: 'Acero' })).rejects.toMatchObject({
+        status: 404,
+      });
+    });
+
+    it('responde 409 cuando el código ya pertenece a otro material', async () => {
+      repository.findOne.mockResolvedValue({ id: 9, codigo: 'MAT-02' });
+
+      await expect(
+        service.update(1, { codigo: 'MAT-02' }),
+      ).rejects.toThrow(ConflictException);
+      expect(repository.update).not.toHaveBeenCalled();
     });
   });
 

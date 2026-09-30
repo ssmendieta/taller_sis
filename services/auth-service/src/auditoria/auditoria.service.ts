@@ -62,41 +62,70 @@ export class AuditoriaService {
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const qb = this.repo.createQueryBuilder('auditoria');
+    const base = this.repo
+      .createQueryBuilder('a')
+      .leftJoin('usuarios', 'actor', 'actor.id = a.usuario_actor_id')
+      .leftJoin('usuarios', 'afectado', 'afectado.id = a.usuario_afectado_id');
 
+    if (query.usuario !== undefined) {
+      base.andWhere(
+        '(a.usuario_actor_id = :usuario OR a.usuario_afectado_id = :usuario)',
+        { usuario: query.usuario },
+      );
+    }
     if (query.usuario_actor_id !== undefined) {
-      qb.andWhere('auditoria.usuario_actor_id = :usuario_actor_id', {
+      base.andWhere('a.usuario_actor_id = :usuario_actor_id', {
         usuario_actor_id: query.usuario_actor_id,
       });
     }
+    if (query.usuario_afectado_id !== undefined) {
+      base.andWhere('a.usuario_afectado_id = :usuario_afectado_id', {
+        usuario_afectado_id: query.usuario_afectado_id,
+      });
+    }
     if (query.accion !== undefined) {
-      qb.andWhere('auditoria.accion = :accion', { accion: query.accion });
+      base.andWhere('a.accion = :accion', { accion: query.accion });
     }
     if (query.entidad !== undefined) {
-      qb.andWhere('auditoria.entidad = :entidad', { entidad: query.entidad });
+      base.andWhere('a.entidad = :entidad', { entidad: query.entidad });
     }
     if (query.entidad_id !== undefined) {
-      qb.andWhere('auditoria.entidad_id = :entidad_id', {
+      base.andWhere('a.entidad_id = :entidad_id', {
         entidad_id: query.entidad_id,
       });
     }
     if (query.fechaDesde !== undefined) {
-      qb.andWhere('auditoria.fecha_hora >= :fechaDesde', {
+      base.andWhere('a.fecha_hora >= :fechaDesde', {
         fechaDesde: query.fechaDesde,
       });
     }
     if (query.fechaHasta !== undefined) {
-      qb.andWhere('auditoria.fecha_hora <= :fechaHasta', {
+      base.andWhere('a.fecha_hora <= :fechaHasta', {
         fechaHasta,
       });
     }
 
-    const [items, total] = await qb
-      .orderBy('auditoria.fecha_hora', 'DESC')
-      .addOrderBy('auditoria.id', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    const total = await base.getCount();
+    const items = await base
+      .clone()
+      .select([
+        'a.id AS id',
+        'a.usuario_actor_id AS usuario_actor_id',
+        'a.accion AS accion',
+        'a.entidad AS entidad',
+        'a.entidad_id AS entidad_id',
+        'a.usuario_afectado_id AS usuario_afectado_id',
+        'a.datos_antes AS datos_antes',
+        'a.datos_despues AS datos_despues',
+        'a.fecha_hora AS fecha_hora',
+        'actor.nombre_completo AS usuario_actor_nombre',
+        'afectado.nombre_completo AS usuario_afectado_nombre',
+      ])
+      .orderBy('a.fecha_hora', 'DESC')
+      .addOrderBy('a.id', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany();
 
     return {
       items,

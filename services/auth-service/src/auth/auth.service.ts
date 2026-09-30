@@ -6,12 +6,14 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { compare } from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 import { Repository } from 'typeorm';
 
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { Rol } from '../roles/entities/role.entity';
 import { LoginDto } from './dto/login.dto';
 import { JwtPayload } from '../authz/jwt-payload.interface';
+import { SesionesService } from '../sesiones/sesiones.service';
 
 export interface UsuarioParaAuth {
   id: string;
@@ -33,6 +35,8 @@ export class AuthService {
 
     @InjectRepository(Rol)
     private readonly roles: Repository<Rol>,
+
+    private readonly sesiones: SesionesService,
   ) {}
 
   async login(dto: LoginDto) {
@@ -74,13 +78,16 @@ export class AuthService {
 
     const permisos = (rolAsignado.permisos ?? []).filter((permiso) => permiso.activo);
 
+    const jti = randomUUID();
     const payload = {
       sub: usuario.id,
       correo: usuario.correo,
       rolId: usuario.rol_id,
+      jti,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
+    await this.sesiones.crear(jti, usuario.id);
 
     return {
       accessToken,
@@ -95,6 +102,7 @@ export class AuthService {
         },
         permisos: permisos.map((permiso) => ({
           id: permiso.id,
+          codigo: permiso.codigo,
           nombre: permiso.nombre,
         })),
       },
@@ -104,6 +112,10 @@ export class AuthService {
   // Auth conserva la fuente de verdad sobre el usuario y sus permisos actuales.
   // Producción consulta este endpoint protegido antes de efectuar una operación.
   async sesionActual(usuario: JwtPayload) {
+    if (!usuario.jti) {
+      throw new UnauthorizedException('La sesión no es válida');
+    }
+    await this.sesiones.validarYRefrescar(usuario.jti, usuario.sub);
     const rol = await this.roles.findOne({
       where: { id: String(usuario.rolId) },
       relations: ['permisos'],
@@ -111,13 +123,29 @@ export class AuthService {
     if (!rol || !rol.activo) {
       throw new ForbiddenException('El rol asignado ya no está disponible');
     }
+    const titular = await this.usuarios.findOne({
+      where: { id: String(usuario.sub) },
+    });
     return {
       id: String(usuario.sub),
+      correo: titular?.correo ?? String(usuario.correo ?? ''),
+      nombre_completo: titular?.nombre_completo ?? null,
       rol: rol.nombre,
       permisos: (rol.permisos ?? [])
         .filter((permiso) => permiso.activo)
-        .map((permiso) => permiso.codigo),
+        .map((permiso) => ({
+          id: permiso.id,
+          codigo: permiso.codigo,
+          nombre: permiso.nombre,
+        })),
     };
+  }
+
+  async logout(usuario: JwtPayload) {
+    if (usuario?.jti) {
+      await this.sesiones.revocar(usuario.jti, usuario.sub);
+    }
+    return { message: 'Sesión cerrada' };
   }
 
   private async buscarUsuarioParaAuth(

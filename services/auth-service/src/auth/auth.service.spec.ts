@@ -24,6 +24,8 @@ function preparar(usuarios: UsuarioPrueba[]) {
         }),
       }),
     }),
+    findOne: async ({ where }: { where: { id: string } }) =>
+      usuarios.find((u) => String(u.id) === String(where.id)) ?? null,
   } as unknown as Repository<Usuario>;
   const repositorioRoles = {
     findOne: async ({ where }: { where: { id: string } }) =>
@@ -40,7 +42,12 @@ function preparar(usuarios: UsuarioPrueba[]) {
       return 'jwt-de-prueba';
     },
   } as unknown as JwtService;
-  return { servicio: new AuthService(jwt, repositorioUsuarios, repositorioRoles), payloads };
+  const sesiones = {
+    crear: async () => undefined,
+    validarYRefrescar: async () => undefined,
+    revocar: async () => true,
+  } as unknown as import('../sesiones/sesiones.service').SesionesService;
+  return { servicio: new AuthService(jwt, repositorioUsuarios, repositorioRoles, sesiones), payloads };
 }
 
 async function usuarioDePrueba(rolId = '1'): Promise<UsuarioPrueba> {
@@ -62,10 +69,11 @@ describe('ABC-167: pruebas del servicio de autenticación', () => {
     assert.equal(respuesta.accessToken, 'jwt-de-prueba');
     assert.equal(payloads[0].sub, '3');
     assert.equal(payloads[0].rolId, '1');
+    assert.equal(typeof payloads[0].jti, 'string');
     assert.deepEqual(respuesta.usuario, {
       id: '3', correo: 'ana@example.com', nombre_completo: 'Ana',
       rol: { id: '1', nombre: 'Administrador' },
-      permisos: [{ id: '7', nombre: 'Gestionar usuarios' }],
+      permisos: [{ id: '7', codigo: 'usuarios.gestionar', nombre: 'Gestionar usuarios' }],
     });
     assert.equal('password_hash' in respuesta.usuario, false);
   });
@@ -118,13 +126,27 @@ describe('ABC-167: pruebas del servicio de autenticación', () => {
 
   it('devuelve el rol actual y solo permisos activos a un token ya validado', async () => {
     const { servicio } = preparar([await usuarioDePrueba()]);
-    const respuesta = await servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '1' });
+    const respuesta = await servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '1', jti: 'jti-1' });
     assert.deepEqual(respuesta, {
-      id: '3', rol: 'Administrador', permisos: ['usuarios.gestionar'],
+      id: '3',
+      correo: 'ana@example.com',
+      nombre_completo: 'Ana',
+      rol: 'Administrador',
+      permisos: [{ id: '7', codigo: 'usuarios.gestionar', nombre: 'Gestionar usuarios' }],
     });
     await assert.rejects(
-      () => servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '999' }),
+      () => servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '999', jti: 'jti-1' }),
       ForbiddenException,
     );
+    await assert.rejects(
+      () => servicio.sesionActual({ sub: '3', correo: 'ana@example.com', rolId: '1' }),
+      UnauthorizedException,
+    );
+  });
+
+  it('cierra la sesión revocando el jti', async () => {
+    const { servicio } = preparar([await usuarioDePrueba()]);
+    const respuesta = await servicio.logout({ sub: '3', correo: 'ana@example.com', rolId: '1', jti: 'jti-1' });
+    assert.equal(respuesta.message, 'Sesión cerrada');
   });
 });

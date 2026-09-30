@@ -20,11 +20,15 @@ export class AvancesProduccionController {
   }
 
   @Get()
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   findAll() {
     return this.avancesProduccionService.findAll();
   }
 
   @Get(':id')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.avancesProduccionService.findOne(id);
   }

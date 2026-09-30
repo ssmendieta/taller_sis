@@ -18,3 +18,16 @@ export async function iniciarSesion(correo, password) {
   }
   return datos;
 }
+
+export async function cerrarSesionServidor() {
+  const token = sessionStorage.getItem("accessToken");
+  if (!token) return;
+  try {
+    await fetch(`${apiConfig.gatewayUrl}/api/auth/logout`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // El cierre local siempre se ejecuta aunque falle la red.
+  }
+}

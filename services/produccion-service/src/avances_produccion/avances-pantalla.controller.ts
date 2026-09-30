@@ -44,12 +44,16 @@ export class AvancesPantallaController {
 
   // Listar avances de una orden: GET /avances/:ordenId
   @Get(':ordenId')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   listarPorOrden(@Param('ordenId', ParseIntPipe) ordenId: number) {
     return this.avancesService.listarPorOrden(ordenId);
   }
 
   // Total producido de una orden: GET /avances/:ordenId/total
   @Get(':ordenId/total')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   totalProducido(@Param('ordenId', ParseIntPipe) ordenId: number) {
     return this.avancesService.totalProducido(ordenId);
   }

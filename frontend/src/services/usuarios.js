@@ -38,8 +38,9 @@ function exigirLista(datos, descripcion) {
   return datos;
 }
 
-export async function listarUsuarios(signal) {
-  return exigirLista(await solicitar("", { signal }), "usuarios");
+export async function listarUsuarios(signal, incluirEliminados = false) {
+  const ruta = incluirEliminados ? "?incluirEliminados=true" : "";
+  return exigirLista(await solicitar(ruta, { signal }), "usuarios");
 }
 
 export async function listarRolesActivos(signal) {

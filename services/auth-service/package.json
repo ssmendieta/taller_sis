@@ -14,7 +14,8 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "seed:admin": "ts-node --transpile-only src/seeds/seed-admin.ts"
   },
   "jest": {
     "preset": "ts-jest",
