@@ -6,13 +6,15 @@ import { Receta } from './entities/receta.entity';
 import { RecetaMaterial } from './entities/receta-material.entity';
 import { RecetasController } from './recetas.controller';
 import { RecetasService } from './recetas.service';
+import { RecetasVersionService } from './recetas-version.service';
+import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Receta, RecetaMaterial, Material]),
   ],
   controllers: [RecetasController],
-  providers: [RecetasService],
+  providers: [RecetasService, RecetasVersionService, PermisoProduccionGuard],
   exports: [RecetasService],
 })
 export class RecetasModule {}

@@ -8,12 +8,20 @@ import {
   Patch,
   Post,
   Query,
+  SetMetadata,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
 import { RecetasService } from './recetas.service';
+import { RecetasVersionService } from './recetas-version.service';
 import { CreateRecetaDto } from './dto/create-receta.dto';
 import { UpdateRecetaDto } from './dto/update-receta.dto';
+import { CrearVersionRecetaDto } from './dto/crear-version-receta.dto';
+import {
+  PermisoProduccionGuard,
+  PERMISO_PRODUCCION,
+} from '../auth/permiso-produccion.guard';
 
 @UsePipes(
   new ValidationPipe({
@@ -24,7 +32,10 @@ import { UpdateRecetaDto } from './dto/update-receta.dto';
 )
 @Controller('recetas')
 export class RecetasController {
-  constructor(private readonly recetasService: RecetasService) {}
+  constructor(
+    private readonly recetasService: RecetasService,
+    private readonly recetasVersionService: RecetasVersionService,
+  ) {}
 
   @Post()
   create(@Body() dto: CreateRecetaDto) {
@@ -66,5 +77,24 @@ export class RecetasController {
   @Patch(':id/desactivar')
   desactivar(@Param('id', ParseIntPipe) id: number) {
     return this.recetasService.desactivar(id);
+  }
+
+  // ABC-137: crea una versión nueva de la receta sin borrar la anterior
+  // (desactiva la versión actual y da de alta la nueva con sus materiales).
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'recetas.gestionar')
+  @Post(':id/versiones')
+  crearVersion(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CrearVersionRecetaDto,
+  ) {
+    return this.recetasVersionService.crearNuevaVersion(
+      id,
+      dto.producto_nombre,
+      dto.materiales.map((material) => ({
+        materialId: material.material_id,
+        cantidadRequerida: material.cantidad_requerida,
+      })),
+    );
   }
 }
