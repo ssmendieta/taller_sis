@@ -9,7 +9,12 @@ import {
 import { Reflector } from '@nestjs/core';
 
 type PermisoAuth = string | { codigo: string };
-type IdentidadAuth = { id: string; rol: string; permisos: PermisoAuth[] };
+type IdentidadAuth = {
+  id: string;
+  rol: string;
+  nombre_completo?: string | null;
+  permisos: PermisoAuth[];
+};
 export const PERMISO_PRODUCCION = 'permiso_produccion';
 
 @Injectable()
@@ -21,7 +26,8 @@ export class PermisoProduccionGuard implements CanActivate {
       headers: { authorization?: string };
       body?: { nuevoEstado?: string };
       usuarioId?: number;
-      usuarioAutenticado?: { sub: number; rolNombre: string };
+      usuarioNombre?: string | null;
+      usuarioAutenticado?: { sub: number; rolNombre: string; nombre?: string | null };
     }>();
     const authorization = request.headers.authorization;
     if (!authorization || !/^Bearer\s+\S+$/i.test(authorization)) {
@@ -69,7 +75,11 @@ export class PermisoProduccionGuard implements CanActivate {
       throw new ForbiddenException('No tiene permisos para esta operación');
     }
     request.usuarioId = usuarioId;
-    request.usuarioAutenticado = { sub: usuarioId, rolNombre: identidad.rol };
+    const nombre = typeof identidad.nombre_completo === 'string' && identidad.nombre_completo.trim()
+      ? identidad.nombre_completo.trim()
+      : null;
+    request.usuarioNombre = nombre;
+    request.usuarioAutenticado = { sub: usuarioId, rolNombre: identidad.rol, nombre };
     return true;
   }
 }

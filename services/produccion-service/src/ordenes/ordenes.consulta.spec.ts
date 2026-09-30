@@ -20,7 +20,7 @@ describe('ABC-169: consulta de órdenes', () => {
   beforeEach(() => query.mockClear());
 
   it('expone los campos que usa la tabla y toma producto de la receta almacenada', async () => {
-    const respuesta = await servicio.buscar();
+    const respuesta = await servicio.buscar({});
     expect(respuesta).toEqual(registrosAlmacenados);
     expect(respuesta[0]).toMatchObject({
       codigo: 'ORD-18', producto_nombre: 'Pan', cantidad_solicitada: '2.5000',
@@ -31,9 +31,9 @@ describe('ABC-169: consulta de órdenes', () => {
 
   it('usa parámetros para filtros, sin incorporar texto de búsqueda al SQL', async () => {
     const texto = "Pan' OR true --";
-    await servicio.buscar('PLANIFICADA', texto, '2026-10-04');
+    await servicio.buscar({ estado: 'PLANIFICADA', producto: texto, fechaDesde: '2026-10-04', fechaHasta: '2026-10-04' });
     const [sql, parametros] = query.mock.calls[0];
     expect(sql).not.toContain(texto);
-    expect(parametros).toEqual(['PLANIFICADA', texto, '2026-10-04']);
+    expect(parametros).toEqual(['PLANIFICADA', texto, '2026-10-04', '2026-10-04']);
   });
 });

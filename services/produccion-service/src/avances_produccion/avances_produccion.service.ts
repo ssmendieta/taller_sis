@@ -1,10 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -47,14 +45,8 @@ export class AvancesProduccionService {
     usuarioAutenticado?: UsuarioAutenticadoProduccion,
   ): Promise<RegistroAvanceResponse> {
     if (!usuarioAutenticado) {
-      throw new ServiceUnavailableException(
-        'No se puede registrar el avance: Production Service aún no recibe la identidad validada de ABC-151.',
-      );
-    }
-
-    if (usuarioAutenticado.rolNombre !== 'Encargado de Producción') {
-      throw new ForbiddenException(
-        'Solo el rol Encargado de Producción puede registrar avances.',
+      throw new UnauthorizedException(
+        'Debe iniciar sesión para registrar avances.',
       );
     }
 
@@ -76,7 +68,14 @@ export class AvancesProduccionService {
     }
 
     return this.ordenRepository.manager.transaction(async (manager) =>
-      this.registrarEnTransaccion(manager, dto, usuarioId),
+      this.registrarEnTransaccion(
+        manager,
+        dto,
+        usuarioId,
+        typeof usuarioAutenticado.nombre === 'string' && usuarioAutenticado.nombre.trim()
+          ? usuarioAutenticado.nombre.trim()
+          : `Usuario #${usuarioId}`,
+      ),
     );
   }
 
@@ -84,6 +83,7 @@ export class AvancesProduccionService {
     manager: EntityManager,
     dto: CreateAvancesProduccionDto,
     usuarioId: string,
+    usuarioNombre: string,
   ): Promise<RegistroAvanceResponse> {
     const orden = await manager.findOne(OrdenProduccion, {
       where: { id: dto.orden_id },
@@ -129,6 +129,7 @@ export class AvancesProduccionService {
       orden_id: String(orden.id),
       cantidad_producida: dto.cantidad_producida,
       usuario_responsable_id: usuarioId,
+      usuario_responsable_nombre: usuarioNombre,
     });
     const cantidadProducidaAcumulada = nuevoAcumuladoUnidades / 10_000;
     const cantidadPendiente =
@@ -146,7 +147,8 @@ export class AvancesProduccionService {
     return this.ordenRepository.manager.query(`
       SELECT id::text AS id, orden_id::text AS orden_id,
              cantidad_producida::text AS cantidad_producida, fecha_hora,
-             usuario_responsable_id::text AS usuario_responsable_id
+             usuario_responsable_id::text AS usuario_responsable_id,
+             COALESCE(usuario_responsable_nombre, 'Usuario #' || usuario_responsable_id) AS usuario_responsable_nombre
       FROM avances_produccion ORDER BY fecha_hora DESC, id DESC
     `);
   }
@@ -156,7 +158,8 @@ export class AvancesProduccionService {
       `
       SELECT id::text AS id, orden_id::text AS orden_id,
              cantidad_producida::text AS cantidad_producida, fecha_hora,
-             usuario_responsable_id::text AS usuario_responsable_id
+             usuario_responsable_id::text AS usuario_responsable_id,
+             COALESCE(usuario_responsable_nombre, 'Usuario #' || usuario_responsable_id) AS usuario_responsable_nombre
       FROM avances_produccion WHERE id = $1
     `,
       [id],
@@ -171,7 +174,8 @@ export class AvancesProduccionService {
       `
       SELECT id::text AS id, orden_id::text AS orden_id,
              cantidad_producida::text AS cantidad_producida, fecha_hora,
-             usuario_responsable_id::text AS usuario_responsable_id
+             usuario_responsable_id::text AS usuario_responsable_id,
+             COALESCE(usuario_responsable_nombre, 'Usuario #' || usuario_responsable_id) AS usuario_responsable_nombre
       FROM avances_produccion
       WHERE orden_id = $1
       ORDER BY fecha_hora DESC, id DESC

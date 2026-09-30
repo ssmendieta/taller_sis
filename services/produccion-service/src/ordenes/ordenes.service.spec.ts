@@ -1,9 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   NotFoundException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { OrdenesService } from './ordenes.service';
 import { EstadoOrden } from './estado-orden.enum';
@@ -112,13 +110,13 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     expect(managerSave).toHaveBeenCalledTimes(2);
     expect(managerCreate).toHaveBeenCalledWith(
       expect.anything(),
-      {
+      expect.objectContaining({
         ordenId: 1,
         estadoAnterior: EstadoOrden.PENDIENTE,
         estadoNuevo: EstadoOrden.PLANIFICADA,
         usuarioResponsableId: 7,
         motivo: 'Planificada para el lunes',
-      },
+      }),
     );
     expect(resultado).toEqual({ ...ordenBase('PLANIFICADA') });
   });
@@ -145,26 +143,23 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   });
 
   describe('ABC-188: precondiciones de inicio', () => {
-    it('bloquea el inicio si no se recibió identidad autenticada', async () => {
+    it('exige un responsable válido cuando no hay identidad autenticada', async () => {
       await expect(service.cambiarEstado(1, {
         nuevoEstado: EstadoOrden.EN_PRODUCCION,
-        usuarioResponsableId: 7,
-      })).rejects.toThrow(/identidad validada de ABC-151/);
+      } as any)).rejects.toBeInstanceOf(BadRequestException);
 
       expect(findOne).not.toHaveBeenCalled();
       expect(transaction).not.toHaveBeenCalled();
     });
 
-    it('rechaza un rol distinto al rol exacto requerido', async () => {
-      await expect(service.cambiarEstado(1, {
+    it('acepta cualquier rol verificado: el permiso lo decide el guard', async () => {
+      prepararInicio();
+      await service.cambiarEstado(1, {
         nuevoEstado: EstadoOrden.EN_PRODUCCION,
         usuarioResponsableId: 7,
-      }, { sub: 27, rolNombre: 'Administrador' })).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+      }, { sub: 27, rolNombre: 'Administrador' });
 
-      expect(findOne).not.toHaveBeenCalled();
-      expect(transaction).not.toHaveBeenCalled();
+      expect(transaction).toHaveBeenCalledTimes(1);
     });
 
     it('rechaza una orden que no está PLANIFICADA sin persistir transición', async () => {
@@ -364,51 +359,45 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     },
   );
 
-  it('requiere la identidad ABC-151 y el rol correcto para cerrar una orden', async () => {
-    await expect(
-      service.cambiarEstado(1, {
+  it('usa la identidad autenticada para cerrar una orden', async () => {
+    findOne.mockResolvedValue(ordenBase('EN_PRODUCCION'));
+    managerFindOne.mockResolvedValue({});
+
+    await service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.FINALIZADA,
+      usuarioResponsableId: 7,
+    }, { sub: 27, rolNombre: 'Supervisor' });
+
+    expect(transaction).toHaveBeenCalled();
+    expect(managerCreate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ usuarioResponsableId: 27 }),
+    );
+  });
+
+  it('acepta finalizar con cualquier rol verificado', async () => {
+    findOne.mockResolvedValue(ordenBase('EN_PRODUCCION'));
+    managerFindOne.mockResolvedValue({});
+
+    await service.cambiarEstado(
+      1,
+      {
         nuevoEstado: EstadoOrden.FINALIZADA,
         usuarioResponsableId: 7,
-      }),
-    ).rejects.toThrow(/identidad validada de ABC-151/);
+      },
+      { sub: 27, rolNombre: 'Supervisor' },
+    );
 
-    await expect(
-      service.cambiarEstado(
-        1,
-        {
-          nuevoEstado: EstadoOrden.CANCELADA,
-          motivo: 'Motivo válido',
-          usuarioResponsableId: 7,
-        },
-        { sub: 27, rolNombre: 'Supervisor' },
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(transaction).not.toHaveBeenCalled();
+    expect(transaction).toHaveBeenCalled();
   });
 
-  it('rechaza finalizar una orden con rol Supervisor', async () => {
-    await expect(
-      service.cambiarEstado(
-        1,
-        {
-          nuevoEstado: EstadoOrden.FINALIZADA,
-          usuarioResponsableId: 7,
-        },
-        { sub: 27, rolNombre: 'Supervisor' },
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-
-    expect(transaction).not.toHaveBeenCalled();
-  });
-
-  it('responde 503 al cancelar una orden sin identidad autenticada', async () => {
+  it('exige un responsable válido al cancelar sin identidad autenticada', async () => {
     await expect(
       service.cambiarEstado(1, {
         nuevoEstado: EstadoOrden.CANCELADA,
         motivo: 'Motivo válido',
-        usuarioResponsableId: 7,
-      }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+      } as any),
+    ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(transaction).not.toHaveBeenCalled();
   });
@@ -468,13 +457,13 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     expect(managerCreate).toHaveBeenCalledTimes(1);
     expect(managerCreate).toHaveBeenCalledWith(
       expect.anything(),
-      {
+      expect.objectContaining({
         ordenId: 1,
         estadoAnterior: EstadoOrden.EN_PRODUCCION,
         estadoNuevo: EstadoOrden.FINALIZADA,
         usuarioResponsableId: 27,
         motivo: 'Lote completo',
-      },
+      }),
     );
   });
 
@@ -535,11 +524,11 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     const filas: unknown[] = [];
     (repositorioMock.query as jest.Mock).mockResolvedValue(filas);
 
-    await expect(service.buscar('PLANIFICADA', 'OP-00', '2026-10-01')).resolves.toBe(filas);
+    await expect(service.buscar({ estado: 'PLANIFICADA', producto: 'OP-00', fechaDesde: '2026-10-01', fechaHasta: '2026-10-01' })).resolves.toBe(filas);
 
     expect(repositorioMock.query).toHaveBeenCalledWith(
       expect.stringContaining('FROM ordenes_produccion'),
-      ['PLANIFICADA', 'OP-00', '2026-10-01'],
+      ['PLANIFICADA', 'OP-00', '2026-10-01', '2026-10-01'],
     );
   });
 
@@ -638,26 +627,25 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   });
 
   it('obtenerMateriales multiplica la cantidad requerida por la cantidad solicitada de la orden', async () => {
+    findOne.mockResolvedValue({ ...ordenBase('PLANIFICADA'), cantidad: 10 });
     repositorioMock.query = jest.fn().mockResolvedValue([
       {
-        orden_id: 1,
-        orden_codigo: 'OP-001',
-        codigo: 'MAT-001',
-        nombre: 'Acero',
+        material_id: 1,
+        material_codigo: 'MAT-001',
+        material_nombre: 'Acero',
         unidad_medida: 'kg',
-        cantidad_requerida: 20,
+        cantidad_requerida: 2,
       },
     ]);
 
     const resultado = await service.obtenerMateriales(1);
 
     const [sql, parametros] = repositorioMock.query.mock.calls[0];
-    expect(sql).toMatch(
-      /ROUND\(rm\.cantidad_requerida \* o\.cantidad_solicitada,\s*4\)/,
-    );
+    expect(sql).toContain('receta_material');
     expect(sql).toContain('FROM ordenes_produccion');
     expect(parametros).toEqual([1]);
-    expect(resultado[0].cantidad_requerida).toBe(20);
+    expect(resultado.materiales[0].cantidad_requerida).toBe(20);
+    expect(resultado.orden_id).toBe(1);
   });
 
 });

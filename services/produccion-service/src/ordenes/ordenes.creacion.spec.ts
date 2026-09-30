@@ -54,14 +54,14 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
   };
 
   it('confirma una orden válida y entrega el identificador guardado', async () => {
-    const guardada = { id: 10, codigo: 'ORD-123', ...ordenValida, estado: 'PENDIENTE' };
+    const guardada = { id: 10, codigo: 'ORD-2026-00010', ...ordenValida, estado: 'PENDIENTE' };
     crear.mockResolvedValue(guardada);
 
     const respuesta = await enviarOrden(ordenValida);
 
     expect(respuesta.status).toBe(201);
     expect(respuesta.datos).toEqual(guardada);
-    expect(crear).toHaveBeenCalledWith(ordenValida);
+    expect(crear).toHaveBeenCalledWith(ordenValida, undefined);
   });
 
   it('rechaza una orden incompleta sin llamar al servicio', async () => {
@@ -87,16 +87,24 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
     expect(respuesta.datos.message).toBe('Servicio de datos no disponible');
   });
 
-  it('genera códigos distintos para dos órdenes creadas en el mismo segundo', async () => {
+  it('genera códigos legibles ORD-AAAA-NNNNN sin colisiones', async () => {
+    let secuencia = 0;
     const ordenes = {
-      create: (datos: Record<string, unknown>) => datos,
-      save: async (datos: Record<string, unknown>) => datos,
+      query: async () => [{ n: String((secuencia += 1)) }],
+      manager: {
+        transaction: async (fn: (m: any) => Promise<unknown>) =>
+          fn({
+            create: (_t: unknown, v: object) => v,
+            save: async (_t: unknown, v: object) => ({ id: secuencia, ...v }),
+          }),
+      },
     } as unknown as Repository<OrdenProduccion>;
-    const servicio = new OrdenesService(ordenes, {} as Repository<HistorialEstadoOrden>, {} as any, {} as any);
-    const primera = await servicio.create(ordenValida);
-    const segunda = await servicio.create(ordenValida);
+    const recetas = { findOne: async () => ({ id: 2, activa: true }) } as any;
+    const servicio = new OrdenesService(ordenes, {} as Repository<HistorialEstadoOrden>, {} as any, recetas);
+    const actor = { sub: 7, rolNombre: 'Encargado de Producción', nombre: 'Ana' };
+    const primera = await servicio.create({ ...ordenValida, fecha_programada: '2099-10-01' } as any, actor);
+    const segunda = await servicio.create({ ...ordenValida, fecha_programada: '2099-10-01' } as any, actor);
     expect(primera.codigo).not.toBe(segunda.codigo);
-    expect(primera.codigo).toMatch(/^ORD-[a-f0-9]{32}$/);
-    expect(primera.codigo.length).toBeLessThanOrEqual(40);
+    expect(primera.codigo).toMatch(/^ORD-\d{4}-\d{5}$/);
   });
 });

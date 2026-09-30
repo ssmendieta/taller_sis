@@ -1,114 +1,90 @@
 import { apiConfig } from "./api";
 
+function encabezados(extra = {}) {
+  const token = sessionStorage.getItem("accessToken") || localStorage.getItem("accessToken");
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
+async function exigirOk(response, mensaje) {
+  if (!response.ok) {
+    const texto = await response.text().catch(() => "");
+    let detalle = mensaje;
+    try {
+      const datos = texto ? JSON.parse(texto) : null;
+      const posible = datos?.message;
+      detalle = Array.isArray(posible) ? posible.join(". ") : posible || mensaje;
+    } catch {
+      if (texto) detalle = texto;
+    }
+    throw new Error(detalle);
+  }
+  return response;
+}
+
 
 // ================================
 // ORDENES
 // ================================
 
 export async function obtenerOrdenes() {
-
-
   const response = await fetch(
-    `${apiConfig.apiUrl}/api/produccion/ordenes/buscar`
+    `${apiConfig.apiUrl}/api/produccion/ordenes/buscar`,
+    { headers: encabezados() }
   );
 
-
-  if (!response.ok) {
-
-    throw new Error(
-      "Error al obtener órdenes"
-    );
-
-  }
-
+  await exigirOk(response, "Error al obtener órdenes");
 
   const datos = await response.json();
-
-
-  console.log(
-    "SERVICE ORDENES:",
-    datos
-  );
-
 
   return Array.isArray(datos)
     ? datos
     : [datos];
-
 }
 
 
 
 
 export async function obtenerOrden(id) {
-
-
   const response = await fetch(
-    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}`
+    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}`,
+    { headers: encabezados() }
   );
 
-
-  if (!response.ok) {
-
-    throw new Error(
-      "Error al obtener detalle de orden"
-    );
-
-  }
-
+  await exigirOk(response, "Error al obtener detalle de orden");
 
   return await response.json();
-
 }
 
 
 
 
 export async function obtenerMaterialesOrden(id) {
-
-
   const response = await fetch(
-    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}/materiales`
+    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}/materiales`,
+    { headers: encabezados() }
   );
 
-
-  if (!response.ok) {
-
-    throw new Error(
-      "Error al obtener materiales"
-    );
-
-  }
-
+  await exigirOk(response, "Error al obtener materiales");
 
   return await response.json();
-
 }
 
 
 
 
 export async function obtenerHistorialOrden(id) {
-
-
   const response = await fetch(
-    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}/historial`
+    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}/historial`,
+    { headers: encabezados() }
   );
 
-
-  if (!response.ok) {
-
-    throw new Error(
-      "Error al obtener historial"
-    );
-
-  }
-
+  await exigirOk(response, "Error al obtener historial");
 
   return await response.json();
-
 }
-
 
 
 
@@ -122,80 +98,19 @@ export async function registrarAvance(
   ordenId,
   cantidad
 ) {
-
-
-  console.log(
-    "ENVIANDO AVANCE:",
-    {
-      ordenId,
-      cantidad
-    }
-  );
-
-
-  const token = sessionStorage.getItem("accessToken");
-
   const response = await fetch(
-
     `${apiConfig.apiUrl}/api/produccion/avances/${ordenId}`,
-
     {
-
-      method:"POST",
-
-      headers:{
-
-        "Content-Type":"application/json",
-
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-
-      },
-
-
-      body:JSON.stringify({
-
-        cantidad:Number(cantidad),
-
-        usuario_id:1
-
-      })
-
+      method: "POST",
+      headers: encabezados({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ cantidad: Number(cantidad) })
     }
-
   );
 
+  await exigirOk(response, "No se pudo registrar el avance.");
 
-
-  console.log(
-    "STATUS AVANCE:",
-    response.status
-  );
-
-
-
-  const texto = await response.text();
-
-
-  console.log(
-    "RESPUESTA AVANCE:",
-    texto
-  );
-
-
-
-  if(!response.ok){
-
-    throw new Error(texto);
-
-  }
-
-
-
-  return JSON.parse(texto);
-
-
+  return response.json();
 }
-
 
 
 
@@ -203,29 +118,14 @@ export async function registrarAvance(
 export async function obtenerAvancesOrden(
   ordenId
 ) {
-
-
   const response = await fetch(
-
-    `${apiConfig.apiUrl}/api/produccion/avances/${ordenId}`
-
+    `${apiConfig.apiUrl}/api/produccion/avances/${ordenId}`,
+    { headers: encabezados() }
   );
 
-
-
-  if(!response.ok){
-
-    throw new Error(
-      "Error al obtener avances"
-    );
-
-  }
-
-
+  await exigirOk(response, "Error al obtener avances");
 
   return await response.json();
-
-
 }
 
 
@@ -234,27 +134,12 @@ export async function obtenerAvancesOrden(
 export async function obtenerTotalProducido(
   ordenId
 ) {
-
-
   const response = await fetch(
-
-    `${apiConfig.apiUrl}/api/produccion/avances/${ordenId}/total`
-
+    `${apiConfig.apiUrl}/api/produccion/avances/${ordenId}/total`,
+    { headers: encabezados() }
   );
 
-
-
-  if(!response.ok){
-
-    throw new Error(
-      "Error al obtener total producido"
-    );
-
-  }
-
-
+  await exigirOk(response, "Error al obtener total producido");
 
   return await response.json();
-
-
 }

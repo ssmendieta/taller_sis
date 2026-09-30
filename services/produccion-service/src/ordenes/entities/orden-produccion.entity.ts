@@ -23,6 +23,9 @@ export class OrdenProduccion {
   @Column({ name: 'responsable_usuario_id', type: 'int' })
   responsable_id: number;
 
+  @Column({ name: 'responsable_nombre', type: 'varchar', length: 150, nullable: true })
+  responsable_nombre: string | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   iniciada_en: Date;
 

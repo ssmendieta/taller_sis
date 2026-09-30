@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { OrdenesService } from './ordenes.service';
 import { EstadoOrden } from './estado-orden.enum';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
@@ -55,10 +55,13 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
     expect(transacciones).toBe(0);
   }
 
-  it('rechaza otro rol sin tocar la orden', async () => {
-    await expect(service.cambiarEstado(12, dto, { sub: 8, rolNombre: 'Supervisor' }))
-      .rejects.toBeInstanceOf(ForbiddenException);
-    sinCambios();
+  it('acepta cualquier identidad verificada: el permiso lo decide el guard', async () => {
+    await service.cambiarEstado(12, dto, { sub: 8, rolNombre: 'Supervisor' });
+    expect(transacciones).toBe(1);
+    expect(actual.estado).toBe(EstadoOrden.EN_PRODUCCION);
+    expect(historial).toEqual([expect.objectContaining({ ordenId: 12,
+      estadoAnterior: EstadoOrden.PLANIFICADA, estadoNuevo: EstadoOrden.EN_PRODUCCION,
+      usuarioResponsableId: 8 })]);
   });
 
   it('rechaza una orden PENDIENTE aunque tenga materiales', async () => {

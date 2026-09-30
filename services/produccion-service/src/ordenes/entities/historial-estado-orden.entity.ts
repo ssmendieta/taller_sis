@@ -34,6 +34,13 @@ export class HistorialEstadoOrden {
   usuarioResponsableId: number;
 
   @Column({
+    name: 'usuario_responsable_nombre',
+    length: 150,
+    nullable: true,
+  })
+  usuarioResponsableNombre: string | null;
+
+  @Column({
     name: 'fecha_hora',
     type: 'timestamptz',
     default: () => 'NOW()',

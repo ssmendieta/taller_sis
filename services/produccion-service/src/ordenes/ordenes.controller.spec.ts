@@ -42,13 +42,15 @@ describe('OrdenesController (ABC-144)', () => {
     ordenesServiceMock.buscar.mockResolvedValue([]);
 
     await expect(
-      controller.buscar('PLANIFICADA', 'OP-00', '2026-10-01'),
+      controller.buscar('PLANIFICADA', 'OP-00', '2026-10-01', undefined, undefined),
     ).resolves.toEqual([]);
-    expect(ordenesServiceMock.buscar).toHaveBeenCalledWith(
-      'PLANIFICADA',
-      'OP-00',
-      '2026-10-01',
-    );
+    expect(ordenesServiceMock.buscar).toHaveBeenCalledWith({
+      estado: 'PLANIFICADA',
+      producto: 'OP-00',
+      fecha: '2026-10-01',
+      fechaDesde: undefined,
+      fechaHasta: undefined,
+    });
   });
 
   it('conserva la delegación del endpoint de historial existente', async () => {

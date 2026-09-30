@@ -30,8 +30,11 @@ export class OrdenesController {
   @Post()
   @UseGuards(PermisoProduccionGuard)
   @SetMetadata(PERMISO_PRODUCCION, 'ordenes.crear')
-  create(@Body() createOrdenDto: CreateOrdenDto) {
-    return this.ordenesService.create(createOrdenDto);
+  create(
+    @Body() createOrdenDto: CreateOrdenDto,
+    @Req() request: { usuarioAutenticado: UsuarioAutenticadoProduccion },
+  ) {
+    return this.ordenesService.create(createOrdenDto, request.usuarioAutenticado);
   }
 
   @Get()
@@ -48,8 +51,10 @@ export class OrdenesController {
     @Query('estado') estado?: string,
     @Query('producto') producto?: string,
     @Query('fecha') fecha?: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
   ) {
-    return this.ordenesService.buscar(estado, producto, fecha);
+    return this.ordenesService.buscar({ estado, producto, fecha, fechaDesde, fechaHasta });
   }
 
   @Get('codigo/:codigo')

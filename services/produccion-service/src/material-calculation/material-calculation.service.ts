@@ -12,6 +12,18 @@ export interface MaterialCalculado extends MaterialReceta {
   cantidadTotal: number;
 }
 
+// Cálculo compartido: multiplica cada línea por la cantidad solicitada.
+// Lo usan POST /material-calculation/calcular y GET /ordenes/:id/materiales.
+export function multiplicarMateriales(
+  cantidadSolicitada: number,
+  materialesReceta: MaterialReceta[],
+): MaterialCalculado[] {
+  return materialesReceta.map((material) => ({
+    ...material,
+    cantidadTotal: Number(material.cantidadRequerida) * Number(cantidadSolicitada),
+  }));
+}
+
 @Injectable()
 export class MaterialCalculationService {
 
@@ -30,10 +42,6 @@ export class MaterialCalculationService {
       throw new BadRequestException('materialesReceta no puede estar vacía.');
     }
 
-    return materialesReceta.map((material) => ({
-      ...material,
-      cantidadTotal:
-        material.cantidadRequerida * cantidadSolicitada,
-    }));
+    return multiplicarMateriales(cantidadSolicitada, materialesReceta);
   }
 }

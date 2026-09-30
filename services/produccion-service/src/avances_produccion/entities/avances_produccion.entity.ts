@@ -19,4 +19,7 @@ export class AvancesProduccion {
 
   @Column({type: 'bigint'})
   usuario_responsable_id!: string;
+
+  @Column({type: 'varchar', length: 150, nullable: true, name: 'usuario_responsable_nombre'})
+  usuario_responsable_nombre!: string | null;
 }
