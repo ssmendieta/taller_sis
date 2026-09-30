@@ -15,7 +15,11 @@ Catálogo real en BD (`permisos.codigo`, migración `1710000000001-AuthSeed`):
 `recetas.gestionar`, `materiales.calcular`,
 `materiales.consultar_disponibilidad`, `materiales.solicitar` (catálogo, sin asignar en Sprint 1).
 
-Asignación vigente (migración `1710000000003-AlignPermisosMatriz`):
+Asignación vigente (migración `1710000000003-AlignPermisosMatriz` + ajuste
+`1710000000008-EncargadoConsultaOrdenes`): el Encargado de Producción conserva
+`ordenes.consultar` porque sin lectura no puede operar sus propias órdenes
+(listar, ver detalle, iniciar desde la pantalla de consulta). El Supervisor
+sigue sin ningún permiso de mutación.
 
 | Permiso                                | Código                                | Administrador | Encargado de Producción | Encargado de Logística | Supervisor |
 | -------------------------------------- | ------------------------------------- | ------------- | ----------------------- | ---------------------- | ---------- |
@@ -30,7 +34,7 @@ Asignación vigente (migración `1710000000003-AlignPermisosMatriz`):
 | Iniciar orden de producción            | `ordenes.iniciar`                     | —             | ✓                       | —                      | —          |
 | Finalizar/cancelar orden               | `ordenes.finalizar_cancelar`          | —             | ✓                       | —                      | —          |
 | Registrar avance de producción         | `ordenes.registrar_avance`            | —             | ✓                       | —                      | —          |
-| Consultar órdenes de producción        | `ordenes.consultar`                   | —             | —                       | —                      | ✓          |
+| Consultar órdenes de producción        | `ordenes.consultar`                   | —             | ✓                       | —                      | ✓          |
 | Consultar auditoría                    | `auditoria.consultar`                 | ✓             | —                       | —                      | —          |
 
 Mapa ruta → permiso (produccion-service, `PermisoProduccionGuard` decide solo por permiso):

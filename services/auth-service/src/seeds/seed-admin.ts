@@ -46,27 +46,34 @@ async function main() {
       return;
     }
     const passwordHash = await hash(datos.password, 10);
-    const creado = await client.query(
-      `INSERT INTO usuarios (nombre_completo, correo, password_hash, rol_id, activo)
-       VALUES ($1, $2, $3, $4, TRUE) RETURNING id`,
-      [datos.nombre, datos.correo, passwordHash, rolId],
-    );
-    const usuarioId = creado.rows[0].id;
-    await client.query(
-      `INSERT INTO auditoria (usuario_actor_id, accion, entidad, entidad_id, usuario_afectado_id, datos_antes, datos_despues)
-       VALUES (NULL, 'CREACION_USUARIO', 'USUARIO', $1, $1, NULL, $2)`,
-      [
-        String(usuarioId),
-        JSON.stringify({
-          id: String(usuarioId),
-          nombre_completo: datos.nombre,
-          correo: datos.correo,
-          rol_id: String(rolId),
-          activo: true,
-          origen: 'seed:admin',
-        }),
-      ],
-    );
+    await client.query('BEGIN');
+    try {
+      const creado = await client.query(
+        `INSERT INTO usuarios (nombre_completo, correo, password_hash, rol_id, activo)
+         VALUES ($1, $2, $3, $4, TRUE) RETURNING id`,
+        [datos.nombre, datos.correo, passwordHash, rolId],
+      );
+      const usuarioId = creado.rows[0].id;
+      await client.query(
+        `INSERT INTO auditoria (usuario_actor_id, accion, entidad, entidad_id, usuario_afectado_id, datos_antes, datos_despues)
+         VALUES (NULL, 'CREACION_USUARIO', 'USUARIO', $1::text, $1::bigint, NULL, $2)`,
+        [
+          String(usuarioId),
+          JSON.stringify({
+            id: String(usuarioId),
+            nombre_completo: datos.nombre,
+            correo: datos.correo,
+            rol_id: String(rolId),
+            activo: true,
+            origen: 'seed:admin',
+          }),
+        ],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
     console.log(`seed:admin: administrador ${datos.correo} creado.`);
   } finally {
     await client.end();

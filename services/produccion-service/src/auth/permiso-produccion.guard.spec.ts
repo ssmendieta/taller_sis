@@ -17,7 +17,7 @@ describe('ABC-119/192/197: Auth valida los permisos actuales en Producción', ()
     authorization?: string,
     body?: { nuevoEstado?: string },
   ) {
-    const request = { headers: { authorization }, body, usuarioId: undefined as number | undefined };
+    const request = { headers: { authorization }, body, usuarioId: undefined as number | undefined, usuarioAutenticado: undefined as unknown };
     const context = {
       getHandler: () => controller.prototype[metodo],
       switchToHttp: () => ({ getRequest: () => request }),
@@ -41,13 +41,30 @@ describe('ABC-119/192/197: Auth valida los permisos actuales en Producción', ()
     expect(consulta).not.toHaveBeenCalled();
   });
 
-  it('no confía en un rol distinto ni en un permiso desactivado', async () => {
+  it('decide solo por permiso: un rol personalizado con el permiso pasa', async () => {
     auth('Supervisor', ['ordenes.crear']);
-    await expect(guard.canActivate(contexto(OrdenesController, 'create', 'Bearer token').context))
-      .rejects.toBeInstanceOf(ForbiddenException);
+    const personalizado = contexto(OrdenesController, 'create', 'Bearer token');
+    expect(await guard.canActivate(personalizado.context)).toBe(true);
+    expect(personalizado.request.usuarioId).toBe(7);
     auth('Encargado de Producción', []);
     await expect(guard.canActivate(contexto(OrdenesController, 'create', 'Bearer token').context))
       .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('acepta permisos como objetos {codigo} y expone el nombre del usuario', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: '7',
+        rol: 'Auditor',
+        nombre_completo: 'Ana Pérez',
+        permisos: [{ id: '1', codigo: 'ordenes.crear', nombre: 'Crear' }],
+      }),
+    });
+    const orden = contexto(OrdenesController, 'create', 'Bearer token');
+    expect(await guard.canActivate(orden.context)).toBe(true);
+    expect(orden.request.usuarioAutenticado).toMatchObject({ sub: 7, nombre: 'Ana Pérez' });
   });
 
   it('usa el ID obtenido de Auth al crear y comprueba el permiso específico del cierre', async () => {
