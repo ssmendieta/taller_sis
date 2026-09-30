@@ -50,6 +50,22 @@ function leerSesionProduccion() {
   }
 }
 
+// Etiquetas del modal de confirmación por estado de destino (ABC-189: el
+// inicio de producción comparte el mismo flujo de confirmación que
+// finalizar y cancelar).
+const ETIQUETAS_ACCION = {
+  CANCELADA: { titulo: "cancelación", frase: (codigo) => `¿Quieres cancelar la orden ${codigo}?` },
+  EN_PRODUCCION: {
+    titulo: "inicio de producción",
+    frase: (codigo) => `¿Quieres iniciar la producción de la orden ${codigo}?`,
+  },
+  FINALIZADA: { titulo: "finalización", frase: (codigo) => `¿Quieres finalizar la orden ${codigo}?` },
+};
+
+function etiquetaAccion(nuevoEstado) {
+  return ETIQUETAS_ACCION[nuevoEstado] ?? ETIQUETAS_ACCION.FINALIZADA;
+}
+
 export default function ConsultaOrdenesPage() {
   const [ordenes, setOrdenes] = useState(esDemostracion ? ordenesEjemplo : []);
   const [cargando, setCargando] = useState(!esDemostracion);
@@ -203,6 +219,9 @@ export default function ConsultaOrdenesPage() {
                   <td>{mostrarResponsable(orden)}</td>
                   {puedeCerrarOrdenes && (
                     <td className="orders-actions">
+                      {orden.estado === "PLANIFICADA" && (
+                        <button type="button" disabled={guardando} onClick={() => abrirAccion(orden, "EN_PRODUCCION")}>Iniciar producción</button>
+                      )}
                       {orden.estado === "EN_PRODUCCION" && (
                         <button type="button" disabled={guardando} onClick={() => abrirAccion(orden, "FINALIZADA")}>Finalizar</button>
                       )}
@@ -223,8 +242,8 @@ export default function ConsultaOrdenesPage() {
       {accion && (
         <div className="orders-modal-overlay">
           <div className="orders-modal" role="dialog" aria-modal="true" aria-labelledby="orders-action-title">
-            <h2 id="orders-action-title">Confirmar {accion.nuevoEstado === "CANCELADA" ? "cancelación" : "finalización"}</h2>
-            <p>¿Quieres {accion.nuevoEstado === "CANCELADA" ? "cancelar" : "finalizar"} la orden {accion.orden.codigo}?</p>
+            <h2 id="orders-action-title">Confirmar {etiquetaAccion(accion.nuevoEstado).titulo}</h2>
+            <p>{etiquetaAccion(accion.nuevoEstado).frase(accion.orden.codigo)}</p>
             <form onSubmit={confirmarAccion}>
               {accion.nuevoEstado === "CANCELADA" && (
                 <label>Motivo de cancelación
@@ -235,7 +254,7 @@ export default function ConsultaOrdenesPage() {
               <div className="orders-modal-actions">
                 <button type="button" onClick={() => setAccion(null)} disabled={guardando}>Volver</button>
                 <button type="submit" className="orders-modal-confirm" disabled={guardando}>
-                  {guardando ? "Guardando…" : `Confirmar ${accion.nuevoEstado === "CANCELADA" ? "cancelación" : "finalización"}`}
+                  {guardando ? "Guardando…" : `Confirmar ${etiquetaAccion(accion.nuevoEstado).titulo}`}
                 </button>
               </div>
             </form>
