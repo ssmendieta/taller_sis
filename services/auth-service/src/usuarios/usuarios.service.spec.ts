@@ -169,6 +169,69 @@ describe('UsuariosService', () => {
     expect(usuarios[0].correo).toBe('nuevo@example.com');
   });
 
+  describe('ABC-155: nombre completo obligatorio', () => {
+    it('crea usuario con nombre válido', async () => {
+      const { service, usuarios } = preparar();
+
+      const creado = await service.create({ ...datos, rol_id: 1 });
+
+      expect(creado.nombre_completo).toBe('Usuario Prueba');
+      expect(usuarios[0].nombre_completo).toBe('Usuario Prueba');
+    });
+
+    it('recorta espacios externos al crear usuario', async () => {
+      const { service, usuarios } = preparar();
+
+      const creado = await service.create({
+        ...datos,
+        nombre_completo: ' Juan Pérez ',
+        rol_id: 1,
+      });
+
+      expect(creado.nombre_completo).toBe('Juan Pérez');
+      expect(usuarios[0].nombre_completo).toBe('Juan Pérez');
+    });
+
+    it.each(['', '   '])('rechaza nombre %j al crear usuario', async (nombre) => {
+      const { service, usuarios } = preparar();
+
+      await expect(service.create({ ...datos, nombre_completo: nombre, rol_id: 1 }))
+        .rejects.toThrow(BadRequestException);
+
+      expect(usuarios).toHaveLength(0);
+    });
+
+    it('actualiza usuario con nombre válido', async () => {
+      const { service, usuarios } = preparar();
+      await service.create({ ...datos, rol_id: 1 });
+
+      const actualizado = await service.update('1', { nombre_completo: 'Juan Pérez' });
+
+      expect(actualizado.nombre_completo).toBe('Juan Pérez');
+      expect(usuarios[0].nombre_completo).toBe('Juan Pérez');
+    });
+
+    it('recorta espacios externos al actualizar usuario', async () => {
+      const { service, usuarios } = preparar();
+      await service.create({ ...datos, rol_id: 1 });
+
+      const actualizado = await service.update('1', { nombre_completo: ' Juan Pérez ' });
+
+      expect(actualizado.nombre_completo).toBe('Juan Pérez');
+      expect(usuarios[0].nombre_completo).toBe('Juan Pérez');
+    });
+
+    it.each(['', '   '])('rechaza nombre %j al actualizar usuario', async (nombre) => {
+      const { service, usuarios } = preparar();
+      await service.create({ ...datos, rol_id: 1 });
+
+      await expect(service.update('1', { nombre_completo: nombre }))
+        .rejects.toThrow(BadRequestException);
+
+      expect(usuarios[0].nombre_completo).toBe(datos.nombre_completo);
+    });
+  });
+
   it('ABC-165: desactiva, consulta y da de baja lógica al usuario', async () => {
     const { service, usuarios } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any);
@@ -327,25 +390,6 @@ describe('UsuariosService', () => {
       'auditoria indisponible',
     );
     expect(usuarios[0].activo).toBe(true);
-  });
-
-  it('nombre con solo espacios se rechaza al crear y al editar', async () => {
-    const { service, usuarios } = preparar();
-    await expect(service.create({ ...datos, nombre_completo: '   ', rol_id: 1 } as any)).rejects.toThrow(BadRequestException);
-    expect(usuarios).toHaveLength(0);
-    await service.create({ ...datos, rol_id: 1 } as any);
-    await expect(service.update('1', { nombre_completo: '' } as any)).rejects.toThrow(BadRequestException);
-    await expect(service.update('1', { nombre_completo: '   ' } as any)).rejects.toThrow(BadRequestException);
-    expect(usuarios[0].nombre_completo).toBe(datos.nombre_completo);
-  });
-
-  it('recorta espacios del nombre al crear y al editar', async () => {
-    const { service, usuarios } = preparar();
-    const creado = await service.create({ ...datos, nombre_completo: '  Juan Pérez  ', rol_id: 1 } as any);
-    expect(creado.nombre_completo).toBe('Juan Pérez');
-    const editado = await service.update('1', { nombre_completo: '  Ana  ' } as any);
-    expect(editado.nombre_completo).toBe('Ana');
-    expect(usuarios[0].nombre_completo).toBe('Ana');
   });
 
   it('ABC-88: un administrador no puede desactivarse a sí mismo', async () => {

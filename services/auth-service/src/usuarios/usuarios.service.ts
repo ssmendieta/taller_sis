@@ -35,16 +35,16 @@ export class UsuariosService {
     throw error;
   }
 
-  private normalizarNombre(nombre: string): string {
-    const limpio = (nombre ?? '').trim();
-    if (!limpio) {
+  private normalizarNombreCompleto(nombre: string): string {
+    const nombreNormalizado = nombre.trim();
+    if (!nombreNormalizado) {
       throw new BadRequestException('El nombre completo es obligatorio');
     }
-    return limpio;
+    return nombreNormalizado;
   }
 
   async create(dto: CreateUsuarioDto, actorId?: string | number): Promise<Usuario> {
-    const nombreCompleto = this.normalizarNombre(dto.nombre_completo);
+    const nombreCompleto = this.normalizarNombreCompleto(dto.nombre_completo);
     await this.validarRolActivo(dto.rol_id);
     const correo = dto.correo.trim().toLowerCase();
     if (await this.usuarios.createQueryBuilder('usuario')
@@ -170,7 +170,9 @@ export class UsuariosService {
       }
       usuario.rol_id = String(dto.rol_id);
     }
-    if (dto.nombre_completo !== undefined) usuario.nombre_completo = this.normalizarNombre(dto.nombre_completo);
+    if (dto.nombre_completo !== undefined) {
+      usuario.nombre_completo = this.normalizarNombreCompleto(dto.nombre_completo);
+    }
     if (dto.correo !== undefined) {
       const correo = dto.correo.trim().toLowerCase();
       const repetido = await this.usuarios.createQueryBuilder('usuario')
