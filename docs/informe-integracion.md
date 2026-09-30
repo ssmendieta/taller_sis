@@ -10,8 +10,8 @@
 
 ```bash
 git fetch origin
-git log --oneline --graph origin/develop..integracion/sprint1   # 5 commits de integración
-git diff --stat origin/develop...integracion/sprint1            # 76 archivos, +3462 / -734
+git log --oneline --graph origin/develop..integracion/sprint1   # 13 commits propios (6 de integración + 6 de corrección + 1 de documentación)
+git diff --stat origin/develop...integracion/sprint1            # 92 archivos, +4259 / -753
 git show 14635fb   # merge de RamaTats (el más conflictivo)
 git show b802c32   # merge de ramagemina
 git show 802e1f9   # merge de RamaAndrea
@@ -26,6 +26,20 @@ Commits de integración (en orden):
 | `b802c32` | `merge(ramagemina)`: detalle de orden, avances híbrido y pantalla de órdenes (ABC-187, ABC-193, ABC-171, ABC-166) |
 | `659de51` | `fix(bloqueante)`: auth-service no arrancaba (PermisosGuard sin `RolRepository`) |
 | `14635fb` | `merge(RamaTats)`: cálculo de materiales, versiones de receta, doc ERP y pantalla de login (ABC-141, ABC-137, ABC-173, ABC-133) |
+| `a76022f` | `docs(informe)`: este informe |
+
+Commits de corrección (plan de bugs aprobado, §6):
+
+| Commit | Descripción |
+|---|---|
+| `1de7185` | `fix(produccion)`: valida el DTO de materiales (ABC-139) |
+| `d3afa1e` | `fix(produccion)`: materiales de la orden multiplicados por la cantidad solicitada |
+| `2d0d690` | `fix(frontend)`: `OrdenesPage` lee los campos snake_case del API |
+| `d53e364` | `feat(produccion)`: expone `POST /recetas/:id/versiones` (ABC-137) |
+| `0f5b039` | `fix(produccion)`: protege recetas, materiales e inventario con sesión válida |
+| `3992069` | `fix(produccion)`: `PUT /materiales` sin campos → 400 y código repetido → 409 (ABC-139) |
+
+(El informe se actualiza a su vez en un commit final de documentación.)
 
 Verificado: `RamaSergio`, `RamaAndric` y `main` **ya están contenidos en `origin/develop`**
 (`git merge-base --is-ancestor` → exit 0 para los tres), por lo que no se integraron de nuevo.
@@ -88,18 +102,20 @@ Verificado: `RamaSergio`, `RamaAndric` y `main` **ya están contenidos en `origi
 | logistica-service | `npm run build` | exit 0 |
 | frontend | `npm run build` (vite) | exit 0 — 1936 módulos, `index.css` 25.58 kB (incluye `LoginPage.css`) |
 
-### 4.2 Tests — 171/171 ✅
+### 4.2 Tests — 188/188 ✅
 
 | Suite | Comando | Resultado |
 |---|---|---|
 | auth-service | `npx jest` | 10 suites / **56 tests** ✅ |
-| produccion-service | `npx jest` | 10 suites / **108 tests** ✅ |
+| produccion-service | `npx jest` | 12 suites / **125 tests** ✅ (incluye `sesion.guard.spec.ts` y `materiales.service.spec.ts`) |
 | frontend sesión (ABC-177) | `npm run test:session` | **4/4** ✅ |
 | frontend auditoría | `npm run test:audit` | **3/3** ✅ |
 
+⚠️ Salvedad: en alguna corrida de `produccion-service` jest emite `A worker process has failed to exit gracefully` (proceso huérfano, probablemente el `AbortSignal.timeout` de `SesionGuard`); siempre termina con **exit 0** y todos los tests en verde.
+
 ### 4.3 Migraciones desde cero ✅
 
-`auth_db`, `produccion_db` y `logistica_db` **dropeadas y recreadas** en `taller_postgres` (:5433), luego `npm run migration:run`:
+`auth_db` y `produccion_db` **dropeadas y recreadas** en `taller_postgres` (:5433) — dos veces: una para la primera pasada de verificación y otra (29/09, definitiva) para dejar la evidencia de los humos sobre BD limpias —, luego `npm run migration:run`. `logistica_db` no se tocó (sin migraciones pendientes):
 
 - `auth_db` → `AuthSchema1710000000000`, `AuthSeed1710000000001`, `AlignPermisosMatriz1710000000003` (orden correcto, sin duplicados).
 - `produccion_db` → `ProduccionSchema1710000000002`, `InventarioMaterial1710000000004`; 8 tablas + 2 vistas (`vw_orden_avance`, `vw_orden_materiales_requeridos`), incluida `inventario_material`.
@@ -111,6 +127,8 @@ Verificado: `RamaSergio`, `RamaAndric` y `main` **ya están contenidos en `origi
 `JWT_SECRET` definido en los 4 procesos; `/health` → **200** en `:3000` (gateway), `:3001` (auth), `:3002` (producción), `:3003` (logística). El log de producción confirma el registro de las rutas nuevas: `POST /material-calculation/calcular`, `POST|GET /avances/:ordenId`, `GET /avances/:ordenId/total`.
 
 ### 4.5 Humo por el gateway (http://localhost:3000) ✅
+
+Ejecutados el **29/09/2026** sobre `auth_db` y `produccion_db` **recreadas y migradas desde cero** (registro completo en `%TEMP%\opencode\smokes-final.log`; `EXIT1 = EXIT2 = EXIT3 = 0`).
 
 **Autenticación (`smoke1`)**
 
@@ -125,26 +143,28 @@ Verificado: `RamaSergio`, `RamaAndric` y `main` **ya están contenidos en `origi
 | `DELETE /api/auth/users/:id` | **200** |
 | `GET /api/auth/auditoria` (admin) | 200 |
 | `GET /api/auth/users` y `/auditoria` (Supervisor) | **403 / 403** |
-| `GET /me` sin token y con token basura | **401 / 401** |
+| `GET /me` sin token y con token basura · `/auditoria` con token basura | **401 / 401 / 401** |
 
 **Producción (`smoke2`, con `produccion_db` recreada)**
 
 | Endpoint | Código |
 |---|---|
-| `POST /recetas` | 201 |
+| `POST /recetas` (Encargado de Producción) | 201 |
 | `POST /ordenes` (Encargado de Producción) | 201 |
 | `GET /ordenes/buscar` | 200 |
 | `GET /ordenes/:id` (detalle, ABC-187) | 200 |
-| `GET /ordenes/:id/materiales` · `/historial` · `/disponibilidad-materiales` | 200 / 200 / 200 |
-| `GET /inventario/material/:id` · `GET /materiales` | 200 |
+| `GET /ordenes/:id/materiales` → `cantidad_requerida: "25.0000"` (2,5 × 10) | 200 ✅ |
+| `GET /ordenes/:id/historial` · `/disponibilidad-materiales` | 200 / 200 |
+| `GET /recetas` · `GET /materiales` · `GET /inventario/material/:id` (con token) | 200 / 200 / 200 |
+| **`GET /recetas` · `/materiales` · `/inventario/material/:id` sin token** | **401 / 401 / 401** |
 | `PATCH /ordenes/:id/estado` PLANIFICADA → EN_PRODUCCION → FINALIZADA | 200 / 200 / 200 |
 | `POST /avances/:ordenId` (pantalla) · `GET .../total` · `GET` listado | 201 / 200 / 200 |
 | `POST /avances-produccion` (guard) | 201 |
 | `POST /avances` sin token → 401 · con Supervisor → 403 | 401 / 403 |
 | `PATCH /ordenes/:id/estado` con Supervisor → 403 | 403 |
-| Cancelar sin motivo → 400 · con motivo → 200 · transición inválida → 400 | 400 / 200 / 400 |
+| Cancelar sin motivo → 400 · con motivo → 200 | 400 / 200 |
 
-**Lo nuevo de `RamaTats` (`smoke3`)**
+**Lo nuevo de `RamaTats` + plan de bugs (`smoke3`)**
 
 | Endpoint | Código |
 |---|---|
@@ -152,8 +172,26 @@ Verificado: `RamaSergio`, `RamaAndric` y `main` **ya están contenidos en `origi
 | `POST /recetas` (v1) → `PATCH /:id/desactivar` → `POST /recetas` (v2) | 201 / **200** / 201 |
 | `GET /recetas?activa=false` (historial de versiones) · `?activa=true` | 200 / 200 |
 | `POST /recetas` duplicada activa | 409 |
+| **`POST /recetas/:id/versiones` sin token (ABC-137)** | **401** |
+| **`POST /recetas/:id/versiones` con Administrador** | **403** |
+| **`POST /recetas/:id/versiones` con DTO inválido** | **400** |
+| **`POST /recetas/:id/versiones` (Encargado de Producción)** | **201** |
 | `GET /me` y `/auditoria` con token basura | 401 / 401 |
-| Ciclo de orden + avances + historial + materiales + 403 Supervisor | 201/200/200/400/403 (ver §4.5) |
+| Ciclo de orden + avances + historial + materiales + 403 Supervisor | 201/200/200/200/400/403 |
+
+**Validación de `POST`/`PUT /materiales` (commits `1de7185` + `3992069`)**
+
+| Caso | Código |
+|---|---|
+| `POST /materiales` con DTO válido | **201** |
+| `POST /materiales` con DTO inválido (`{"nombre":123}`) | **400** |
+| `POST /materiales` con código repetido | **409** |
+| `POST /materiales` sin token | **401** |
+| `PUT /materiales/:id` con cuerpo vacío `{}` | **400** (`Debe indicar al menos un campo a actualizar`) |
+| `PUT /materiales/:id` con campo válido | **200** |
+| `PUT /materiales/:id` sin token | **401** |
+
+> Nota: en `smoke3` la transición inválida de orden está etiquetada "409" en el script, pero la API devuelve **400** (discrepancia de etiqueta en el script de humo, no en el servicio).
 
 ### 4.6 Frontend ✅ (con salvedad)
 
@@ -177,7 +215,8 @@ Verificado: `RamaSergio`, `RamaAndric` y `main` **ya están contenidos en `origi
 | ABC-196 | Avances de producción | ramagemina | **integrada y verificada** | `POST /avances/:ordenId` 201, total/listado 200, 401/403 |
 | ABC-166 | Control de roles en usuarios | ramagemina | **integrada y verificada** (cobertura alternativa) | `RolesGuard` descartado por decisión; cubierto por `PermisosGuard` (403 verificados) |
 | ABC-141 | Cálculo de materiales requeridos (servicio) | RamaTats | **integrada y verificada** | `POST /material-calculation/calcular` → 201 con `cantidadTotal: 25` |
-| ABC-137 | Control de versiones de recetas | RamaTats | **integrada, con defectos** | `RecetasVersionService` compilado y registrado, pero **sin endpoint**: nadie lo invoca (ni siquiera en su propia rama). El versionado real funciona vía `PATCH /recetas/:id/desactivar` + `POST /recetas` (201/200/201 y `?activa=false` → historial). |
+| ABC-137 | Control de versiones de recetas | RamaTats | **integrada y verificada** | `POST /recetas/:id/versiones` expuesto en `d53e364`: 401 sin sesión, 403 sin `recetas.gestionar`, 400 con DTO inválido, **201** con Encargado de Producción. El versionado "clásico" (`desactivar` + `POST`) sigue funcionando (201/200/201 y `?activa=false` → historial). |
+| ABC-139 | Alta/edición de materiales con validación | RamaTats / develop | **corregida y verificada** | `UpdateMaterialDto` escrito a mano en `1de7185`: POST inválido → 400, PUT vacío → 400, código repetido → 409 (`3992069`); sin token → 401 (§4.5). |
 | ABC-173 | Documentación de integración con ERP de inventarios | RamaTats | **integrada y verificada** | `docs/integracion-erp-inventarios.md` en el commit `14635fb` |
 | ABC-133 | Interfaz de inicio de sesión | RamaTats | **integrada y verificada** (diseño) | Markup + `LoginPage.css` integrados; ⚠️ sin prueba visual en navegador |
 | ABC-176 | Login con backend (token) | develop+Andrea | **integrada y verificada** | `POST /api/auth/login` → 200 con token; `GET /me` → 200 |
@@ -199,15 +238,22 @@ Resto de referencias ABC encontradas en comentarios (`ABC-119/148/151/164/167/18
 |---|---|
 | **auth-service no arrancaba** | `Nest can't resolve dependencies of the PermisosGuard ... "RolRepository"`. Se añadió `TypeOrmModule.forFeature([Rol])` a `auditoria.module.ts` y `permisos.module.ts` (`659de51`, `fix(bloqueante)`). **Bug preexistente**: reproducido igual en `origin/develop` puro con un worktree temporal, no introducido por la integración. |
 
-### 6.2 Preexistentes — documentados, **no** corregidos
+### 6.2 Corregidos en esta rama (plan aprobado)
+
+| # | Bug | Commit | Evidencia |
+|---|---|---|---|
+| 1 | `POST /materiales` no validaba el DTO (ABC-139) | `1de7185` | POST inválido → **400**; POST válido → 201 |
+| 2 | `GET /ordenes/:id/materiales` no multiplicaba por la cantidad solicitada | `d3afa1e` | Orden de 10 × 2,5 → `cantidad_requerida: "25.0000"` (+ test unitario) |
+| 3 | `OrdenesPage.jsx` leía `cantidadSolicitada`/`fechaProgramada` (el API devuelve snake_case) | `2d0d690` | `??` en `OrdenesPage.jsx:332,338`; `vite build` OK |
+| 4 | `RecetasVersionService` sin endpoint (ABC-137) | `d53e364` | `POST /recetas/:id/versiones` → 401 / 403 / 400 / **201** |
+| 5 | Recetas, materiales e inventario abiertos sin sesión | `0f5b039` | `SesionGuard`: sin token → **401** en `GET/POST /recetas`, `GET/POST /materiales`, `GET /inventario`; con token → 200 |
+| 6 | `PUT /materiales` con cuerpo vacío → 500 (TypeORM sin valores) y `POST` con código repetido → 500 (violación de única) | `3992069` | PUT `{}` → **400**; código repetido → **409**; ambos casos con test unitario |
+
+### 6.3 Preexistentes — documentados, **no** corregidos
 
 | Bug | Detalle |
 |---|---|
-| `POST /materiales` → 400 | `create-material.dto.ts` (ABC-139) no tiene decoradores de validación y el `ValidationPipe` global usa `forbidNonWhitelisted`. Ocurre igual en `develop`. |
-| `GET /ordenes/:id/materiales` no multiplica por la cantidad solicitada | Devuelve `cantidad_requerida: 2.5000` en una orden de 10 unidades; `disponibilidad-materiales` sí calcula 25. |
-| `OrdenesPage.jsx` lee campos inexistentes | Usa `orden.cantidadSolicitada` y `orden.fechaProgramada`; el API devuelve `cantidad_solicitada` / `fecha_programada` (sin mapeo en `ordenesService.js`) → celdas vacías en la pantalla de Avances. |
-| `RecetasVersionService` sin endpoint (ABC-137) | Provider registrado pero no expuesto ni invocado. |
-| `frontend/src/styles/login.css` sin uso | `LoginPage.jsx` ahora importa `LoginPage.css` (diseño de RamaTats); el CSS antiguo queda huérfano (no se borra por ser archivo de develop). |
+| `frontend/src/styles/login.css` sin uso | `LoginPage.jsx` ahora importa `LoginPage.css` (diseño de RamaTats); el CSS antiguo queda huérfano (**no se borra**: es un archivo de develop y así quedó acordado). |
 
 ---
 
@@ -242,4 +288,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\opencode\smoke3.p
 
 **Nota:** `smoke1` y `smoke2` comparten `body.json`; ejecutarlos **en paralelo** pisa los bodies y produce falsos negativos (400/404 fantasma). Correrlos en secuencia.
 
-**Datos de prueba sembrados:** `admin@taller.com`/`Admin@123`, `encargado@taller.com`/`Prod@123`, `supervisor@taller.com`/`Sup@123`; material `MAT-01` con `inventario_material = 1000`.
+**Datos de prueba sembrados:** `admin@taller.com`/`Admin@123` (rol 1), `encargado@taller.com`/`Prod@123` (rol 2), `supervisor@taller.com`/`Sup@123` (rol 4); material `MAT-01` con `inventario_material = 1000`.
+
+⚠️ **Las migraciones de `auth` siembran los 4 roles y los 13 permisos, pero no crean usuarios** (comportamiento preexistente). Para la verificación se insertaron a mano con hashes bcrypt (`$2b$10$...`) en `auth_db`; si se recrea esa BD hay que volver a sembrarlos (o crearlos con `POST /api/auth/users` y luego darles el rol).
