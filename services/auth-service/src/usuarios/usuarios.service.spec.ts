@@ -18,11 +18,36 @@ describe('UsuariosService', () => {
 
     const repoUsuarios = {
       create: (datos: Partial<Usuario>) => ({ activo: true, eliminado_en: null, ...datos }) as Usuario,
-      createQueryBuilder: () => ({
-        where: (_sql: string, { correo }: { correo: string }) => ({
-          getOne: async () => usuarios.find((usuario) => usuario.correo.toLowerCase() === correo) ?? null,
-        }),
-      }),
+      createQueryBuilder: () => {
+        let correoBuscado: string | undefined;
+        let excluir: string | undefined;
+        const chain: any = {
+          innerJoin: () => chain,
+          where: (_sql: string, params: any = {}) => {
+            if (params?.correo !== undefined) correoBuscado = params.correo;
+            if (params?.excluir !== undefined) excluir = String(params.excluir);
+            return chain;
+          },
+          andWhere: (_sql: string, params: any = {}) => {
+            if (params?.correo !== undefined) correoBuscado = params.correo;
+            if (params?.excluir !== undefined) excluir = String(params.excluir);
+            return chain;
+          },
+          getOne: async () =>
+            correoBuscado === undefined
+              ? null
+              : (usuarios.find((usuario) => usuario.correo.toLowerCase() === correoBuscado) ?? null),
+          getCount: async () =>
+            usuarios.filter(
+              (usuario) =>
+                String(usuario.rol_id) === '1' &&
+                usuario.activo &&
+                !usuario.eliminado_en &&
+                String(usuario.id) !== String(excluir ?? '__ninguno__'),
+            ).length,
+        };
+        return chain;
+      },
       find: async () => usuarios.filter((usuario) => !usuario.eliminado_en).map((usuario) => {
         const { password_hash: _hash, ...sinHash } = usuario;
         return sinHash as Usuario;
@@ -108,6 +133,7 @@ describe('UsuariosService', () => {
   it('ABC-180: cambia a otro rol activo y rechaza después uno inactivo', async () => {
     const { service, usuarios } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any);
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any);
     await service.update('1', { rol_id: 2 } as any);
     expect(usuarios[0].rol_id).toBe('2');
     await expect(service.update('1', { rol_id: 3 } as any)).rejects.toThrow(BadRequestException);
@@ -146,7 +172,8 @@ describe('UsuariosService', () => {
   it('ABC-165: desactiva, consulta y da de baja lógica al usuario', async () => {
     const { service, usuarios } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any);
-    
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any);
+
     await service.changeStatus('1', false);
     await service.softDelete('1');
     expect(usuarios[0].activo).toBe(false);
@@ -199,6 +226,7 @@ describe('UsuariosService', () => {
   it('ABC-164: audita el cambio de rol con los valores anterior y nuevo', async () => {
     const { service, mockAuditoriaService } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any, 42);
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any, 42);
     mockAuditoriaService.registrar.mockClear();
 
     await service.update('1', { rol_id: 2 } as any, 42);
@@ -218,6 +246,7 @@ describe('UsuariosService', () => {
   it('ABC-164: registra por separado el cambio de rol y los otros datos editados', async () => {
     const { service, mockAuditoriaService } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any, 42);
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any, 42);
     mockAuditoriaService.registrar.mockClear();
 
     await service.update('1', { rol_id: 2, nombre_completo: 'Nombre nuevo' } as any, 42);
@@ -238,6 +267,7 @@ describe('UsuariosService', () => {
   it('ABC-164: audita el cambio de estado', async () => {
     const { service, mockAuditoriaService } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any);
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any);
     mockAuditoriaService.registrar.mockClear();
 
     await service.changeStatus('1', false, 42);
@@ -256,6 +286,7 @@ describe('UsuariosService', () => {
   it('ABC-164: audita la eliminación lógica registrando su estado previo real', async () => {
     const { service, mockAuditoriaService } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any);
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any);
     await service.changeStatus('1', false); // Lo desactivamos primero
     mockAuditoriaService.registrar.mockClear();
 
@@ -287,6 +318,7 @@ describe('UsuariosService', () => {
   it('ABC-164: revierte el cambio de estado si falla el registro de auditoría', async () => {
     const { service, usuarios, mockAuditoriaService } = preparar();
     await service.create({ ...datos, rol_id: 1 } as any, 42);
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any, 42);
     mockAuditoriaService.registrar.mockImplementation(async () => {
       throw new Error('auditoria indisponible');
     });
@@ -295,5 +327,19 @@ describe('UsuariosService', () => {
       'auditoria indisponible',
     );
     expect(usuarios[0].activo).toBe(true);
+  });
+
+  it('ABC-88: un administrador no puede desactivarse a sí mismo', async () => {
+    const { service } = preparar();
+    await service.create({ ...datos, rol_id: 1 } as any);
+    await service.create({ ...datos, correo: 'otro@example.com', rol_id: 1 } as any);
+    await expect(service.changeStatus('1', false, '1')).rejects.toThrow(ConflictException);
+  });
+
+  it('ABC-88: no se puede dejar el sistema sin un Administrador activo', async () => {
+    const { service } = preparar();
+    await service.create({ ...datos, rol_id: 1 } as any);
+    await expect(service.changeStatus('1', false, 99)).rejects.toThrow(ConflictException);
+    await expect(service.softDelete('1', 99)).rejects.toThrow(ConflictException);
   });
 });

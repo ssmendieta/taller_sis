@@ -17,7 +17,7 @@ function prepararUsuario(usuario, roles) {
     correo: usuario.correo,
     rol_id: rolId,
     rol: roles.find((rol) => String(rol.id) === rolId)?.nombre ?? "Rol inactivo o no disponible",
-    estado: usuario.activo ? "Activo" : "Inactivo",
+    estado: usuario.eliminado_en ? "Dado de baja" : usuario.activo ? "Activo" : "Inactivo",
   };
 }
 
@@ -54,7 +54,7 @@ function UsuarioPage() {
     setCargando(true);
     setErrorCarga("");
     Promise.all([
-      listarUsuarios(controller.signal),
+      listarUsuarios(controller.signal, true),
       listarRolesActivos(controller.signal),
     ])
       .then(([datosUsuarios, datosRoles]) => {
@@ -172,7 +172,7 @@ function UsuarioPage() {
     try {
       if (accionPendiente === "baja") {
         await darDeBajaUsuario(usuarioSeleccionado.id);
-        setUsuarios((actuales) => actuales.filter((item) => item.id !== usuarioSeleccionado.id));
+        setUsuarios((actuales) => actuales.map((item) => item.id === usuarioSeleccionado.id ? { ...item, estado: "Dado de baja" } : item));
       } else {
         const actualizado = await cambiarEstadoUsuario(usuarioSeleccionado.id, accionPendiente === "activar");
         const usuario = prepararUsuario(actualizado, roles);
@@ -255,6 +255,7 @@ function UsuarioPage() {
             <option value="Todos">Todos</option>
             <option value="Activo">Activos</option>
             <option value="Inactivo">Inactivos</option>
+            <option value="Dado de baja">Dados de baja</option>
           </select>
         </div>
 
@@ -306,44 +307,48 @@ function UsuarioPage() {
                   <td>
                     <div className="acciones">
 
-                      <button
-                        className="btn-editar"
-                        onClick={() => abrirEditar(usuario)}
-                      >
-                        Editar
-                      </button>
+                      {usuario.estado === "Dado de baja" ? (
+                        <span>—</span>
+                      ) : (
+                        <>
+                          <button
+                            className="btn-editar"
+                            onClick={() => abrirEditar(usuario)}
+                          >
+                            Editar
+                          </button>
 
-                      {usuario.estado === "Activo" && (
-                        <button
-                          className="btn-accion btn-desactivar"
-                          onClick={() =>
-                            prepararAccion(usuario, "desactivar")
-                          }
-                        >
-                          Desactivar
-                        </button>
-                      )}
+                          {usuario.estado === "Activo" && (
+                            <button
+                              className="btn-accion btn-desactivar"
+                              onClick={() =>
+                                prepararAccion(usuario, "desactivar")
+                              }
+                            >
+                              Desactivar
+                            </button>
+                          )}
 
-                      {usuario.estado === "Inactivo" && (
-                        <button
-                          className="btn-accion btn-activar"
-                          onClick={() =>
-                            prepararAccion(usuario, "activar")
-                          }
-                        >
-                          Activar
-                        </button>
-                      )}
+                          {usuario.estado === "Inactivo" && (
+                            <button
+                              className="btn-accion btn-activar"
+                              onClick={() =>
+                                prepararAccion(usuario, "activar")
+                              }
+                            >
+                              Activar
+                            </button>
+                          )}
 
-                      {usuario.estado !== "Dado de baja" && (
-                        <button
-                          className="btn-accion btn-baja"
-                          onClick={() =>
-                            prepararAccion(usuario, "baja")
-                          }
-                        >
-                          Dar de baja
-                        </button>
+                          <button
+                            className="btn-accion btn-baja"
+                            onClick={() =>
+                              prepararAccion(usuario, "baja")
+                            }
+                          >
+                            Dar de baja
+                          </button>
+                        </>
                       )}
 
                     </div>

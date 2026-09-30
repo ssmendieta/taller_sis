@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   UseGuards,
   UsePipes,
@@ -48,8 +49,11 @@ export class UsuariosController {
   }
 
   @Get()
-  findAll() {
-    return this.usuariosService.findAll();
+  findAll(@Query('incluirEliminados') incluirEliminados?: string) {
+    const incluir = incluirEliminados === 'true' || incluirEliminados === '1';
+    return incluir
+      ? this.usuariosService.findAllIncluyendoBajas()
+      : this.usuariosService.findAll();
   }
 
   @Get('roles-disponibles')
