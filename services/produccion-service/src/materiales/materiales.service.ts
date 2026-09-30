@@ -1,4 +1,4 @@
-import { ConflictException, BadRequestException, Injectable } from '@nestjs/common';
+import { ConflictException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
@@ -26,10 +26,14 @@ export class MaterialesService {
 
 
   // Buscar material por ID
-  findOne(id: number) {
-    return this.materialRepository.findOne({
+  async findOne(id: number) {
+    const material = await this.materialRepository.findOne({
       where: { id }
     });
+    if (!material) {
+      throw new NotFoundException(`Material con id ${id} no encontrado`);
+    }
+    return material;
   }
 
 
@@ -52,7 +56,14 @@ export class MaterialesService {
 });
 
 
-    return this.materialRepository.save(material);
+    try {
+      return await this.materialRepository.save(material);
+    } catch (error) {
+      if ((error as { code?: string })?.code === '23505') {
+        throw new ConflictException(`Ya existe un material con el código '${dto.codigo}'`);
+      }
+      throw error;
+    }
   }
 
 
@@ -70,7 +81,23 @@ export class MaterialesService {
       throw new BadRequestException('Debe indicar al menos un campo a actualizar');
     }
 
-    await this.materialRepository.update(id, campos);
+    if (campos.codigo !== undefined) {
+      const otro = await this.materialRepository.findOne({
+        where: { codigo: campos.codigo },
+      });
+      if (otro && Number(otro.id) !== Number(id)) {
+        throw new ConflictException(`Ya existe un material con el código '${campos.codigo}'`);
+      }
+    }
+
+    try {
+      await this.materialRepository.update(id, campos);
+    } catch (error) {
+      if ((error as { code?: string })?.code === '23505') {
+        throw new ConflictException('Ya existe un material con ese código');
+      }
+      throw error;
+    }
 
 
     return this.findOne(id);
@@ -80,8 +107,18 @@ export class MaterialesService {
 
   // Eliminar material
   async remove(id: number) {
+    await this.findOne(id);
 
-    await this.materialRepository.delete(id);
+    try {
+      await this.materialRepository.delete(id);
+    } catch (error) {
+      if ((error as { code?: string })?.code === '23503') {
+        throw new ConflictException(
+          'No se puede eliminar el material porque está usado en recetas.',
+        );
+      }
+      throw error;
+    }
 
     return {
       mensaje: 'Material eliminado correctamente'

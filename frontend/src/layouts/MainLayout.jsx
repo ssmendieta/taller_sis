@@ -31,6 +31,7 @@ export default function MainLayout({ children }) {
   const puedeCrearOrdenes = tienePermiso(usuario, "ordenes.crear");
   const puedeAvances = tienePermiso(usuario, "ordenes.registrar_avance");
   const puedeRecetas = tienePermiso(usuario, "recetas.gestionar");
+  const puedeMateriales = tieneAlgunPermiso(usuario, ["materiales.consultar_disponibilidad", "recetas.gestionar"]);
   const puedeRoles = tienePermiso(usuario, "roles_permisos.gestionar");
   const puedeUsuarios = tienePermiso(usuario, "usuarios.gestionar");
   const puedeAuditoria = tienePermiso(usuario, "auditoria.consultar");
@@ -48,6 +49,7 @@ export default function MainLayout({ children }) {
           {puedeCrearOrdenes && <Link className={isActive("/ordenes")} to="/ordenes"><IconoNavegacion nombre="ordenes" />Nueva orden</Link>}
           {puedeAvances && <Link className={isActive("/produccion/avances")} to="/produccion/avances"><IconoNavegacion nombre="avances" />Avances</Link>}
           {puedeRecetas && <Link className={isActive("/recetas")} to="/recetas"><IconoNavegacion nombre="recetas" />Recetas</Link>}
+          {puedeMateriales && <Link className={isActive("/materiales")} to="/materiales"><IconoNavegacion nombre="recetas" />Materiales</Link>}
           {puedeRoles && <Link className={isActive("/roles")} to="/roles"><IconoNavegacion nombre="roles" />Roles</Link>}
           {puedeUsuarios && <Link className={isActive("/usuarios")} to="/usuarios"><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
           {nombreRol === "Encargado de Logística" && <Link className={isActive("/logistica")} to="/logistica"><IconoNavegacion nombre="logistica" />Logística</Link>}

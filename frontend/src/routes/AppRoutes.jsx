@@ -8,6 +8,7 @@ import OrdenesPage from "../pages/OrdenesPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import SystemStatusPage from "../pages/SystemStatusPage.jsx";
 import RecetasPage from "../pages/RecetasPage.jsx";
+import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
 import OrdenPage from "../pages/OrdenPage.jsx";
@@ -24,6 +25,7 @@ export default function AppRoutes() {
       <Route path="/produccion/avances" element={privada(<OrdenesPage />, ["ordenes.registrar_avance"])} />
       <Route path="/auditoria" element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])} />
       <Route path="/recetas" element={privada(<RecetasPage />, ["recetas.gestionar"])} />
+      <Route path="/materiales" element={privada(<MaterialesPage />, ["materiales.consultar_disponibilidad", "recetas.gestionar"])} />
       <Route path="/logistica" element={<LogisticaPage />} />
       <Route path="/estado" element={<SystemStatusPage />} />
       <Route path="/roles" element={privada(<RolesPage />, ["roles_permisos.gestionar"])} />
