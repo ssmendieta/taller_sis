@@ -8,24 +8,34 @@ import { QueryAuditoriaDto } from './dto/query-auditoria.dto';
 
 interface QueryBuilderProbe {
   andWhere(condition: string, parameters?: Record<string, string>): QueryBuilderProbe;
+  leftJoin(...args: any[]): QueryBuilderProbe;
+  select(...args: any[]): QueryBuilderProbe;
   orderBy(property: string, direction: 'ASC' | 'DESC'): QueryBuilderProbe;
   addOrderBy(property: string, direction: 'ASC' | 'DESC'): QueryBuilderProbe;
-  skip(count: number): QueryBuilderProbe;
-  take(count: number): QueryBuilderProbe;
-  getManyAndCount(): Promise<[Auditoria[], number]>;
+  offset(count: number): QueryBuilderProbe;
+  limit(count: number): QueryBuilderProbe;
+  clone(): QueryBuilderProbe;
+  getCount(): Promise<number>;
+  getRawMany(): Promise<Auditoria[]>;
 }
 
 function consultaService(items: Auditoria[] = [], total = items.length) {
   const conditions: Array<{ condition: string; parameters?: Record<string, string> }> = [];
   const orderings: Array<{ property: string; direction: 'ASC' | 'DESC' }> = [];
   const aliases: string[] = [];
-  const pagination = { skip: -1, take: -1 };
+  const pagination = { offset: -1, limit: -1 };
   let executed = 0;
 
   let queryBuilder: QueryBuilderProbe;
   queryBuilder = {
     andWhere(condition, parameters) {
       conditions.push({ condition, parameters });
+      return queryBuilder;
+    },
+    leftJoin() {
+      return queryBuilder;
+    },
+    select() {
       return queryBuilder;
     },
     orderBy(property, direction) {
@@ -36,17 +46,23 @@ function consultaService(items: Auditoria[] = [], total = items.length) {
       orderings.push({ property, direction });
       return queryBuilder;
     },
-    skip(count) {
-      pagination.skip = count;
+    offset(count) {
+      pagination.offset = count;
       return queryBuilder;
     },
-    take(count) {
-      pagination.take = count;
+    limit(count) {
+      pagination.limit = count;
       return queryBuilder;
     },
-    async getManyAndCount() {
+    clone() {
+      return queryBuilder;
+    },
+    async getCount() {
+      return total;
+    },
+    async getRawMany() {
       executed += 1;
-      return [items, total];
+      return items;
     },
   };
 
@@ -141,9 +157,9 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
 
     const resultado = await probe.service.consultar(new QueryAuditoriaDto());
 
-    expect(probe.aliases).toEqual(['auditoria']);
+    expect(probe.aliases).toEqual(['a']);
     expect(probe.conditions).toHaveLength(0);
-    expect(probe.pagination).toEqual({ skip: 0, take: 20 });
+    expect(probe.pagination).toEqual({ offset: 0, limit: 20 });
     expect(probe.executionCount()).toBe(1);
     expect(resultado).toEqual({
       items: [evento],
@@ -162,7 +178,7 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
 
     const resultado = await probe.service.consultar(query);
 
-    expect(probe.pagination).toEqual({ skip: 20, take: 10 });
+    expect(probe.pagination).toEqual({ offset: 20, limit: 10 });
     expect(resultado).toMatchObject({ page: 3, limit: 10, totalPages: 5 });
   });
 
@@ -174,7 +190,7 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
     await probe.service.consultar(query);
 
     expect(probe.conditions).toContainEqual({
-      condition: 'auditoria.usuario_actor_id = :usuario_actor_id',
+      condition: 'a.usuario_actor_id = :usuario_actor_id',
       parameters: { usuario_actor_id: '9007199254740993' },
     });
   });
@@ -187,7 +203,7 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
     await probe.service.consultar(query);
 
     expect(probe.conditions).toContainEqual({
-      condition: 'auditoria.accion = :accion',
+      condition: 'a.accion = :accion',
       parameters: { accion: 'CAMBIO_ESTADO' },
     });
   });
@@ -200,7 +216,7 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
     await probe.service.consultar(query);
 
     expect(probe.conditions).toContainEqual({
-      condition: 'auditoria.entidad = :entidad',
+      condition: 'a.entidad = :entidad',
       parameters: { entidad: 'USUARIO' },
     });
   });
@@ -213,8 +229,21 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
     await probe.service.consultar(query);
 
     expect(probe.conditions).toContainEqual({
-      condition: 'auditoria.entidad_id = :entidad_id',
+      condition: 'a.entidad_id = :entidad_id',
       parameters: { entidad_id: '21' },
+    });
+  });
+
+  it('filtra por usuario (actor o afectado)', async () => {
+    const probe = consultaService();
+    const query = new QueryAuditoriaDto();
+    query.usuario = '8';
+
+    await probe.service.consultar(query);
+
+    expect(probe.conditions).toContainEqual({
+      condition: '(a.usuario_actor_id = :usuario OR a.usuario_afectado_id = :usuario)',
+      parameters: { usuario: '8' },
     });
   });
 
@@ -227,11 +256,11 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
     await probe.service.consultar(query);
 
     expect(probe.conditions).toContainEqual({
-      condition: 'auditoria.fecha_hora >= :fechaDesde',
+      condition: 'a.fecha_hora >= :fechaDesde',
       parameters: { fechaDesde: query.fechaDesde },
     });
     expect(probe.conditions).toContainEqual({
-      condition: 'auditoria.fecha_hora <= :fechaHasta',
+      condition: 'a.fecha_hora <= :fechaHasta',
       parameters: { fechaHasta: query.fechaHasta },
     });
   });
@@ -244,7 +273,7 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
     await probe.service.consultar(query);
 
     expect(probe.conditions).toContainEqual({
-      condition: 'auditoria.fecha_hora <= :fechaHasta',
+      condition: 'a.fecha_hora <= :fechaHasta',
       parameters: { fechaHasta: '2026-09-30T23:59:59.999Z' },
     });
   });
@@ -263,12 +292,12 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
 
     expect(probe.conditions).toHaveLength(6);
     expect(probe.conditions.map(({ condition }) => condition)).toEqual([
-      'auditoria.usuario_actor_id = :usuario_actor_id',
-      'auditoria.accion = :accion',
-      'auditoria.entidad = :entidad',
-      'auditoria.entidad_id = :entidad_id',
-      'auditoria.fecha_hora >= :fechaDesde',
-      'auditoria.fecha_hora <= :fechaHasta',
+      'a.usuario_actor_id = :usuario_actor_id',
+      'a.accion = :accion',
+      'a.entidad = :entidad',
+      'a.entidad_id = :entidad_id',
+      'a.fecha_hora >= :fechaDesde',
+      'a.fecha_hora <= :fechaHasta',
     ]);
   });
 
@@ -278,8 +307,8 @@ describe('AuditoriaService.consultar (ABC-184)', () => {
     await probe.service.consultar(new QueryAuditoriaDto());
 
     expect(probe.orderings).toEqual([
-      { property: 'auditoria.fecha_hora', direction: 'DESC' },
-      { property: 'auditoria.id', direction: 'DESC' },
+      { property: 'a.fecha_hora', direction: 'DESC' },
+      { property: 'a.id', direction: 'DESC' },
     ]);
   });
 
