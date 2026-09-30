@@ -329,13 +329,13 @@ export default function OrdenesPage() {
 
 
               <td>
-                {orden.fechaProgramada}
+                {orden.fecha_programada ?? orden.fechaProgramada}
               </td>
 
 
 
               <td>
-                {orden.cantidadSolicitada}
+                {orden.cantidad_solicitada ?? orden.cantidadSolicitada}
               </td>
 
 
