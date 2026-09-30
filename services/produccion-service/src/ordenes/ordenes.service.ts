@@ -159,8 +159,7 @@ export class OrdenesService {
     if (!orden) {
       throw new NotFoundException(`Orden con id ${id} no encontrada`);
     }
-    const receta = await this.recetasService.findOne(orden.producto_id).catch(() => null);
-    const filas = (await this.ordenRepository.query(
+    const receta = await this.recetasService.findOne(orden.producto_id).catch(() => null);    const filas = (await this.ordenRepository.query(
       `SELECT COALESCE(SUM(cantidad_producida), 0) AS acumulado
        FROM avances_produccion WHERE orden_id = $1`,
       [id],
@@ -170,7 +169,10 @@ export class OrdenesService {
     return {
       ...orden,
       producto: receta
-        ? { codigo: receta.productoCodigo, nombre: receta.productoNombre }
+        ? {
+            codigo: receta.productoCodigo ?? receta.producto_codigo,
+            nombre: receta.productoNombre ?? receta.producto_nombre,
+          }
         : null,
       cantidad_solicitada: solicitada,
       responsable: {

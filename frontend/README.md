@@ -1,6 +1,6 @@
 # Frontend - Fase 1
 
-React + Vite. Rutas: `/`, `/login`, `/produccion`, `/logistica`.
+React + Vite. Rutas: `/` (redirige por rol), `/login`, `/ordenes`, `/ordenes/:id`, `/recetas`, `/materiales` (sin menú), `/usuarios`, `/roles`, `/auditoria`, `/estado` (solo admin).
 
 ```bash
 npm install

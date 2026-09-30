@@ -648,4 +648,22 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     expect(resultado.orden_id).toBe(1);
   });
 
+  it('obtenerDetalle expone producto, cantidades, responsable y avance (ABC-187)', async () => {
+    findOne.mockResolvedValue({ ...ordenBase('EN_PRODUCCION'), cantidad: 10 });
+    // RecetasService.findOne devuelve toResponse (snake_case).
+    recetaFindOne.mockResolvedValue({
+      id: 1,
+      producto_codigo: 'PAN-001',
+      producto_nombre: 'Pan integral',
+      activa: true,
+    });
+    repositorioMock.query = jest.fn().mockResolvedValue([{ acumulado: '3.5' }]);
+
+    const resultado = await service.obtenerDetalle(1);
+
+    expect(resultado.producto).toEqual({ codigo: 'PAN-001', nombre: 'Pan integral' });
+    expect(resultado.cantidad_solicitada).toBe(10);
+    expect(resultado.responsable).toEqual({ id: 7, nombre: 'Usuario #7' });    expect(resultado.avance).toEqual({ acumulado: 3.5, pendiente: 6.5 });
+  });
+
 });
