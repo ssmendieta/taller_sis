@@ -7,6 +7,7 @@ import { OrdenesModule } from './ordenes/ordenes.module';
 import { RecetasModule } from './recetas/recetas.module';
 import { MaterialesModule } from './materiales/materiales.module';
 import { InventarioModule } from './inventario/inventario.module';
+import { UnidadesModule } from './unidades/unidades.module';
 import { MaterialCalculationService } from './material-calculation/material-calculation.service';
 import { MaterialCalculationController } from './material-calculation/material-calculation.controller';
 
@@ -19,6 +20,7 @@ import { MaterialCalculationController } from './material-calculation/material-c
     RecetasModule,
     MaterialesModule,
     InventarioModule,
+    UnidadesModule,
   ],
   controllers: [AppController, MaterialCalculationController],
   providers: [

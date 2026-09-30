@@ -90,6 +90,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       orden_id: 1,
       orden_codigo: 'OP-001',
       cantidad_producir: 10,
+      unidad_producto: 'unidad',
       materiales: [],
     });
     managerFindOne.mockResolvedValue({ ...ordenBase(EstadoOrden.EN_PRODUCCION) });
@@ -128,6 +129,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       orden_id: 1,
       orden_codigo: 'OP-001',
       cantidad_producir: 10,
+      unidad_producto: 'unidad',
       materiales: [],
     });
     managerFindOne.mockResolvedValue({});
@@ -203,6 +205,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
           orden_id: 1,
           orden_codigo: 'OP-001',
           cantidad_producir: 10,
+          unidad_producto: 'unidad',
           materiales: [material],
         });
 
@@ -661,7 +664,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
 
     const resultado = await service.obtenerDetalle(1);
 
-    expect(resultado.producto).toEqual({ codigo: 'PAN-001', nombre: 'Pan integral' });
+    expect(resultado.producto).toEqual({ codigo: 'PAN-001', nombre: 'Pan integral', unidad_producto: 'unidad' });
     expect(resultado.cantidad_solicitada).toBe(10);
     expect(resultado.responsable).toEqual({ id: 7, nombre: 'Usuario #7' });    expect(resultado.avance).toEqual({ acumulado: 3.5, pendiente: 6.5 });
   });

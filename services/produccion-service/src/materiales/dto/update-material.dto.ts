@@ -1,6 +1,7 @@
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { CreateMaterialDto } from './create-material.dto';
+import { CODIGOS_UNIDADES } from '../../unidades/unidades.catalogo';
 
 // PUT /materiales/:id: mismas reglas que la creación, con todos los campos
 // opcionales. Antes el parámetro era `Partial<CreateMaterialDto>`, que en
@@ -24,6 +25,9 @@ export class UpdateMaterialDto {
   @IsOptional()
   @IsString({ message: 'unidadMedida debe ser una cadena' })
   @IsNotEmpty({ message: 'unidadMedida no puede estar vacía' })
+  @IsIn(CODIGOS_UNIDADES, {
+    message: `unidadMedida debe ser una unidad válida: ${CODIGOS_UNIDADES.join(', ')}`,
+  })
   @MaxLength(40)
   unidadMedida?: CreateMaterialDto['unidadMedida'];
 

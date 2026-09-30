@@ -11,6 +11,7 @@ import { Receta } from './entities/receta.entity';
 import { RecetaMaterial } from './entities/receta-material.entity';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { UNIDAD_POR_DEFECTO } from '../unidades/unidades.catalogo';
 import {
   CreateRecetaDto,
   RecetaMaterialItemDto,
@@ -56,14 +57,18 @@ export class RecetasService {
   }
 
   // POST /recetas — crea la receta junto con su lista de materiales.
+  // producto_codigo: si se omite se autogenera PRD-0001 secuencial y único;
+  // si se recibe se respeta y se valida unicidad (compatibilidad).
   async create(dto: CreateRecetaDto) {
+    const codigo = (dto.producto_codigo ?? '').trim() || (await this.generarCodigoProducto());
+    const unidad = (dto.unidad_producto ?? UNIDAD_POR_DEFECTO).trim() || UNIDAD_POR_DEFECTO;
     const vigente = await this.recetaRepository.findOne({
-      where: { productoCodigo: dto.producto_codigo, activa: true },
+      where: { productoCodigo: codigo, activa: true },
     });
 
     if (vigente) {
       throw new ConflictException(
-        `Ya existe una receta activa (id ${vigente.id}) para el producto_codigo '${dto.producto_codigo}'. ` +
+        `Ya existe una receta activa (id ${vigente.id}) para el producto_codigo '${codigo}'. ` +
           `Desactívela con PATCH /recetas/${vigente.id}/desactivar antes de crear una nueva.`,
       );
     }
@@ -75,8 +80,9 @@ export class RecetasService {
       const creada = await this.dataSource.transaction(async (manager) => {
         const receta = await manager.save(
           manager.create(Receta, {
-            productoCodigo: dto.producto_codigo,
+            productoCodigo: codigo,
             productoNombre: dto.producto_nombre,
+            unidadProducto: unidad,
             activa: dto.activa ?? true,
           }),
         );
@@ -112,7 +118,7 @@ export class RecetasService {
     } catch (error) {
       if (this.esViolacionDeUnicidad(error)) {
         throw new ConflictException(
-          `Ya existe una receta activa para el producto_codigo '${dto.producto_codigo}'.`,
+          `Ya existe una receta activa para el producto_codigo '${codigo}'.`,
         );
       }
 
@@ -150,6 +156,9 @@ export class RecetasService {
     await this.dataSource.transaction(async (manager) => {
       if (dto.producto_nombre !== undefined) {
         receta.productoNombre = dto.producto_nombre;
+      }
+      if (dto.unidad_producto !== undefined) {
+        receta.unidadProducto = dto.unidad_producto;
       }
 
       receta.actualizadoEn = new Date();
@@ -238,15 +247,33 @@ export class RecetasService {
     return codigo === '23505';
   }
 
+  // Código secuencial PRD-0001 único (solo se usa cuando el cliente omite
+  // producto_codigo). Reintenta ante carrera de unicidad.
+  private async generarCodigoProducto(): Promise<string> {
+    for (let intento = 0; intento < 10; intento += 1) {
+      const filas = (await this.recetaRepository.query(
+        `SELECT COALESCE(MAX(CAST(SUBSTRING(producto_codigo FROM 5) AS INTEGER)), 0) AS maximo
+         FROM recetas WHERE producto_codigo ~ '^PRD-[0-9]+$'`,
+      )) as Array<{ maximo: string | number }>;
+      const siguiente = Number(filas[0]?.maximo ?? 0) + 1 + intento;
+      const codigo = `PRD-${String(siguiente).padStart(4, '0')}`;
+      const existe = await this.recetaRepository.findOne({ where: { productoCodigo: codigo } });
+      if (!existe) return codigo;
+    }
+    return `PRD-${Date.now().toString().slice(-6)}`;
+  }
+
 
   private toResponse(receta: Receta) {
     return {
       id: Number(receta.id),
       producto_codigo: receta.productoCodigo,
       producto_nombre: receta.productoNombre,
+      unidad_producto: (receta as { unidadProducto?: string }).unidadProducto ?? UNIDAD_POR_DEFECTO,
       activa: receta.activa,
       creado_en: receta.creadoEn,
       actualizado_en: receta.actualizadoEn,
+      cantidad_materiales: (receta.items ?? []).length,
       materiales: (receta.items ?? []).map((item) => ({
         material_id: Number(item.materialId),
         cantidad_requerida: Number(item.cantidadRequerida),

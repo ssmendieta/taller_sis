@@ -114,6 +114,7 @@ export class RecetasController {
         materialId: material.material_id,
         cantidadRequerida: material.cantidad_requerida,
       })),
+      dto.unidad_producto,
     );
   }
 }

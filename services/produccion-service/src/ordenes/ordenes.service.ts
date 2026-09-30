@@ -166,14 +166,18 @@ export class OrdenesService {
     )) as Array<{ acumulado: string | number }>;
     const acumulado = Number(filas[0]?.acumulado ?? 0);
     const solicitada = Number(orden.cantidad);
+    const unidad = (receta as { unidad_producto?: string } | null)?.unidad_producto ?? 'unidad';
     return {
       ...orden,
       producto: receta
         ? {
             codigo: receta.productoCodigo ?? receta.producto_codigo,
             nombre: receta.productoNombre ?? receta.producto_nombre,
+            unidad_producto: unidad,
           }
         : null,
+      unidad_producto: unidad,
+      unidad_medida: unidad,
       cantidad_solicitada: solicitada,
       responsable: {
         id: orden.responsable_id,
@@ -226,6 +230,8 @@ export class OrdenesService {
       orden_id: orden.id,
       orden_codigo: orden.codigo,
       cantidad_solicitada: Number(orden.cantidad),
+      unidad_producto: await this.unidadDeReceta(orden.producto_id),
+      unidad_medida: await this.unidadDeReceta(orden.producto_id),
       materiales: calculados.map((m) => ({
         material_id: m.materialId,
         codigo: m.materialCodigo,
@@ -255,6 +261,8 @@ export class OrdenesService {
              o.codigo,
              r.producto_codigo,
              r.producto_nombre,
+             COALESCE(r.unidad_producto, 'unidad') AS unidad_producto,
+             COALESCE(r.unidad_producto, 'unidad') AS unidad_medida,
              o.cantidad_solicitada::text AS cantidad_solicitada,
              o.fecha_programada::text AS fecha_programada,
              o.estado,
@@ -341,8 +349,18 @@ export class OrdenesService {
       orden_id: orden.id,
       orden_codigo: orden.codigo,
       cantidad_producir: Number(orden.cantidad),
+      unidad_producto: await this.unidadDeReceta(orden.producto_id),
       materiales: resultado,
     };
+  }
+
+  private async unidadDeReceta(recetaId: number): Promise<string> {
+    try {
+      const receta = await this.recetasService.findOne(recetaId).catch(() => null);
+      return (receta as { unidad_producto?: string } | null)?.unidad_producto ?? 'unidad';
+    } catch {
+      return 'unidad';
+    }
   }
 
 

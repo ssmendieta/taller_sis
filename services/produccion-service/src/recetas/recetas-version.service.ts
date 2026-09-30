@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 // las entidades de develop (mismas tablas y columnas) para no mapearlas dos veces.
 import { Receta } from './entities/receta.entity';
 import { RecetaMaterial } from './entities/receta-material.entity';
+import { UNIDAD_POR_DEFECTO } from '../unidades/unidades.catalogo';
 
 @Injectable()
 export class RecetasVersionService {
@@ -17,6 +18,7 @@ export class RecetasVersionService {
       materialId: number;
       cantidadRequerida: number;
     }[],
+    unidadProducto?: string,
   ) {
     return this.dataSource.transaction(async (manager) => {
       const recetaAnterior = await manager.findOne(Receta, {
@@ -34,10 +36,15 @@ export class RecetasVersionService {
         { activa: false },
       );
 
-      // Crear una nueva versión sin borrar la anterior
+      // Crear una nueva versión sin borrar la anterior. El código del
+      // producto se conserva; la unidad se hereda salvo que se indique otra.
       const nuevaReceta = manager.create(Receta, {
         productoCodigo: recetaAnterior.productoCodigo,
         productoNombre,
+        unidadProducto:
+          unidadProducto ??
+          (recetaAnterior as { unidadProducto?: string }).unidadProducto ??
+          UNIDAD_POR_DEFECTO,
         activa: true,
       });
 

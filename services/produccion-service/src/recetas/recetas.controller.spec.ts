@@ -27,7 +27,7 @@ describe('RecetasController.crearVersion (ABC-137)', () => {
 
     expect(crearNuevaVersion).toHaveBeenCalledWith(3, 'Pan integral v2', [
       { materialId: 1, cantidadRequerida: 2.5 },
-    ]);
+    ], undefined);
     expect(resultado).toEqual({ id: 9, activa: true });
   });
 

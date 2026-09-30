@@ -30,6 +30,13 @@ export class Receta {
   productoNombre: string;
 
   @Column({
+    name: 'unidad_producto',
+    length: 20,
+    default: 'unidad',
+  })
+  unidadProducto: string;
+
+  @Column({
     default: true,
   })
   activa: boolean;

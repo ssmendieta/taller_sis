@@ -51,7 +51,7 @@ describe('ABC-170: flujo completo de estados de una orden', () => {
     service = new OrdenesService(ordenRepository, historialRepository, {} as any,
       { findOne: async () => ({ activa: true }) } as any);
     jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
-      orden_id: 42, orden_codigo: 'ORD-42', cantidad_producir: 1, materiales: [],
+      orden_id: 42, orden_codigo: 'ORD-42', cantidad_producir: 1, unidad_producto: 'unidad', materiales: [],
     });
   });
 
