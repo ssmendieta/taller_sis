@@ -56,7 +56,14 @@ export default function AppRoutes() {
         <Route path="/ordenes" element={privada(<OrdenesPage />, ["ordenes.consultar"])} />
         <Route path="/ordenes/:id" element={privada(<OrdenDetallePage />, ["ordenes.consultar"])} />
         <Route path="/logistica" element={<LogisticaPage />} />
-        <Route path="/logistica/boletas/:id" element={<BoletaDetallePage />} />
+        <Route
+  path="/logistica/boletas/:id"
+  element={
+    <ProtectedRoute roles={["Administrador", "Encargado de Logística"]}>
+      <BoletaDetallePage />
+    </ProtectedRoute>
+  }
+/>
         <Route path="/recetas" element={privada(<RecetasPage />, ["recetas.gestionar"])} />
         <Route path="/materiales" element={privada(<MaterialesPage />, ["materiales.consultar_disponibilidad", "recetas.gestionar"])} />
         <Route path="/usuarios" element={privada(<UsuarioPage />, ["usuarios.gestionar"])} />
