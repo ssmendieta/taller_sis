@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import Logo from "../components/Logo.jsx";
@@ -41,20 +41,20 @@ export default function MainLayout({ children }) {
       <aside className="sidebar" data-open={abierto ? "true" : "false"} aria-label="Barra lateral">
         <div className="sidebar-top">
           <Link to="/" className="brand-link" aria-label={NOMBRE_SISTEMA} style={{ textDecoration: "none" }}><Logo /></Link>
-          <button type="button" className="menu-toggle" aria-expanded={abierto} aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>☰</button>
+          <button type="button" className="menu-toggle" aria-expanded={abierto} aria-label={abierto ? "Cerrar menÃº" : "Abrir menÃº"} onClick={() => setAbierto((v) => !v)}>â˜°</button>
         </div>
-        <nav className="navbar" aria-label="Navegación principal">
-          {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
+        <nav className="navbar" aria-label="NavegaciÃ³n principal">
+          {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Ã“rdenes</Link>}
           {puedeRecetas && <Link className={activo("/recetas")} to="/recetas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recetas" />Recetas</Link>}
           {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios" onClick={() => setAbierto(false)}><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
           {puedeRoles && <Link className={activo("/roles")} to="/roles" onClick={() => setAbierto(false)}><IconoNavegacion nombre="roles" />Roles y permisos</Link>}
-          {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria" onClick={() => setAbierto(false)}><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
+          {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria" onClick={() => setAbierto(false)}><IconoNavegacion nombre="auditoria" />AuditorÃ­a</Link>}
         </nav>
         {usuario && (
           <div className="nav-user">
             <p className="nav-user-name">{nombre}</p>
             {rol && <p className="nav-user-role">{rol}</p>}
-            <button type="button" className="nav-logout" aria-label={`Cerrar sesión de ${nombre}`} onClick={async () => { await cerrarSesionServidor(); salir(); navigate("/login", { replace: true }); }}>Cerrar sesión</button>
+            <button type="button" className="nav-logout" aria-label={`Cerrar sesiÃ³n de ${nombre}`} onClick={async () => { await cerrarSesionServidor(); salir(); navigate("/login", { replace: true }); }}>Cerrar sesiÃ³n</button>
           </div>
         )}
       </aside>
@@ -64,3 +64,4 @@ export default function MainLayout({ children }) {
     </div>
   );
 }
+

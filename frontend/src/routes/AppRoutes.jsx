@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+﻿import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import LoginPage from "../pages/LoginPage.jsx";
 import OrdenesPage from "../pages/OrdenesPage.jsx";
 import OrdenDetallePage from "../pages/OrdenDetallePage.jsx";
@@ -7,6 +7,7 @@ import RecetasPage from "../pages/RecetasPage.jsx";
 import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
+import LogisticaPage from "../pages/LogisticaPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
@@ -25,7 +26,7 @@ function InicioRedirect() {
   return (
     <section className="ts-page" aria-labelledby="sin-funciones">
       <h1 id="sin-funciones">Sin funciones asignadas</h1>
-      <p>Tu rol aún no tiene funciones. Contacta al administrador.</p>
+      <p>Tu rol aÃºn no tiene funciones. Contacta al administrador.</p>
     </section>
   );
 }
@@ -35,8 +36,8 @@ function NoEncontrada() {
   return (
     <main className="login-page">
       <div className="ts-public" role="alert">
-        <h1>Página no encontrada</h1>
-        <p>La dirección no existe o fue movida.</p>
+        <h1>PÃ¡gina no encontrada</h1>
+        <p>La direcciÃ³n no existe o fue movida.</p>
         <Link className="ts-btn ts-btn-primary" to={usuario ? "/" : "/login"}>Volver</Link>
       </div>
     </main>
@@ -46,13 +47,14 @@ function NoEncontrada() {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Pública: sin barra lateral ni cabecera del sistema */}
+      {/* PÃºblica: sin barra lateral ni cabecera del sistema */}
       <Route path="/login" element={<LoginPage />} />
-      {/* Autenticadas: solo aquí se monta el layout con barra lateral */}
+      {/* Autenticadas: solo aquÃ­ se monta el layout con barra lateral */}
       <Route element={<MainLayout><Outlet /></MainLayout>}>
         <Route path="/" element={<InicioRedirect />} />
         <Route path="/ordenes" element={privada(<OrdenesPage />, ["ordenes.consultar"])} />
         <Route path="/ordenes/:id" element={privada(<OrdenDetallePage />, ["ordenes.consultar"])} />
+        <Route path="/logistica" element={<LogisticaPage />} />
         <Route path="/recetas" element={privada(<RecetasPage />, ["recetas.gestionar"])} />
         <Route path="/materiales" element={privada(<MaterialesPage />, ["materiales.consultar_disponibilidad", "recetas.gestionar"])} />
         <Route path="/usuarios" element={privada(<UsuarioPage />, ["usuarios.gestionar"])} />
@@ -63,8 +65,9 @@ export default function AppRoutes() {
         <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
         <Route path="/logistica" element={<Navigate to="/" replace />} />
       </Route>
-      {/* 404 público: tampoco monta el layout */}
+      {/* 404 pÃºblico: tampoco monta el layout */}
       <Route path="*" element={<NoEncontrada />} />
     </Routes>
   );
 }
+
