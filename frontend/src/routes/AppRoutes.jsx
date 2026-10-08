@@ -8,6 +8,7 @@ import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
+import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
@@ -55,6 +56,7 @@ export default function AppRoutes() {
         <Route path="/ordenes" element={privada(<OrdenesPage />, ["ordenes.consultar"])} />
         <Route path="/ordenes/:id" element={privada(<OrdenDetallePage />, ["ordenes.consultar"])} />
         <Route path="/logistica" element={<LogisticaPage />} />
+        <Route path="/logistica/boletas/:id" element={<BoletaDetallePage />} />
         <Route path="/recetas" element={privada(<RecetasPage />, ["recetas.gestionar"])} />
         <Route path="/materiales" element={privada(<MaterialesPage />, ["materiales.consultar_disponibilidad", "recetas.gestionar"])} />
         <Route path="/usuarios" element={privada(<UsuarioPage />, ["usuarios.gestionar"])} />
@@ -70,4 +72,5 @@ export default function AppRoutes() {
     </Routes>
   );
 }
+
 
