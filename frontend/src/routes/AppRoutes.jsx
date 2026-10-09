@@ -1,4 +1,4 @@
-﻿import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import LoginPage from "../pages/LoginPage.jsx";
 import OrdenesPage from "../pages/OrdenesPage.jsx";
 import OrdenDetallePage from "../pages/OrdenDetallePage.jsx";
@@ -8,6 +8,7 @@ import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
+import BoletasPage from "../pages/BoletasPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
@@ -57,6 +58,14 @@ export default function AppRoutes() {
         <Route path="/ordenes/:id" element={privada(<OrdenDetallePage />, ["ordenes.consultar"])} />
         <Route path="/logistica" element={<LogisticaPage />} />
         <Route
+  path="/logistica/boletas"
+  element={
+    <ProtectedRoute roles={["Administrador", "Encargado de Logística"]}>
+      <BoletasPage />
+    </ProtectedRoute>
+  }
+/>
+        <Route
   path="/logistica/boletas/:id"
   element={
     <ProtectedRoute roles={["Administrador", "Encargado de Logística"]}>
@@ -72,7 +81,7 @@ export default function AppRoutes() {
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
-        <Route path="/logistica" element={<Navigate to="/" replace />} />
+
       </Route>
       {/* 404 pÃºblico: tampoco monta el layout */}
       <Route path="*" element={<NoEncontrada />} />
