@@ -12,7 +12,15 @@
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/database/data-source.ts",
-    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts"
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/src"],
+    "testMatch": ["**/*.spec.ts"]
   },
   "dependencies": {
     "@nestjs/common": "^10.3.9",
@@ -29,8 +37,12 @@
   "devDependencies": {
     "@nestjs/cli": "^10.3.2",
     "@nestjs/schematics": "^10.1.1",
+    "@nestjs/testing": "^10.4.22",
+    "@types/jest": "^30.0.0",
     "typescript": "^5.4.5",
     "ts-node": "^10.9.2",
-    "@types/node": "^20.12.12"
+    "@types/node": "^20.12.12",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.14"
   }
 }
