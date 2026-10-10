@@ -10,6 +10,7 @@ import { InventarioModule } from './inventario/inventario.module';
 import { UnidadesModule } from './unidades/unidades.module';
 import { MaterialCalculationService } from './material-calculation/material-calculation.service';
 import { MaterialCalculationController } from './material-calculation/material-calculation.controller';
+import { PubSubModule } from './integraciones/pubsub/pubsub.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { MaterialCalculationController } from './material-calculation/material-c
     MaterialesModule,
     InventarioModule,
     UnidadesModule,
+    PubSubModule,
   ],
   controllers: [AppController, MaterialCalculationController],
   providers: [

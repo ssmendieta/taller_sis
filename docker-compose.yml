@@ -76,6 +76,15 @@
       - DB_DATABASE=${DB_PRODUCCION_DATABASE:-produccion_db}
       - SKIP_DB=${SKIP_DB:-false}
       - AUTH_SERVICE_URL=http://auth-service:3001
+      - PUBSUB_ENABLED=${PUBSUB_ENABLED:-false}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-}
+      - PUBSUB_TOPIC_ID=${PUBSUB_TOPIC_ID:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp/pubsub-service-account.json
+    volumes:
+      - type: bind
+        source: ${GCP_CREDENTIALS_HOST_PATH}
+        target: /run/secrets/gcp/pubsub-service-account.json
+        read_only: true
     depends_on:
       postgres:
         condition: service_healthy
