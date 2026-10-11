@@ -11,6 +11,7 @@ import { UnidadesModule } from './unidades/unidades.module';
 import { MaterialCalculationService } from './material-calculation/material-calculation.service';
 import { MaterialCalculationController } from './material-calculation/material-calculation.controller';
 import { PubSubModule } from './integraciones/pubsub/pubsub.module';
+import { SolicitudesMaterialModule } from './solicitudes-material/solicitudes-material.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PubSubModule } from './integraciones/pubsub/pubsub.module';
     MaterialesModule,
     InventarioModule,
     UnidadesModule,
+    SolicitudesMaterialModule,
     PubSubModule,
   ],
   controllers: [AppController, MaterialCalculationController],
