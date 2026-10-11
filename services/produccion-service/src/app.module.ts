@@ -12,6 +12,7 @@ import { MaterialCalculationService } from './material-calculation/material-calc
 import { MaterialCalculationController } from './material-calculation/material-calculation.controller';
 import { PubSubModule } from './integraciones/pubsub/pubsub.module';
 import { SolicitudesMaterialModule } from './solicitudes-material/solicitudes-material.module';
+import { ConsumosMaterialModule } from './consumos-material/consumos-material.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { SolicitudesMaterialModule } from './solicitudes-material/solicitudes-ma
     InventarioModule,
     UnidadesModule,
     SolicitudesMaterialModule,
+    ConsumosMaterialModule,
     PubSubModule,
   ],
   controllers: [AppController, MaterialCalculationController],
