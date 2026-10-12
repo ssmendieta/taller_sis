@@ -9,6 +9,7 @@ import { OrdenesService } from './ordenes.service';
 import { OrdenesController } from './ordenes.controller';
 import { RecetasModule } from '../recetas/recetas.module';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
+import { MaterialCalculationModule } from '../material-calculation/material-calculation.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
       Inventario,
     ]),
     RecetasModule,
+    MaterialCalculationModule,
   ],
   controllers: [OrdenesController],
   providers: [OrdenesService, PermisoProduccionGuard],

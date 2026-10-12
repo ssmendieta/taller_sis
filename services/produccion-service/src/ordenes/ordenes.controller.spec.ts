@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrdenesController } from './ordenes.controller';
 import { OrdenesService } from './ordenes.service';
+import { MaterialCalculationService } from '../material-calculation/material-calculation.service';
 
 describe('OrdenesController (ABC-144)', () => {
   let controller: OrdenesController;
@@ -16,7 +17,10 @@ describe('OrdenesController (ABC-144)', () => {
     jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrdenesController],
-      providers: [{ provide: OrdenesService, useValue: ordenesServiceMock }],
+      providers: [
+        { provide: OrdenesService, useValue: ordenesServiceMock },
+        { provide: MaterialCalculationService, useValue: {} },
+      ],
     }).compile();
 
     controller = module.get<OrdenesController>(OrdenesController);
