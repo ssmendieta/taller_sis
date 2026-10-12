@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { obtenerOrdenes } from "../services/ordenesService.js";
 import { listarMateriales } from "../services/materiales.js";
 import {
@@ -20,7 +20,18 @@ function nombreOrden(orden) {
 function fechaSolicitud(fecha) {
   if (!fecha) return "—";
   const valor = new Date(fecha);
-  return Number.isNaN(valor.getTime()) ? fecha : valor.toLocaleString("es-BO");
+  return Number.isNaN(valor.getTime())
+    ? fecha
+    : valor.toLocaleString("es-BO");
+}
+
+function esConflicto(error) {
+  return (
+    error.status === 409 ||
+    /conflict|ya existe|solicitud abierta|duplicad/i.test(
+      error.message || ""
+    )
+  );
 }
 
 export default function SolicitudesMaterialPage() {
@@ -37,9 +48,13 @@ export default function SolicitudesMaterialPage() {
   const [error, setError] = useState("");
   const [aviso, setAviso] = useState("");
 
-  async function cargarDatos() {
+  // Evita envíos duplicados incluso ante clics muy rápidos.
+  const envioEnCurso = useRef(false);
+
+  async function cargarDatos(mostrarError = true) {
     setCargando(true);
-    setError("");
+    if (mostrarError) setError("");
+
     try {
       const [listaOrdenes, listaMateriales, listaSolicitudes] =
         await Promise.all([
@@ -52,7 +67,9 @@ export default function SolicitudesMaterialPage() {
       setMateriales(Array.isArray(listaMateriales) ? listaMateriales : []);
       setSolicitudes(Array.isArray(listaSolicitudes) ? listaSolicitudes : []);
     } catch (e) {
-      setError(e.message || "No se pudieron cargar los datos.");
+      if (mostrarError) {
+        setError(e.message || "No se pudieron cargar los datos.");
+      }
     } finally {
       setCargando(false);
     }
@@ -71,6 +88,7 @@ export default function SolicitudesMaterialPage() {
           const material = materiales.find(
             (m) => String(m.id) === String(valor)
           );
+
           return {
             ...item,
             materialId: valor,
@@ -96,26 +114,45 @@ export default function SolicitudesMaterialPage() {
 
   async function enviarFormulario(evento) {
     evento.preventDefault();
+
+    if (envioEnCurso.current) return;
+
     setError("");
     setAviso("");
 
     if (!ordenId) {
-      setError("Selecciona una orden.");
+      setError("Selecciona una orden de producción.");
       return;
     }
 
-    if (items.some((item) => !item.materialId || Number(item.cantidad) <= 0)) {
-      setError("Selecciona cada material e ingresa cantidades mayores que cero.");
+    if (
+      items.length === 0 ||
+      items.some(
+        (item) =>
+          !item.materialId ||
+          !Number.isFinite(Number(item.cantidad)) ||
+          Number(item.cantidad) <= 0 ||
+          !item.unidad.trim()
+      )
+    ) {
+      setError(
+        "Selecciona cada material, verifica su unidad e ingresa cantidades mayores que cero."
+      );
       return;
     }
 
     const ids = items.map((item) => String(item.materialId));
+
     if (new Set(ids).size !== ids.length) {
-      setError("No puedes repetir un material en la misma solicitud.");
+      setError(
+        "No puedes repetir un material en la misma solicitud. Corrige los materiales antes de continuar."
+      );
       return;
     }
 
+    envioEnCurso.current = true;
     setGuardando(true);
+
     try {
       const creada = await crearSolicitudMaterial({
         ordenId: Number(ordenId),
@@ -126,20 +163,37 @@ export default function SolicitudesMaterialPage() {
         })),
       });
 
-      setAviso(`Solicitud ${creada.id} registrada correctamente.`);
+      setAviso(
+        `Solicitud ${creada.id} registrada correctamente.`
+      );
       setOrdenId("");
       setItems([{ materialId: "", cantidad: "", unidad: "" }]);
       setDetalle(creada);
-      await cargarDatos();
+
+      // Recarga los datos desde la API.
+      await cargarDatos(false);
     } catch (e) {
-      setError(e.message || "No se pudo registrar la solicitud.");
+      if (esConflicto(e)) {
+        setError(
+          "Ya existe una solicitud abierta para este material y orden. Revisa la solicitud existente en el listado; no se creó otra."
+        );
+        await cargarDatos(false);
+      } else {
+        setError(
+          e.message ||
+            "No se pudo registrar la solicitud. Verifica los datos e inténtalo nuevamente."
+        );
+      }
     } finally {
+      envioEnCurso.current = false;
       setGuardando(false);
     }
   }
 
   async function verDetalle(id) {
     setError("");
+    setAviso("");
+
     try {
       const solicitud = await obtenerSolicitudMaterial(id);
       setDetalle(solicitud);
@@ -152,8 +206,17 @@ export default function SolicitudesMaterialPage() {
     <section className="ts-page" aria-labelledby="solicitudes-title">
       <PageHeader titulo="Solicitudes de materiales" />
 
-      {aviso && <p className="ts-success" role="status">{aviso}</p>}
-      {error && <p className="ts-feedback ts-error" role="alert">{error}</p>}
+      {aviso && (
+        <p className="ts-success" role="status">
+          {aviso}
+        </p>
+      )}
+
+      {error && (
+        <p className="ts-feedback ts-error" role="alert">
+          {error}
+        </p>
+      )}
 
       <div className="ts-panel">
         <div className="ts-panel-title">
@@ -168,6 +231,7 @@ export default function SolicitudesMaterialPage() {
                 id="solicitud-orden"
                 value={ordenId}
                 onChange={(e) => setOrdenId(e.target.value)}
+                disabled={guardando}
                 required
               >
                 <option value="">Seleccionar orden</option>
@@ -189,6 +253,7 @@ export default function SolicitudesMaterialPage() {
                   onChange={(e) =>
                     cambiarItem(indice, "materialId", e.target.value)
                   }
+                  disabled={guardando}
                   required
                 >
                   <option value="">Seleccionar material</option>
@@ -210,13 +275,18 @@ export default function SolicitudesMaterialPage() {
                   onChange={(e) =>
                     cambiarItem(indice, "cantidad", e.target.value)
                   }
+                  disabled={guardando}
                   required
                 />
               </label>
 
               <label>
                 Unidad
-                <input value={item.unidad} readOnly placeholder="Elige material" />
+                <input
+                  value={item.unidad}
+                  readOnly
+                  placeholder="Elige material"
+                />
               </label>
 
               {items.length > 1 && (
@@ -224,6 +294,7 @@ export default function SolicitudesMaterialPage() {
                   type="button"
                   className="ts-btn ts-btn-quiet"
                   onClick={() => quitarItem(indice)}
+                  disabled={guardando}
                 >
                   Quitar
                 </button>
@@ -236,13 +307,15 @@ export default function SolicitudesMaterialPage() {
               type="button"
               className="ts-btn"
               onClick={agregarItem}
+              disabled={guardando}
             >
               Agregar material
             </button>
+
             <button
               type="submit"
               className="ts-btn ts-btn-primary"
-              disabled={guardando}
+              disabled={guardando || cargando}
             >
               {guardando ? "Registrando..." : "Registrar solicitud"}
             </button>
@@ -256,17 +329,19 @@ export default function SolicitudesMaterialPage() {
           <button
             type="button"
             className="ts-btn"
-            onClick={cargarDatos}
-            disabled={cargando}
+            onClick={() => cargarDatos()}
+            disabled={cargando || guardando}
           >
-            Actualizar
+            {cargando ? "Actualizando..." : "Actualizar"}
           </button>
         </div>
 
         {cargando ? (
           <p className="ts-feedback">Cargando solicitudes...</p>
         ) : solicitudes.length === 0 ? (
-          <p className="ts-feedback">Todavía no hay solicitudes registradas.</p>
+          <p className="ts-feedback">
+            Todavía no hay solicitudes registradas.
+          </p>
         ) : (
           <div className="ts-table-wrap">
             <table className="ts-table">
@@ -320,9 +395,16 @@ export default function SolicitudesMaterialPage() {
             </button>
           </div>
 
-          <p><strong>Orden:</strong> {detalle.orden?.codigo ?? detalle.ordenId ?? "—"}</p>
-          <p><strong>Estado:</strong> {detalle.estado ?? "PENDIENTE"}</p>
-          <p><strong>Fecha:</strong> {fechaSolicitud(detalle.fecha)}</p>
+          <p>
+            <strong>Orden:</strong>{" "}
+            {detalle.orden?.codigo ?? detalle.ordenId ?? "—"}
+          </p>
+          <p>
+            <strong>Estado:</strong> {detalle.estado ?? "PENDIENTE"}
+          </p>
+          <p>
+            <strong>Fecha:</strong> {fechaSolicitud(detalle.fecha)}
+          </p>
 
           <div className="ts-table-wrap">
             <table className="ts-table">
