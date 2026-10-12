@@ -1,91 +1,63 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { AvancesProduccion } from '../avances_produccion/entities/avances_produccion.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { CreateResultadoConformeDto } from './dto/create-resultado-conforme.dto';
+import { ResultadoConforme } from './entities/resultado-conforme.entity';
 
-export const PERMISO_CONSULTAR_CONFORMES = 'ordenes.consultar';
-
-interface FilaConformesOrden {
-  orden_id: number | string;
-  orden_codigo: string;
-  producto_id: number | string;
-  producto_codigo: string;
-  producto_nombre: string;
-  unidad: string;
-  cantidad_conforme: string | number;
-  version: string | number;
-  fecha: Date | string | null;
-}
-
-export interface ConformesOrdenResponse {
-  ordenId: number;
-  ordenCodigo: string;
-  producto: {
-    id: number;
-    codigo: string;
-    nombre: string;
-    unidad: string;
-  };
-  cantidadConforme: string;
-  version: number;
-  fecha: string | null;
-  permisoRequerido: typeof PERMISO_CONSULTAR_CONFORMES;
-}
-
-function cantidadDecimal(valor: string | number): string {
-  return Number(valor).toFixed(4);
-}
-
-function fechaIso(valor: Date | string | null): string | null {
-  if (valor === null) return null;
-  return valor instanceof Date ? valor.toISOString() : new Date(valor).toISOString();
+function unidadesEscaladas(valor: string): bigint {
+  const [entero, decimales = ''] = valor.split('.');
+  return BigInt(entero) * 10000n + BigInt(decimales.padEnd(4, '0'));
 }
 
 @Injectable()
 export class CalidadService {
   constructor(
-    @InjectRepository(OrdenProduccion)
-    private readonly ordenesRepository: Repository<OrdenProduccion>,
+    @InjectRepository(ResultadoConforme)
+    private readonly resultadosRepository: Repository<ResultadoConforme>,
+    private readonly dataSource: DataSource,
   ) {}
 
-  async consultarConformes(ordenId: number): Promise<ConformesOrdenResponse> {
-    const filas = (await this.ordenesRepository.query(
-      `SELECT o.id AS orden_id,
-              o.codigo AS orden_codigo,
-              r.id AS producto_id,
-              r.producto_codigo,
-              r.producto_nombre,
-              r.unidad_producto AS unidad,
-              COALESCE(SUM(a.cantidad_producida), 0) AS cantidad_conforme,
-              COUNT(a.id) AS version,
-              MAX(a.fecha_hora) AS fecha
-       FROM ordenes_produccion o
-       JOIN recetas r ON r.id = o.receta_id
-       LEFT JOIN avances_produccion a ON a.orden_id = o.id
-       WHERE o.id = $1
-       GROUP BY o.id, o.codigo, r.id, r.producto_codigo,
-                r.producto_nombre, r.unidad_producto`,
-      [ordenId],
-    )) as FilaConformesOrden[];
+  async registrarConforme(dto: CreateResultadoConformeDto, usuarioId: number) {
+    if (!Number.isSafeInteger(usuarioId) || usuarioId < 1) {
+      throw new UnauthorizedException('Debe iniciar sesión');
+    }
+    if (!Number.isSafeInteger(dto.ordenId) || dto.ordenId < 1 ||
+        !Number.isFinite(dto.cantidad) || dto.cantidad <= 0 || dto.cantidad > 9999999999.9999 ||
+        Number(dto.cantidad.toFixed(4)) !== dto.cantidad) {
+      throw new BadRequestException('Orden y cantidad deben ser positivas; cantidad admite hasta cuatro decimales');
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const orden = await manager.findOne(OrdenProduccion, {
+        where: { id: dto.ordenId }, lock: { mode: 'pessimistic_write' },
+      });
+      if (!orden) throw new NotFoundException(`Orden con id ${dto.ordenId} no encontrada`);
 
-    const fila = filas[0];
-    if (!fila) {
+      const producido = await manager.getRepository(AvancesProduccion).createQueryBuilder('avance')
+        .select('COALESCE(SUM(avance.cantidad_producida), 0)::text', 'total')
+        .where('avance.orden_id = :ordenId', { ordenId: String(dto.ordenId) })
+        .getRawOne<{ total: string }>();
+      const conforme = await manager.getRepository(ResultadoConforme).createQueryBuilder('resultado')
+        .select('COALESCE(SUM(resultado.cantidad), 0)::text', 'total')
+        .where('resultado.ordenId = :ordenId', { ordenId: String(dto.ordenId) })
+        .getRawOne<{ total: string }>();
+      if (unidadesEscaladas(conforme.total) + unidadesEscaladas(dto.cantidad.toFixed(4)) > unidadesEscaladas(producido.total)) {
+        throw new ConflictException('El acumulado conforme no puede superar las unidades producidas según los avances');
+      }
+      return manager.save(ResultadoConforme, {
+        ordenId: String(dto.ordenId), cantidad: dto.cantidad.toFixed(4), responsableUsuarioId: String(usuarioId),
+      });
+    });
+  }
+
+  async consultarConformes(ordenId: number) {
+    if (!Number.isSafeInteger(ordenId) || ordenId < 1) throw new BadRequestException('El id de la orden debe ser un entero positivo válido');
+    if (!await this.dataSource.getRepository(OrdenProduccion).existsBy({ id: ordenId })) {
       throw new NotFoundException(`Orden con id ${ordenId} no encontrada`);
     }
-
-    return {
-      ordenId: Number(fila.orden_id),
-      ordenCodigo: fila.orden_codigo,
-      producto: {
-        id: Number(fila.producto_id),
-        codigo: fila.producto_codigo,
-        nombre: fila.producto_nombre,
-        unidad: fila.unidad,
-      },
-      cantidadConforme: cantidadDecimal(fila.cantidad_conforme),
-      version: Number(fila.version),
-      fecha: fechaIso(fila.fecha),
-      permisoRequerido: PERMISO_CONSULTAR_CONFORMES,
-    };
+    return this.resultadosRepository.find({
+      where: { ordenId: String(ordenId) }, order: { fechaHora: 'ASC', id: 'ASC' },
+    });
   }
 }

@@ -27,6 +27,7 @@ import { CalidadModule } from './calidad/calidad.module';
     UnidadesModule,
     SolicitudesMaterialModule,
     ConsumosMaterialModule,
+    CalidadModule,
     PubSubModule,
     CalidadModule,
   ],
