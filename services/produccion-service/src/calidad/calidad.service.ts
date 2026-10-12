@@ -5,6 +5,7 @@ import { AvancesProduccion } from '../avances_produccion/entities/avances_produc
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { CreateResultadoConformeDto } from './dto/create-resultado-conforme.dto';
 import { ResultadoConforme } from './entities/resultado-conforme.entity';
+import { TipoResultadoCalidad } from './entities/tipo-resultado-calidad.enum';
 
 function unidadesEscaladas(valor: string): bigint {
   const [entero, decimales = ''] = valor.split('.');
@@ -19,7 +20,11 @@ export class CalidadService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async registrarConforme(dto: CreateResultadoConformeDto, usuarioId: number) {
+  registrarConforme(dto: CreateResultadoConformeDto, usuarioId: number) {
+    return this.registrarResultado({ ...dto, tipo: TipoResultadoCalidad.CONFORME }, usuarioId);
+  }
+
+  async registrarResultado(dto: CreateResultadoConformeDto, usuarioId: number) {
     if (!Number.isSafeInteger(usuarioId) || usuarioId < 1) {
       throw new UnauthorizedException('Debe iniciar sesión');
     }
@@ -27,6 +32,17 @@ export class CalidadService {
         !Number.isFinite(dto.cantidad) || dto.cantidad <= 0 || dto.cantidad > 9999999999.9999 ||
         Number(dto.cantidad.toFixed(4)) !== dto.cantidad) {
       throw new BadRequestException('Orden y cantidad deben ser positivas; cantidad admite hasta cuatro decimales');
+    }
+    const tipo = dto.tipo ?? TipoResultadoCalidad.CONFORME;
+    if (!Object.values(TipoResultadoCalidad).includes(tipo)) throw new BadRequestException('Tipo de resultado inválido');
+    let causaDefecto: string | null = null;
+    if (tipo === TipoResultadoCalidad.DEFECTUOSO) {
+      if (typeof dto.causaDefecto !== 'string' || !dto.causaDefecto.trim() || dto.causaDefecto.length > 500) {
+        throw new BadRequestException('La causa del defecto es obligatoria y admite hasta 500 caracteres');
+      }
+      causaDefecto = dto.causaDefecto.trim();
+    } else if (dto.causaDefecto !== undefined) {
+      throw new BadRequestException('Un resultado conforme no admite causa de defecto');
     }
     return this.dataSource.transaction(async (manager) => {
       const orden = await manager.findOne(OrdenProduccion, {
@@ -38,26 +54,32 @@ export class CalidadService {
         .select('COALESCE(SUM(avance.cantidad_producida), 0)::text', 'total')
         .where('avance.orden_id = :ordenId', { ordenId: String(dto.ordenId) })
         .getRawOne<{ total: string }>();
-      const conforme = await manager.getRepository(ResultadoConforme).createQueryBuilder('resultado')
+      const clasificado = await manager.getRepository(ResultadoConforme).createQueryBuilder('resultado')
         .select('COALESCE(SUM(resultado.cantidad), 0)::text', 'total')
         .where('resultado.ordenId = :ordenId', { ordenId: String(dto.ordenId) })
         .getRawOne<{ total: string }>();
-      if (unidadesEscaladas(conforme.total) + unidadesEscaladas(dto.cantidad.toFixed(4)) > unidadesEscaladas(producido.total)) {
-        throw new ConflictException('El acumulado conforme no puede superar las unidades producidas según los avances');
+      if (unidadesEscaladas(clasificado.total) + unidadesEscaladas(dto.cantidad.toFixed(4)) > unidadesEscaladas(producido.total)) {
+        throw new ConflictException('Conformes y defectuosos acumulados no pueden superar las unidades producidas según los avances');
       }
       return manager.save(ResultadoConforme, {
         ordenId: String(dto.ordenId), cantidad: dto.cantidad.toFixed(4), responsableUsuarioId: String(usuarioId),
+        tipo, causaDefecto,
       });
     });
   }
 
-  async consultarConformes(ordenId: number) {
+  consultarConformes(ordenId: number) {
+    return this.consultarResultados(ordenId, TipoResultadoCalidad.CONFORME);
+  }
+
+  async consultarResultados(ordenId: number, tipo: TipoResultadoCalidad = TipoResultadoCalidad.CONFORME) {
     if (!Number.isSafeInteger(ordenId) || ordenId < 1) throw new BadRequestException('El id de la orden debe ser un entero positivo válido');
+    if (!Object.values(TipoResultadoCalidad).includes(tipo)) throw new BadRequestException('Tipo de resultado inválido');
     if (!await this.dataSource.getRepository(OrdenProduccion).existsBy({ id: ordenId })) {
       throw new NotFoundException(`Orden con id ${ordenId} no encontrada`);
     }
     return this.resultadosRepository.find({
-      where: { ordenId: String(ordenId) }, order: { fechaHora: 'ASC', id: 'ASC' },
+      where: { ordenId: String(ordenId), tipo }, order: { fechaHora: 'ASC', id: 'ASC' },
     });
   }
 }

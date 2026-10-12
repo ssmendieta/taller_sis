@@ -15,6 +15,7 @@ describe('ABC-82: conformes por HTTP', () => {
   let permisos: string[];
   let producido: string;
   let conforme: string;
+  let defectuoso: string;
   const httpFetch = global.fetch;
   const referencias = { existsBy: jest.fn() };
   const resultados = { find: jest.fn() };
@@ -40,6 +41,7 @@ describe('ABC-82: conformes por HTTP', () => {
     permisos = ['calidad.registrar_conformes', 'ordenes.consultar'];
     producido = '23.0000';
     conforme = '0.0000';
+    defectuoso = '0.0000';
     jest.spyOn(global, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
       id: '42', rol: 'Encargado de Producción', permisos,
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
@@ -47,8 +49,8 @@ describe('ABC-82: conformes por HTTP', () => {
     manager.getRepository.mockImplementation((entity) => ({
       createQueryBuilder: () => {
         const query = {
-          select: jest.fn(() => query), where: jest.fn(() => query),
-          getRawOne: jest.fn(async () => ({ total: entity === AvancesProduccion ? producido : conforme })),
+          select: jest.fn(() => query), where: jest.fn(() => query), andWhere: jest.fn(() => query),
+          getRawOne: jest.fn(async () => ({ total: entity === AvancesProduccion ? producido : (Number(conforme) + Number(defectuoso)).toFixed(4) })),
         };
         return query;
       },
@@ -124,7 +126,7 @@ describe('ABC-82: conformes por HTTP', () => {
     permisos = ['ordenes.consultar'];
     resultados.find.mockResolvedValue([{ id: '1', cantidad: '10.0000' }]);
     expect(await request('/orden/1', 'GET')).toEqual({ status: 200, body: [{ id: '1', cantidad: '10.0000' }] });
-    expect(resultados.find).toHaveBeenCalledWith(expect.objectContaining({ where: { ordenId: '1' } }));
+    expect(resultados.find).toHaveBeenCalledWith(expect.objectContaining({ where: { ordenId: '1', tipo: 'CONFORME' } }));
   });
 
   it('403: registrar no concede lectura', async () => {
@@ -137,5 +139,57 @@ describe('ABC-82: conformes por HTTP', () => {
     expect((await request('/orden/999', 'GET')).status).toBe(404);
     expect((await request('/orden/abc', 'GET')).status).toBe(400);
     expect((await request('/orden/0', 'GET')).status).toBe(400);
+  });
+
+  it('201: registra 5 defectuosas con 100 producidas y 95 conformes', async () => {
+    producido = '100.0000';
+    conforme = '95.0000';
+    const response = await request('', 'POST', { ordenId: 1, cantidad: 5, tipo: 'DEFECTUOSO', causaDefecto: ' Sellado incompleto ' });
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ tipo: 'DEFECTUOSO', causaDefecto: 'Sellado incompleto', responsableUsuarioId: '42', cantidad: '5.0000' });
+  });
+
+  it.each([undefined, '', '   ', '\t\n', null, 123, 'x'.repeat(501)])('400: rechaza causa de defecto invalida %s', async (causaDefecto) => {
+    expect((await request('', 'POST', { ordenId: 1, cantidad: 5, tipo: 'DEFECTUOSO', causaDefecto })).status).toBe(400);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1])('400: rechaza cantidad defectuosa %s', async (cantidad) => {
+    expect((await request('', 'POST', { ordenId: 1, cantidad, tipo: 'DEFECTUOSO', causaDefecto: 'Sellado' })).status).toBe(400);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('409: rechaza 6 defectuosas con 100 producidas y 95 conformes', async () => {
+    producido = '100.0000';
+    conforme = '95.0000';
+    expect((await request('', 'POST', { ordenId: 1, cantidad: 6, tipo: 'DEFECTUOSO', causaDefecto: 'Sellado' })).status).toBe(409);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('409: incluye defectos previos al validar nuevos conformes', async () => {
+    producido = '100.0000';
+    conforme = '95.0000';
+    defectuoso = '5.0000';
+    expect((await request('', 'POST', { ordenId: 1, cantidad: 1 })).status).toBe(409);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('400: no admite tipo desconocido ni causa en conformes', async () => {
+    expect((await request('', 'POST', { ...body, tipo: 'OTRO' })).status).toBe(400);
+    expect((await request('', 'POST', { ...body, causaDefecto: 'No corresponde' })).status).toBe(400);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('403: registrar defectos exige el permiso de calidad existente', async () => {
+    permisos = ['ordenes.consultar'];
+    expect((await request('', 'POST', { ordenId: 1, cantidad: 5, tipo: 'DEFECTUOSO', causaDefecto: 'Sellado' })).status).toBe(403);
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('200: consulta defectos por tipo en la ruta existente', async () => {
+    resultados.find.mockResolvedValue([{ tipo: 'DEFECTUOSO', cantidad: '5.0000' }]);
+    expect(await request('/orden/1?tipo=DEFECTUOSO', 'GET')).toEqual({ status: 200, body: [{ tipo: 'DEFECTUOSO', cantidad: '5.0000' }] });
+    expect(resultados.find).toHaveBeenCalledWith(expect.objectContaining({ where: { ordenId: '1', tipo: 'DEFECTUOSO' } }));
+    expect((await request('/orden/1?tipo=OTRO', 'GET')).status).toBe(400);
   });
 });

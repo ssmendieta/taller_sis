@@ -25,7 +25,7 @@ describe('ABC-82: consulta de resultados conformes persistidos', () => {
     find.mockResolvedValue(resultados);
     await expect(service.consultarConformes(15)).resolves.toEqual(resultados);
     expect(existsBy).toHaveBeenCalledWith({ id: 15 });
-    expect(find).toHaveBeenCalledWith({ where: { ordenId: '15' }, order: { fechaHora: 'ASC', id: 'ASC' } });
+    expect(find).toHaveBeenCalledWith({ where: { ordenId: '15', tipo: 'CONFORME' }, order: { fechaHora: 'ASC', id: 'ASC' } });
   });
 
   it('devuelve una lista vacia si la orden no tiene resultados conformes', async () => {

@@ -9,6 +9,7 @@ import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { ResultadoConforme } from './entities/resultado-conforme.entity';
 import { AvancesProduccion } from '../avances_produccion/entities/avances_produccion.entity';
 import { CalidadService } from './calidad.service';
+import { TipoResultadoCalidad1710000000015 } from '../database/migrations/1710000000015-TipoResultadoCalidad';
 
 const entities = [ResultadoConforme, OrdenProduccion, AvancesProduccion];
 
@@ -42,6 +43,7 @@ describeReal('ABC-82: persistencia PostgreSQL de ResultadoConforme', () => {
       await new ProduccionSchema1710000000002().up(runner);
       await new OrdenesCodigoSecuencia1710000000007().up(runner);
       await new ResultadosConformes1710000000014().up(runner);
+      await new TipoResultadoCalidad1710000000015().up(runner);
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.query("INSERT INTO ordenes_produccion (codigo,receta_id,cantidad_solicitada,fecha_programada,responsable_usuario_id) VALUES ('O1',1,100,CURRENT_DATE,42)");
       await runner.commitTransaction();
