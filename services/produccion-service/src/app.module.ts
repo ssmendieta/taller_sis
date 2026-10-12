@@ -13,6 +13,7 @@ import { MaterialCalculationController } from './material-calculation/material-c
 import { PubSubModule } from './integraciones/pubsub/pubsub.module';
 import { SolicitudesMaterialModule } from './solicitudes-material/solicitudes-material.module';
 import { ConsumosMaterialModule } from './consumos-material/consumos-material.module';
+import { CalidadModule } from './calidad/calidad.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ConsumosMaterialModule } from './consumos-material/consumos-material.mo
     SolicitudesMaterialModule,
     ConsumosMaterialModule,
     PubSubModule,
+    CalidadModule,
   ],
   controllers: [AppController, MaterialCalculationController],
   providers: [
