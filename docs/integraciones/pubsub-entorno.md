@@ -3,8 +3,9 @@
 ## Objetivo actual
 
 `produccion-service` publica mensajes en un único topic compartido de Google
-Cloud Pub/Sub. Esta etapa no crea topics ni suscripciones, no consume mensajes y
-no se comunica todavía con Inventarios o Contabilidad.
+Cloud Pub/Sub. Esta etapa no crea topics ni suscripciones y no consume mensajes.
+Los contratos de Contabilidad e Inventario/Almacén comparten este topic y se
+diferencian mediante el atributo `eventType`.
 
 ```text
 produccion-service -- publish --> projects/{projectId}/topics/{topicId}
@@ -72,4 +73,6 @@ después de aceptar la publicación.
 - No se crean suscripciones.
 - No hay consumidores, ACK/NACK ni redelivery.
 - No hay simuladores, inbox, outbox ni reintentos persistentes.
-- Los contratos de Inventarios y Contabilidad se definirán en sus tareas.
+- Los contratos están documentados en `contabilidad-v1.md` e
+  `inventario-almacen-v1.md`; en este sprint solo se publican sus eventos
+  salientes y no se leen respuestas.
