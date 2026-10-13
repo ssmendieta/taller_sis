@@ -9,6 +9,7 @@ import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import BoletasPage from "../pages/BoletasPage.jsx";
+import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
@@ -65,6 +66,14 @@ export default function AppRoutes() {
     </ProtectedRoute>
   }
 />
+        <Route
+          path="/logistica/boletas/consulta"
+          element={
+            <ProtectedRoute roles={["Administrador", "Encargado de Log\u00edstica"]}>
+              <ConsultaBoletasPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
   path="/logistica/boletas/:id"
   element={
