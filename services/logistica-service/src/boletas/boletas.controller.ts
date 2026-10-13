@@ -11,8 +11,8 @@ export class BoletasController {
 
   @Post()
   @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.gestionar')
-  create(@Body(new ValidarBoletaPipe()) dto: CrearBoletaDto, @Req() request: { usuarioId: string }) {
-    return this.service.create(dto, request.usuarioId);
+  create(@Body(new ValidarBoletaPipe()) dto: CrearBoletaDto, @Req() request: { usuarioId: string; headers: { authorization?: string } }) {
+    return this.service.create(dto, request.usuarioId, request.headers.authorization ?? '');
   }
 
   @Get()

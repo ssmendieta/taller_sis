@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CrearBoletaDto } from './dto/crear-boleta.dto';
@@ -6,19 +6,41 @@ import { BoletaEnvio } from './entities/boleta-envio.entity';
 import { BoletaEnvioItem } from './entities/boleta-envio-item.entity';
 import { EstadoBoleta } from './entities/estado-boleta.enum';
 import { SolicitudSalida } from '../solicitudes-salida/entities/solicitud-salida.entity';
+import { LotesProduccionClient } from '../disponibilidad-documental/lotes-produccion.client';
 
 @Injectable()
 export class BoletasService {
   constructor(
     @InjectRepository(BoletaEnvio) private readonly boletas: Repository<BoletaEnvio>,
+    @InjectRepository(SolicitudSalida) private readonly solicitudes: Repository<SolicitudSalida>,
     private readonly dataSource: DataSource,
+    private readonly produccion: LotesProduccionClient,
   ) {}
 
-  create(dto: CrearBoletaDto, usuarioId: string): Promise<BoletaEnvio> {
-    return this.dataSource.transaction(async (manager) => {
-      const solicitud = await manager.findOne(SolicitudSalida, { where: { id: dto.solicitudSalidaId } });
-      if (!solicitud) throw new NotFoundException('Solicitud de salida no encontrada');
+  async create(dto: CrearBoletaDto, usuarioId: string, authorization: string): Promise<BoletaEnvio> {
+    const solicitud = await this.solicitudes.findOne({
+      where: { id: dto.solicitudSalidaId },
+      relations: { items: true },
+    });
+    if (!solicitud) throw new NotFoundException('Solicitud de salida no encontrada');
 
+    const orden = await this.produccion.consultarOrdenPorId(solicitud.ordenId, authorization);
+    if (String(orden.id) !== String(solicitud.ordenId) || !orden.codigo.trim() ||
+        !Number.isSafeInteger(Number(orden.producto_id)) || Number(orden.producto_id) < 1 ||
+        !orden.producto || typeof orden.producto !== 'object') {
+      throw new BadGatewayException('Producción devolvió una relación orden-producto incompleta');
+    }
+    const lotes = await this.produccion.consultarPorOrden(orden.codigo, authorization);
+    const lotesDeOrden = lotes.filter((lote) => String(lote.ordenId) === String(solicitud.ordenId));
+    if (lotesDeOrden.length !== lotes.length) {
+      throw new BadGatewayException('Producción devolvió un lote de otra orden');
+    }
+    const referencias = new Set(lotesDeOrden.map((lote) => lote.codigo));
+    if (dto.items.some((item) => !referencias.has(item.referencia))) {
+      throw new NotFoundException('Uno o más ítems no pertenecen a la orden solicitada');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
       const boleta = await manager.save(BoletaEnvio, manager.create(BoletaEnvio, {
         solicitudSalidaId: solicitud.id,
         responsableUsuarioId: usuarioId,

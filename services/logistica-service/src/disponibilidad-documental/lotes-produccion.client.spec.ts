@@ -20,4 +20,11 @@ describe('ABC-296: cliente de lotes de Producción', () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ invalid: true }) }) as any;
     await expect(new LotesProduccionClient().consultarPorOrden('ORD-7', 'Bearer token')).rejects.toBeInstanceOf(BadGatewayException);
   });
+
+  it('consulta una orden existente y rechaza un 404', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ id: 8, codigo: 'ORD-7', producto_id: 3, producto: { codigo: 'P-3' } }) }) as any;
+    await expect(new LotesProduccionClient().consultarOrdenPorId('8', 'Bearer token')).resolves.toMatchObject({ codigo: 'ORD-7' });
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({}) }) as any;
+    await expect(new LotesProduccionClient().consultarOrdenPorId('99', 'Bearer token')).rejects.toThrow('Orden no encontrada');
+  });
 });
