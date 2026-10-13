@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader.jsx";
 
-const ITEMS_POR_PAGINA = 5;
-
 function obtenerBoletas() {
   const boletas = [];
 
@@ -42,6 +40,7 @@ export default function ConsultaBoletasPage() {
   const [estado, setEstado] = useState("");
   const [naturaleza, setNaturaleza] = useState("");
   const [pagina, setPagina] = useState(1);
+  const [porPagina, setPorPagina] = useState(5);
 
   function cargarBoletas() {
     setBoletas(obtenerBoletas());
@@ -76,38 +75,19 @@ export default function ConsultaBoletasPage() {
 
   const totalPaginas = Math.max(
     1,
-    Math.ceil(resultados.length / ITEMS_POR_PAGINA)
+    Math.ceil(resultados.length / porPagina)
   );
 
-  const resultadosPagina = useMemo(() => {
-    const inicio = (pagina - 1) * ITEMS_POR_PAGINA;
+  const paginaActual = Math.min(pagina, totalPaginas);
 
-    return resultados.slice(
-      inicio,
-      inicio + ITEMS_POR_PAGINA
-    );
-  }, [resultados, pagina]);
+  const resultadosPaginados = useMemo(() => {
+    const inicio = (paginaActual - 1) * porPagina;
+    return resultados.slice(inicio, inicio + porPagina);
+  }, [resultados, paginaActual, porPagina]);
 
   useEffect(() => {
-    if (pagina > totalPaginas) {
-      setPagina(totalPaginas);
-    }
-  }, [pagina, totalPaginas]);
-
-  function cambiarNumero(evento) {
-    setNumero(evento.target.value);
     setPagina(1);
-  }
-
-  function cambiarEstado(evento) {
-    setEstado(evento.target.value);
-    setPagina(1);
-  }
-
-  function cambiarNaturaleza(evento) {
-    setNaturaleza(evento.target.value);
-    setPagina(1);
-  }
+  }, [numero, estado, naturaleza, porPagina]);
 
   function limpiarFiltros() {
     setNumero("");
@@ -116,11 +96,11 @@ export default function ConsultaBoletasPage() {
     setPagina(1);
   }
 
-  function paginaAnterior() {
+  function irPaginaAnterior() {
     setPagina((actual) => Math.max(1, actual - 1));
   }
 
-  function paginaSiguiente() {
+  function irPaginaSiguiente() {
     setPagina((actual) =>
       Math.min(totalPaginas, actual + 1)
     );
@@ -158,7 +138,7 @@ export default function ConsultaBoletasPage() {
               id="numero-boleta"
               type="text"
               value={numero}
-              onChange={cambiarNumero}
+              onChange={(e) => setNumero(e.target.value)}
               placeholder="Ej. BOL-0001"
             />
           </label>
@@ -168,7 +148,7 @@ export default function ConsultaBoletasPage() {
             <select
               id="estado-boleta"
               value={estado}
-              onChange={cambiarEstado}
+              onChange={(e) => setEstado(e.target.value)}
             >
               <option value="">Todos</option>
               <option value="BORRADOR">Borrador</option>
@@ -182,12 +162,25 @@ export default function ConsultaBoletasPage() {
             <select
               id="naturaleza-boleta"
               value={naturaleza}
-              onChange={cambiarNaturaleza}
+              onChange={(e) => setNaturaleza(e.target.value)}
             >
               <option value="">Todas</option>
               <option value="TRASLADO">Traslado</option>
               <option value="DESPACHO">Despacho</option>
               <option value="ENTREGA">Entrega</option>
+            </select>
+          </label>
+
+          <label htmlFor="por-pagina">
+            Registros por página
+            <select
+              id="por-pagina"
+              value={porPagina}
+              onChange={(e) => setPorPagina(Number(e.target.value))}
+            >
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
             </select>
           </label>
         </div>
@@ -220,22 +213,12 @@ export default function ConsultaBoletasPage() {
       >
         <div className="ts-panel-title">
           <h3>Resultados</h3>
-
           <span>
             {resultados.length} registro(s)
           </span>
         </div>
 
-        {boletas.length === 0 ? (
-          <p>
-            No hay boletas registradas para mostrar.
-          </p>
-        ) : resultados.length === 0 ? (
-          <p>
-            No hay boletas que coincidan con los filtros
-            seleccionados.
-          </p>
-        ) : (
+        {resultados.length > 0 ? (
           <>
             <div style={{ overflowX: "auto" }}>
               <table className="ts-table">
@@ -252,7 +235,7 @@ export default function ConsultaBoletasPage() {
                 </thead>
 
                 <tbody>
-                  {resultadosPagina.map((boleta) => (
+                  {resultadosPaginados.map((boleta) => (
                     <tr key={boleta.id}>
                       <td>{boleta.numero ?? "—"}</td>
                       <td>{boleta.fecha ?? "—"}</td>
@@ -286,33 +269,39 @@ export default function ConsultaBoletasPage() {
               className="ts-btn-group"
               style={{
                 marginTop: "1rem",
-                alignItems: "center",
                 justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
-              <button
-                type="button"
-                className="ts-btn"
-                onClick={paginaAnterior}
-                disabled={pagina === 1}
-              >
-                Anterior
-              </button>
-
               <span>
-                Página {pagina} de {totalPaginas}
+                Página {paginaActual} de {totalPaginas}
               </span>
 
-              <button
-                type="button"
-                className="ts-btn ts-btn-primary"
-                onClick={paginaSiguiente}
-                disabled={pagina === totalPaginas}
-              >
-                Siguiente
-              </button>
+              <div className="ts-btn-group">
+                <button
+                  type="button"
+                  className="ts-btn"
+                  onClick={irPaginaAnterior}
+                  disabled={paginaActual === 1}
+                >
+                  Anterior
+                </button>
+
+                <button
+                  type="button"
+                  className="ts-btn ts-btn-primary"
+                  onClick={irPaginaSiguiente}
+                  disabled={paginaActual === totalPaginas}
+                >
+                  Siguiente
+                </button>
+              </div>
             </div>
           </>
+        ) : (
+          <p>
+            No hay boletas registradas para mostrar.
+          </p>
         )}
       </div>
     </section>
