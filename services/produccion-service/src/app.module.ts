@@ -13,6 +13,7 @@ import { PubSubModule } from './integraciones/pubsub/pubsub.module';
 import { SolicitudesMaterialModule } from './solicitudes-material/solicitudes-material.module';
 import { ConsumosMaterialModule } from './consumos-material/consumos-material.module';
 import { CalidadModule } from './calidad/calidad.module';
+import { LotesModule } from './lotes/lotes.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CalidadModule } from './calidad/calidad.module';
     SolicitudesMaterialModule,
     ConsumosMaterialModule,
     MaterialCalculationModule,
+    LotesModule,
     CalidadModule,
     PubSubModule,
     CalidadModule,
