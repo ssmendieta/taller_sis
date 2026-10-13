@@ -20,6 +20,27 @@ function unidadesEscaladas(valor: string): bigint {
 export class LotesService {
   constructor(private readonly dataSource: DataSource) {}
 
+  async findByOrderCode(ordenCodigo: string) {
+    const codigo = typeof ordenCodigo === 'string' ? ordenCodigo.trim() : '';
+    if (!codigo || codigo.length > 50) {
+      throw new BadRequestException('El código de orden es obligatorio');
+    }
+    const lotes = await this.dataSource.getRepository(Lote)
+      .createQueryBuilder('lote')
+      .innerJoinAndSelect('lote.orden', 'orden')
+      .where('orden.codigo = :codigo', { codigo })
+      .orderBy('lote.id', 'ASC')
+      .getMany();
+    return lotes.map((lote) => ({
+      id: String(lote.id),
+      codigo: lote.codigo,
+      ordenId: String(lote.ordenId),
+      ordenCodigo: lote.orden.codigo,
+      cantidad: lote.cantidad,
+      fechaHora: lote.fechaHora,
+    }));
+  }
+
   async create(dto: CrearLoteInput, usuarioId: number): Promise<Lote> {
     if (!Number.isSafeInteger(usuarioId) || usuarioId < 1) {
       throw new UnauthorizedException('Debe iniciar sesión');
