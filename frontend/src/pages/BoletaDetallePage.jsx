@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
+import { useSesion } from "../context/SesionContext.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 
 const leyenda = [
   {
     codigo: "TRASLADO",
     descripcion:
-      "Movimiento interno de materiales entre áreas o ubicaciones.",
+      "Movimiento interno de materiales entre Ã¡reas o ubicaciones.",
   },
   {
     codigo: "DESPACHO",
@@ -67,7 +68,7 @@ function fechaParaInput(fecha) {
 
 function fechaParaMostrar(fecha) {
   if (!fecha) {
-    return "—";
+    return "â€”";
   }
 
   const valor = String(fecha);
@@ -84,6 +85,7 @@ function fechaParaMostrar(fecha) {
 export default function BoletaDetallePage() {
   const { id } = useParams();
   const location = useLocation();
+  const { usuario } = useSesion();
 
   const boletaInicial = leerBoleta(
     id,
@@ -101,6 +103,7 @@ export default function BoletaDetallePage() {
 
   const [errores, setErrores] = useState({});
   const [mensaje, setMensaje] = useState("");
+  const [motivoAnulacion, setMotivoAnulacion] = useState("");
 
   if (!boleta) {
     return (
@@ -119,7 +122,7 @@ export default function BoletaDetallePage() {
           </h2>
 
           <p>
-            No existe información disponible para la boleta
+            No existe informaciÃ³n disponible para la boleta
             solicitada.
           </p>
         </div>
@@ -229,6 +232,64 @@ export default function BoletaDetallePage() {
     );
   }
 
+  function anularBoleta(evento) {
+    evento.preventDefault();
+    setMensaje("");
+
+    if (estado !== "EMITIDA") {
+      setMensaje("Solo una boleta EMITIDA puede ser anulada.");
+      return;
+    }
+
+    const motivo = motivoAnulacion.trim();
+
+    if (!motivo) {
+      setMensaje("El motivo de anulación es obligatorio.");
+      return;
+    }
+
+    const nombreUsuario =
+      usuario?.nombreCompleto ||
+      usuario?.nombre ||
+      usuario?.username ||
+      usuario?.usuario ||
+      usuario?.email ||
+      "Usuario autenticado";
+
+    const fechaHora = new Date().toISOString();
+
+    const nuevoHistorial = [
+      ...historial,
+      {
+        fechaHora,
+        accion: "ANULACION",
+        estadoAnterior: "EMITIDA",
+        estadoNuevo: "ANULADA",
+        usuario: nombreUsuario,
+        motivo,
+      },
+    ];
+
+    const actualizada = {
+      ...boleta,
+      estado: "ANULADA",
+      motivoAnulacion: motivo,
+      anuladoPor: nombreUsuario,
+      fechaAnulacion: fechaHora,
+      historial: nuevoHistorial,
+    };
+
+    sessionStorage.setItem(
+      `boleta-${actualizada.id}`,
+      JSON.stringify(actualizada)
+    );
+
+    setBoleta(actualizada);
+    setMotivoAnulacion("");
+    setMensaje(
+      "Boleta anulada correctamente. El documento original permanece visible."
+    );
+  }
   function estiloCampo(campo) {
     if (!errores[campo]) {
       return undefined;
@@ -271,7 +332,7 @@ export default function BoletaDetallePage() {
         <div className="ts-panel-title">
           <div>
             <h2 id="boleta-title">
-              Boleta {boleta.numero ?? "—"}
+              Boleta {boleta.numero ?? "â€”"}
             </h2>
 
             <p>Documento de salida</p>
@@ -282,28 +343,28 @@ export default function BoletaDetallePage() {
 
         <div className="ts-filters">
           <div>
-            <strong>Número</strong>
-            <p>{boleta.numero ?? "—"}</p>
+            <strong>NÃºmero</strong>
+            <p>{boleta.numero ?? "â€”"}</p>
           </div>
 
           <div>
             <strong>Responsable</strong>
-            <p>{boleta.responsable ?? "—"}</p>
+            <p>{boleta.responsable ?? "â€”"}</p>
           </div>
 
           <div>
             <strong>Naturaleza documental</strong>
-            <p>{boleta.naturaleza ?? "—"}</p>
+            <p>{boleta.naturaleza ?? "â€”"}</p>
           </div>
 
           <div>
             <strong>Solicitud</strong>
-            <p>{boleta.solicitudId ?? "—"}</p>
+            <p>{boleta.solicitudId ?? "â€”"}</p>
           </div>
 
           <div>
             <strong>Orden</strong>
-            <p>{boleta.orden ?? "—"}</p>
+            <p>{boleta.orden ?? "â€”"}</p>
           </div>
         </div>
       </div>
@@ -351,7 +412,7 @@ export default function BoletaDetallePage() {
                 }
                 disabled={!esBorrador}
                 style={estiloCampo("origen")}
-                placeholder="Ej. Almacén A"
+                placeholder="Ej. AlmacÃ©n A"
               />
 
               {errores.origen && (
@@ -388,7 +449,7 @@ export default function BoletaDetallePage() {
                 }
                 disabled={!esBorrador}
                 style={estiloCampo("destino")}
-                placeholder="Ej. Área de Producción"
+                placeholder="Ej. Ãrea de ProducciÃ³n"
               />
 
               {errores.destino && (
@@ -496,7 +557,7 @@ export default function BoletaDetallePage() {
               role="status"
               style={{ marginTop: "1rem" }}
             >
-              Esta boleta está emitida y la cabecera
+              Esta boleta estÃ¡ emitida y la cabecera
               se muestra en modo consulta.
             </p>
           )}
@@ -508,7 +569,7 @@ export default function BoletaDetallePage() {
         style={{ marginTop: "1rem" }}
       >
         <div className="ts-panel-title">
-          <h3>Ítems definitivos</h3>
+          <h3>Ãtems definitivos</h3>
         </div>
 
         {items.length > 0 ? (
@@ -537,12 +598,174 @@ export default function BoletaDetallePage() {
           </div>
         ) : (
           <p>
-            No hay ítems definitivos registrados en
+            No hay Ã­tems definitivos registrados en
             esta boleta.
           </p>
         )}
       </div>
 
+      {estado === "EMITIDA" && (
+        <div
+          className="ts-panel"
+          style={{ marginTop: "1rem" }}
+          data-feature="ABC-247"
+        >
+          <div className="ts-panel-title">
+            <div>
+              <h3>Anulación de boleta</h3>
+              <p>
+                La anulación requiere un motivo y registra la identidad
+                del usuario que realiza la operación.
+              </p>
+            </div>
+            <strong>EMITIDA</strong>
+          </div>
+
+          <form onSubmit={anularBoleta} noValidate>
+            <label htmlFor="motivo-anulacion">
+              Motivo de anulación *
+
+              <textarea
+                id="motivo-anulacion"
+                value={motivoAnulacion}
+                onChange={(e) => {
+                  setMotivoAnulacion(e.target.value);
+                  setMensaje("");
+                }}
+                rows="3"
+                placeholder="Explique el motivo de la anulación."
+                required
+                style={{
+                  width: "100%",
+                  marginTop: "0.5rem",
+                  padding: "10px",
+                  border: "1px solid var(--ts-border)",
+                  borderRadius: "var(--ts-radius-control)",
+                  font: "inherit",
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                }}
+              />
+            </label>
+
+            <div
+              className="ts-btn-group ts-btn-group--end"
+              style={{ marginTop: "1rem" }}
+            >
+              <button
+                type="submit"
+                className="ts-btn ts-btn-danger"
+              >
+                Anular boleta
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {estado === "ANULADA" && (
+        <div
+          className="ts-panel"
+          style={{ marginTop: "1rem" }}
+          data-feature="ABC-247"
+        >
+          <div className="ts-panel-title">
+            <div>
+              <h3>Boleta anulada</h3>
+              <p>
+                El documento original permanece visible para consulta.
+              </p>
+            </div>
+            <strong>ANULADA</strong>
+          </div>
+
+          <div className="ts-filters">
+            <div>
+              <strong>Motivo</strong>
+              <p>{boleta.motivoAnulacion ?? "—"}</p>
+            </div>
+
+            <div>
+              <strong>Anulado por</strong>
+              <p>{boleta.anuladoPor ?? "—"}</p>
+            </div>
+
+            <div>
+              <strong>Fecha de anulación</strong>
+              <p>
+                {boleta.fechaAnulacion
+                  ? new Date(
+                      boleta.fechaAnulacion
+                    ).toLocaleString("es-BO")
+                  : "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div
+        className="ts-panel"
+        style={{ marginTop: "1rem" }}
+        data-feature="ABC-247"
+      >
+        <div className="ts-panel-title">
+          <div>
+            <h3>Historial de la boleta</h3>
+            <p>
+              Registro de cambios y acciones realizadas sobre el documento.
+            </p>
+          </div>
+
+          <strong>{historial.length}</strong>
+        </div>
+
+        {historial.length > 0 ? (
+          <div className="ts-table-wrap">
+            <table className="ts-table">
+              <caption>Historial de la boleta</caption>
+
+              <thead>
+                <tr>
+                  <th>Fecha y hora</th>
+                  <th>Acción</th>
+                  <th>Estado anterior</th>
+                  <th>Estado nuevo</th>
+                  <th>Usuario</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {historial.map((evento, indice) => (
+                  <tr
+                    key={`${evento.fechaHora ?? "evento"}-${indice}`}
+                  >
+                    <td>
+                      {evento.fechaHora
+                        ? new Date(
+                            evento.fechaHora
+                          ).toLocaleString("es-BO")
+                        : "—"}
+                    </td>
+
+                    <td>{evento.accion ?? "—"}</td>
+                    <td>{evento.estadoAnterior ?? "—"}</td>
+                    <td>{evento.estadoNuevo ?? "—"}</td>
+                    <td>{evento.usuario ?? "—"}</td>
+                    <td>{evento.motivo ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="ts-empty">
+            <strong>Sin movimientos registrados</strong>
+            Todavía no existen eventos de historial para esta boleta.
+          </p>
+        )}
+      </div>
       <div
         className="ts-panel"
         style={{ marginTop: "1rem" }}
