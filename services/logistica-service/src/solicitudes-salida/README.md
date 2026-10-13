@@ -32,3 +32,9 @@ independientes. La única FK local une los ítems con su solicitud.
 colisiona con los archivos de migración actualmente presentes en Logística.
 Jira requiere acordar la numeración con el equipo; ese acuerdo no se verificó.
 La migración no se ejecutó porque no se identificó una base autorizada.
+
+## Pruebas
+
+Los archivos `*.spec.ts` de este módulo son unitarios y usan mocks para
+repositorios/transacciones. No demuestran persistencia real, rollback en
+PostgreSQL ni conformidad de una orden/lote consultada en Producción.
