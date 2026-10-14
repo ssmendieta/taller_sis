@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import { guardarBoletaLocal } from "../services/logisticaService.js";
 
 const leyenda = [
   {
@@ -136,14 +137,208 @@ export default function BoletaDetallePage() {
 
   const esBorrador = estado === "BORRADOR";
 
-  const items = Array.isArray(boleta.items)
-    ? boleta.items
-    : [];
+  const [lineas, setLineas] = useState(() => {
+    const iniciales = Array.isArray(boletaInicial?.items)
+      ? boletaInicial.items
+      : [];
+
+    return iniciales.map((item, indice) => ({
+      id:
+        item.id ??
+        `linea-${indice + 1}`,
+      material: String(item.material ?? ""),
+      cantidad:
+        item.cantidad === null ||
+        item.cantidad === undefined
+          ? ""
+          : String(item.cantidad),
+      unidad: String(item.unidad ?? ""),
+    }));
+  });
+
+  const [erroresLineas, setErroresLineas] = useState({});
+
+  const items = lineas;
 
   const historial = Array.isArray(boleta.historial)
     ? boleta.historial
     : [];
 
+  function cambiarLinea(lineaId, campo, valor) {
+    if (!esBorrador) {
+      return;
+    }
+
+    setLineas((actuales) =>
+      actuales.map((linea) =>
+        linea.id === lineaId
+          ? {
+              ...linea,
+              [campo]: valor,
+            }
+          : linea
+      )
+    );
+
+    const claveError = `${lineaId}.${campo}`;
+
+    setErroresLineas((actuales) => {
+      const siguientes = { ...actuales };
+      delete siguientes[claveError];
+      return siguientes;
+    });
+
+    setMensaje("");
+  }
+
+  function agregarLinea() {
+    if (!esBorrador) {
+      return;
+    }
+
+    const id =
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `linea-${Date.now()}`;
+
+    setLineas((actuales) => [
+      ...actuales,
+      {
+        id,
+        material: "",
+        cantidad: "",
+        unidad: "",
+      },
+    ]);
+
+    setMensaje("");
+  }
+
+  function eliminarLinea(lineaId) {
+    if (!esBorrador) {
+      return;
+    }
+
+    setLineas((actuales) =>
+      actuales.filter((linea) => linea.id !== lineaId)
+    );
+
+    const prefijo = `${lineaId}.`;
+
+    setErroresLineas((actuales) =>
+      Object.fromEntries(
+        Object.entries(actuales).filter(
+          ([clave]) => !clave.startsWith(prefijo)
+        )
+      )
+    );
+
+    setMensaje("");
+  }
+
+  function validarLineas() {
+    const nuevosErrores = {};
+
+    lineas.forEach((linea) => {
+      const material = String(linea.material ?? "").trim();
+      const unidad = String(linea.unidad ?? "").trim();
+      const cantidad = Number(linea.cantidad);
+
+      if (!material) {
+        nuevosErrores[`${linea.id}.material`] =
+          "El material es obligatorio.";
+      }
+
+      if (!unidad) {
+        nuevosErrores[`${linea.id}.unidad`] =
+          "La unidad es obligatoria.";
+      }
+
+      if (
+        linea.cantidad === "" ||
+        linea.cantidad === null ||
+        linea.cantidad === undefined
+      ) {
+        nuevosErrores[`${linea.id}.cantidad`] =
+          "La cantidad es obligatoria.";
+      } else if (
+        !Number.isFinite(cantidad) ||
+        cantidad <= 0
+      ) {
+        nuevosErrores[`${linea.id}.cantidad`] =
+          "La cantidad debe ser mayor que 0.";
+      }
+    });
+
+    setErroresLineas(nuevosErrores);
+
+    return nuevosErrores;
+  }
+
+  function estiloErrorLinea(lineaId, campo) {
+    if (!erroresLineas[`${lineaId}.${campo}`]) {
+      return undefined;
+    }
+
+    return {
+      borderColor: "#c62828",
+      boxShadow: "0 0 0 1px #c62828",
+    };
+  }
+
+  function guardarLineas() {
+    setMensaje("");
+
+    if (!esBorrador) {
+      setMensaje(
+        "La boleta emitida no puede modificarse."
+      );
+      return;
+    }
+
+    const nuevosErrores = validarLineas();
+
+    if (Object.keys(nuevosErrores).length > 0) {
+      setMensaje(
+        "Corrige los errores de las líneas antes de guardar."
+      );
+      return;
+    }
+
+    const nombreUsuario =
+      usuario?.nombreCompleto ||
+      usuario?.nombre ||
+      usuario?.username ||
+      usuario?.usuario ||
+      usuario?.email ||
+      "Usuario autenticado";
+
+    const fechaHora = new Date().toISOString();
+
+    const lineasValidas = lineas.map((linea) => ({
+      ...linea,
+      material: String(linea.material).trim(),
+      cantidad: Number(linea.cantidad),
+      unidad: String(linea.unidad).trim(),
+    }));
+
+    const actualizada = {
+      ...boleta,
+      items: lineasValidas,
+      ultimoCambioFecha: fechaHora,
+      ultimoCambioPor: nombreUsuario,
+    };
+
+    guardarBoletaLocal(actualizada);
+
+    setLineas(lineasValidas);
+    setBoleta(actualizada);
+
+    setMensaje(
+      "Líneas validadas y guardadas correctamente."
+    );
+  }
   function cambiarCampo(campo, valor) {
     setCabecera((actual) => ({
       ...actual,
@@ -691,209 +886,298 @@ export default function BoletaDetallePage() {
         className="ts-panel"
         style={{ marginTop: "1rem" }}
       >
+        <div
+        className="ts-panel"
+        style={{ marginTop: "1rem" }}
+        data-feature="ABC-221"
+      >
         <div className="ts-panel-title">
-          <h3>Ítems definitivos</h3>
+          <div>
+            <h3>
+              {esBorrador
+                ? "Editor de líneas"
+                : "Ítems definitivos"}
+            </h3>
+
+            {esBorrador && (
+              <p>
+                Agrega, modifica o elimina líneas antes
+                de emitir la boleta.
+              </p>
+            )}
+          </div>
         </div>
 
-        {items.length > 0 ? (
-          <div style={{ overflowX: "auto" }}>
-            <table className="ts-table">
-              <thead>
-                <tr>
-                  <th>Material</th>
-                  <th>Cantidad</th>
-                  <th>Unidad</th>
-                </tr>
-              </thead>
+        {esBorrador ? (
+          <>
+            {lineas.length > 0 ? (
+              <div style={{ overflowX: "auto" }}>
+                <table className="ts-table">
+                  <thead>
+                    <tr>
+                      <th>Material</th>
+                      <th>Cantidad</th>
+                      <th>Unidad</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
 
-              <tbody>
-                {items.map((item) => (
-                  <tr
-                    key={`${item.material}-${item.unidad}`}
-                  >
-                    <td>{item.material}</td>
-                    <td>{item.cantidad}</td>
-                    <td>{item.unidad}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p>
-            No hay ítems definitivos registrados en
-            esta boleta.
-          </p>
-        )}
-      </div>
+                  <tbody>
+                    {lineas.map((linea) => (
+                      <tr key={linea.id}>
+                        <td>
+                          <label
+                            htmlFor={`material-${linea.id}`}
+                          >
+                            <span className="sr-only">
+                              Material
+                            </span>
 
-      {estado === "EMITIDA" && (
-        <div
-          className="ts-panel"
-          style={{ marginTop: "1rem" }}
-          data-feature="ABC-247"
-        >
-          <div className="ts-panel-title">
-            <div>
-              <h3>Anulación de boleta</h3>
+                            <input
+                              id={`material-${linea.id}`}
+                              type="text"
+                              value={linea.material}
+                              onChange={(e) =>
+                                cambiarLinea(
+                                  linea.id,
+                                  "material",
+                                  e.target.value
+                                )
+                              }
+                              aria-invalid={Boolean(
+                                erroresLineas[
+                                  `${linea.id}.material`
+                                ]
+                              )}
+                              aria-describedby={
+                                erroresLineas[
+                                  `${linea.id}.material`
+                                ]
+                                  ? `error-${linea.id}-material`
+                                  : undefined
+                              }
+                              style={estiloErrorLinea(
+                                linea.id,
+                                "material"
+                              )}
+                              placeholder="Ej. Materia prima A"
+                            />
+
+                            {erroresLineas[
+                              `${linea.id}.material`
+                            ] && (
+                              <span
+                                id={`error-${linea.id}-material`}
+                                className="ts-error"
+                                role="alert"
+                              >
+                                {
+                                  erroresLineas[
+                                    `${linea.id}.material`
+                                  ]
+                                }
+                              </span>
+                            )}
+                          </label>
+                        </td>
+
+                        <td>
+                          <label
+                            htmlFor={`cantidad-${linea.id}`}
+                          >
+                            <span className="sr-only">
+                              Cantidad
+                            </span>
+
+                            <input
+                              id={`cantidad-${linea.id}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={linea.cantidad}
+                              onChange={(e) =>
+                                cambiarLinea(
+                                  linea.id,
+                                  "cantidad",
+                                  e.target.value
+                                )
+                              }
+                              aria-invalid={Boolean(
+                                erroresLineas[
+                                  `${linea.id}.cantidad`
+                                ]
+                              )}
+                              aria-describedby={
+                                erroresLineas[
+                                  `${linea.id}.cantidad`
+                                ]
+                                  ? `error-${linea.id}-cantidad`
+                                  : undefined
+                              }
+                              style={estiloErrorLinea(
+                                linea.id,
+                                "cantidad"
+                              )}
+                              placeholder="Ej. 10"
+                            />
+
+                            {erroresLineas[
+                              `${linea.id}.cantidad`
+                            ] && (
+                              <span
+                                id={`error-${linea.id}-cantidad`}
+                                className="ts-error"
+                                role="alert"
+                              >
+                                {
+                                  erroresLineas[
+                                    `${linea.id}.cantidad`
+                                  ]
+                                }
+                              </span>
+                            )}
+                          </label>
+                        </td>
+
+                        <td>
+                          <label
+                            htmlFor={`unidad-${linea.id}`}
+                          >
+                            <span className="sr-only">
+                              Unidad
+                            </span>
+
+                            <input
+                              id={`unidad-${linea.id}`}
+                              type="text"
+                              value={linea.unidad}
+                              onChange={(e) =>
+                                cambiarLinea(
+                                  linea.id,
+                                  "unidad",
+                                  e.target.value
+                                )
+                              }
+                              aria-invalid={Boolean(
+                                erroresLineas[
+                                  `${linea.id}.unidad`
+                                ]
+                              )}
+                              aria-describedby={
+                                erroresLineas[
+                                  `${linea.id}.unidad`
+                                ]
+                                  ? `error-${linea.id}-unidad`
+                                  : undefined
+                              }
+                              style={estiloErrorLinea(
+                                linea.id,
+                                "unidad"
+                              )}
+                              placeholder="Ej. kg"
+                            />
+
+                            {erroresLineas[
+                              `${linea.id}.unidad`
+                            ] && (
+                              <span
+                                id={`error-${linea.id}-unidad`}
+                                className="ts-error"
+                                role="alert"
+                              >
+                                {
+                                  erroresLineas[
+                                    `${linea.id}.unidad`
+                                  ]
+                                }
+                              </span>
+                            )}
+                          </label>
+                        </td>
+
+                        <td className="ts-actions">
+                          <button
+                            type="button"
+                            className="ts-btn ts-btn-danger"
+                            onClick={() =>
+                              eliminarLinea(linea.id)
+                            }
+                          >
+                            Quitar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
               <p>
-                La anulación requiere un motivo y registra la identidad
-                del usuario que realiza la operación.
+                No hay líneas en esta boleta.
+                Agrega una línea para comenzar.
               </p>
-            </div>
-            <strong>EMITIDA</strong>
-          </div>
-
-          <form onSubmit={anularBoleta} noValidate>
-            <label htmlFor="motivo-anulacion">
-              Motivo de anulación *
-
-              <textarea
-                id="motivo-anulacion"
-                value={motivoAnulacion}
-                onChange={(e) => {
-                  setMotivoAnulacion(e.target.value);
-                  setMensaje("");
-                }}
-                rows="3"
-                placeholder="Explique el motivo de la anulación."
-                required
-                style={{
-                  width: "100%",
-                  marginTop: "0.5rem",
-                  padding: "10px",
-                  border: "1px solid var(--ts-border)",
-                  borderRadius: "var(--ts-radius-control)",
-                  font: "inherit",
-                  resize: "vertical",
-                  boxSizing: "border-box",
-                }}
-              />
-            </label>
+            )}
 
             <div
               className="ts-btn-group ts-btn-group--end"
               style={{ marginTop: "1rem" }}
             >
               <button
-                type="submit"
-                className="ts-btn ts-btn-danger"
+                type="button"
+                className="ts-btn"
+                onClick={agregarLinea}
               >
-                Anular boleta
+                + Agregar línea
+              </button>
+
+              <button
+                type="button"
+                className="ts-btn ts-btn-primary"
+                onClick={guardarLineas}
+              >
+                Guardar líneas
               </button>
             </div>
-          </form>
-        </div>
-      )}
-
-      {estado === "ANULADA" && (
-        <div
-          className="ts-panel"
-          style={{ marginTop: "1rem" }}
-          data-feature="ABC-247"
-        >
-          <div className="ts-panel-title">
-            <div>
-              <h3>Boleta anulada</h3>
-              <p>
-                El documento original permanece visible para consulta.
-              </p>
-            </div>
-            <strong>ANULADA</strong>
-          </div>
-
-          <div className="ts-filters">
-            <div>
-              <strong>Motivo</strong>
-              <p>{boleta.motivoAnulacion ?? "—"}</p>
-            </div>
-
-            <div>
-              <strong>Anulado por</strong>
-              <p>{boleta.anuladoPor ?? "—"}</p>
-            </div>
-
-            <div>
-              <strong>Fecha de anulación</strong>
-              <p>
-                {boleta.fechaAnulacion
-                  ? new Date(
-                      boleta.fechaAnulacion
-                    ).toLocaleString("es-BO")
-                  : "—"}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div
-        className="ts-panel"
-        style={{ marginTop: "1rem" }}
-        data-feature="ABC-247"
-      >
-        <div className="ts-panel-title">
-          <div>
-            <h3>Historial de la boleta</h3>
-            <p>
-              Registro de cambios y acciones realizadas sobre el documento.
-            </p>
-          </div>
-
-          <strong>{historial.length}</strong>
-        </div>
-
-        {historial.length > 0 ? (
-          <div className="ts-table-wrap">
-            <table className="ts-table">
-              <caption>Historial de la boleta</caption>
-
-              <thead>
-                <tr>
-                  <th>Fecha y hora</th>
-                  <th>Acción</th>
-                  <th>Estado anterior</th>
-                  <th>Estado nuevo</th>
-                  <th>Usuario</th>
-                  <th>Motivo</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {historial.map((evento, indice) => (
-                  <tr
-                    key={`${evento.fechaHora ?? "evento"}-${indice}`}
-                  >
-                    <td>
-                      {evento.fechaHora
-                        ? new Date(
-                            evento.fechaHora
-                          ).toLocaleString("es-BO")
-                        : "—"}
-                    </td>
-
-                    <td>{evento.accion ?? "—"}</td>
-                    <td>{evento.estadoAnterior ?? "—"}</td>
-                    <td>{evento.estadoNuevo ?? "—"}</td>
-                    <td>{evento.usuario ?? "—"}</td>
-                    <td>{evento.motivo ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          </>
         ) : (
-          <p className="ts-empty">
-            <strong>Sin movimientos registrados</strong>
-            Todavía no existen eventos de historial para esta boleta.
-          </p>
+          <>
+            {items.length > 0 ? (
+              <div style={{ overflowX: "auto" }}>
+                <table className="ts-table">
+                  <thead>
+                    <tr>
+                      <th>Material</th>
+                      <th>Cantidad</th>
+                      <th>Unidad</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {items.map((item) => (
+                      <tr
+                        key={
+                          item.id ??
+                          `${item.material}-${item.unidad}`
+                        }
+                      >
+                        <td>{item.material}</td>
+                        <td>{item.cantidad}</td>
+                        <td>{item.unidad}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>
+                No hay ítems definitivos registrados en
+                esta boleta.
+              </p>
+            )}
+          </>
         )}
       </div>
-      <div
-        className="ts-panel"
-        style={{ marginTop: "1rem" }}
-      >
-        <div className="ts-panel-title">
+      <div className="ts-panel-title">
           <h3>
             Leyenda de naturaleza documental
           </h3>
