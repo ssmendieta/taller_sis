@@ -216,12 +216,23 @@ export default function BoletaDetallePage() {
       return;
     }
 
+    const nombreUsuario =
+      usuario?.nombreCompleto ||
+      usuario?.nombre ||
+      usuario?.username ||
+      usuario?.usuario ||
+      usuario?.email ||
+      "Usuario autenticado";
+
+    const fechaHora = new Date().toISOString();
     const actualizada = {
       ...boleta,
       origen: cabecera.origen.trim(),
       destino: cabecera.destino.trim(),
       fecha: fechaParaMostrar(cabecera.fecha),
       cantidad: Number(cabecera.cantidad),
+      ultimoCambioFecha: fechaHora,
+      ultimoCambioPor: nombreUsuario,
     };
 
     sessionStorage.setItem(
@@ -639,6 +650,41 @@ export default function BoletaDetallePage() {
             </p>
           )}
         </form>
+        {esBorrador && (
+          <div
+            className="ts-panel"
+            style={{ marginTop: "1rem" }}
+            data-feature="ABC-222"
+          >
+            <div className="ts-panel-title">
+              <h3>Último cambio del borrador</h3>
+            </div>
+
+            <div className="ts-filters">
+              <div>
+                <strong>Fecha y hora</strong>
+                <p>
+                  {boleta.ultimoCambioFecha
+                    ? new Date(
+                        boleta.ultimoCambioFecha
+                      ).toLocaleString("es-BO", {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })
+                    : "Sin cambios registrados"}
+                </p>
+              </div>
+
+              <div>
+                <strong>Autor</strong>
+                <p>
+                  {boleta.ultimoCambioPor ??
+                    "Sin autor registrado"}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div
