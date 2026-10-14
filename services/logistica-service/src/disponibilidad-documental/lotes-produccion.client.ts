@@ -12,6 +12,7 @@ export interface LoteProduccionDto {
   codigo: string;
   ordenId: string;
   ordenCodigo: string;
+  productoId: string;
   cantidad: string;
   fechaHora: string;
 }

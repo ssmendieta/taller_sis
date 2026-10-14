@@ -36,6 +36,7 @@ export class LotesService {
       codigo: lote.codigo,
       ordenId: String(lote.ordenId),
       ordenCodigo: lote.orden.codigo,
+      productoId: String(lote.orden.producto_id),
       cantidad: lote.cantidad,
       fechaHora: lote.fechaHora,
     }));

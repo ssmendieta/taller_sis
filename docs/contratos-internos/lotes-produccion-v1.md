@@ -19,6 +19,7 @@ Devuelve un arreglo, posiblemente vacío:
     "codigo": "L-1",
     "ordenId": "8",
     "ordenCodigo": "ORD-7",
+    "productoId": "3",
     "cantidad": "10.0000",
     "fechaHora": "2026-10-13T00:00:00.000Z"
   }
@@ -39,7 +40,8 @@ que la solicitud local apunta a esa orden, que la respuesta contiene un
 boleta sea un código de lote devuelto para esa orden. Una respuesta incompleta,
 un timeout o un error de Producción aborta la creación.
 
-El contrato actual no expone un identificador de producto dentro de cada lote
-ni la boleta recibe un `productoId` independiente; por eso la comparación de
-producto por ítem queda pendiente de una ampliación contractual y no se acepta
-automáticamente como válida.
+El `productoId` se deriva de la relación real lote → orden → producto. La
+solicitud y la boleta actuales todavía no tienen un `productoId` por ítem; por
+eso se comprueba que la referencia pertenezca a la solicitud y que el lote
+pertenezca a la orden y al producto de la orden. La comparación de producto
+específico por ítem requiere ampliar ese modelo y queda pendiente.

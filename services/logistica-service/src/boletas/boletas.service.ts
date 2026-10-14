@@ -30,10 +30,17 @@ export class BoletasService {
         !orden.producto || typeof orden.producto !== 'object') {
       throw new BadGatewayException('Producción devolvió una relación orden-producto incompleta');
     }
+    const solicitudReferencias = new Set((solicitud.items ?? []).map((item) => item.referencia));
+    if (dto.items.some((item) => !solicitudReferencias.has(item.referencia))) {
+      throw new NotFoundException('Uno o más ítems no pertenecen a la solicitud de salida');
+    }
     const lotes = await this.produccion.consultarPorOrden(orden.codigo, authorization);
     const lotesDeOrden = lotes.filter((lote) => String(lote.ordenId) === String(solicitud.ordenId));
     if (lotesDeOrden.length !== lotes.length) {
       throw new BadGatewayException('Producción devolvió un lote de otra orden');
+    }
+    if (lotesDeOrden.some((lote) => String(lote.productoId) !== String(orden.producto_id))) {
+      throw new BadGatewayException('Producción devolvió un lote de otro producto');
     }
     const referencias = new Set(lotesDeOrden.map((lote) => lote.codigo));
     if (dto.items.some((item) => !referencias.has(item.referencia))) {
