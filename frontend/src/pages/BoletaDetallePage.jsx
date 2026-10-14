@@ -7,7 +7,7 @@ const leyenda = [
   {
     codigo: "TRASLADO",
     descripcion:
-      "Movimiento interno de materiales entre Ã¡reas o ubicaciones.",
+      "Movimiento interno de materiales entre áreas o ubicaciones.",
   },
   {
     codigo: "DESPACHO",
@@ -68,7 +68,7 @@ function fechaParaInput(fecha) {
 
 function fechaParaMostrar(fecha) {
   if (!fecha) {
-    return "â€”";
+    return "—";
   }
 
   const valor = String(fecha);
@@ -122,7 +122,7 @@ export default function BoletaDetallePage() {
           </h2>
 
           <p>
-            No existe informaciÃ³n disponible para la boleta
+            No existe información disponible para la boleta
             solicitada.
           </p>
         </div>
@@ -138,6 +138,10 @@ export default function BoletaDetallePage() {
 
   const items = Array.isArray(boleta.items)
     ? boleta.items
+    : [];
+
+  const historial = Array.isArray(boleta.historial)
+    ? boleta.historial
     : [];
 
   function cambiarCampo(campo, valor) {
@@ -232,6 +236,70 @@ export default function BoletaDetallePage() {
     );
   }
 
+  function emitirBoleta() {
+    setMensaje("");
+
+    if (estado !== "BORRADOR") {
+      setMensaje(
+        "Solo una boleta en BORRADOR puede ser emitida."
+      );
+      return;
+    }
+
+    const confirmar = window.confirm(
+      "¿Está seguro de emitir esta boleta? Una vez emitida, la cabecera no podrá modificarse."
+    );
+
+    if (!confirmar) {
+      setMensaje(
+        "Emisión cancelada. La boleta permanece en BORRADOR."
+      );
+      return;
+    }
+
+    const nombreUsuario =
+      usuario?.nombreCompleto ||
+      usuario?.nombre ||
+      usuario?.username ||
+      usuario?.usuario ||
+      usuario?.email ||
+      "Usuario autenticado";
+
+    const fechaHora = new Date().toISOString();
+
+    const historialActual = Array.isArray(boleta.historial)
+      ? boleta.historial
+      : [];
+
+    const actualizada = {
+      ...boleta,
+      estado: "EMITIDA",
+      fechaEmision: fechaHora,
+      emitidaPor: nombreUsuario,
+      historial: [
+        ...historialActual,
+        {
+          fechaHora,
+          accion: "EMISION",
+          estadoAnterior: "BORRADOR",
+          estadoNuevo: "EMITIDA",
+          usuario: nombreUsuario,
+          motivo: "",
+        },
+      ],
+    };
+
+    sessionStorage.setItem(
+      `boleta-${actualizada.id}`,
+      JSON.stringify(actualizada)
+    );
+
+    setBoleta(actualizada);
+
+    setMensaje(
+      "Boleta emitida correctamente."
+    );
+  }
   function anularBoleta(evento) {
     evento.preventDefault();
     setMensaje("");
@@ -332,7 +400,7 @@ export default function BoletaDetallePage() {
         <div className="ts-panel-title">
           <div>
             <h2 id="boleta-title">
-              Boleta {boleta.numero ?? "â€”"}
+              Boleta {boleta.numero ?? "—"}
             </h2>
 
             <p>Documento de salida</p>
@@ -343,28 +411,28 @@ export default function BoletaDetallePage() {
 
         <div className="ts-filters">
           <div>
-            <strong>NÃºmero</strong>
-            <p>{boleta.numero ?? "â€”"}</p>
+            <strong>Número</strong>
+            <p>{boleta.numero ?? "—"}</p>
           </div>
 
           <div>
             <strong>Responsable</strong>
-            <p>{boleta.responsable ?? "â€”"}</p>
+            <p>{boleta.responsable ?? "—"}</p>
           </div>
 
           <div>
             <strong>Naturaleza documental</strong>
-            <p>{boleta.naturaleza ?? "â€”"}</p>
+            <p>{boleta.naturaleza ?? "—"}</p>
           </div>
 
           <div>
             <strong>Solicitud</strong>
-            <p>{boleta.solicitudId ?? "â€”"}</p>
+            <p>{boleta.solicitudId ?? "—"}</p>
           </div>
 
           <div>
             <strong>Orden</strong>
-            <p>{boleta.orden ?? "â€”"}</p>
+            <p>{boleta.orden ?? "—"}</p>
           </div>
         </div>
       </div>
@@ -412,7 +480,7 @@ export default function BoletaDetallePage() {
                 }
                 disabled={!esBorrador}
                 style={estiloCampo("origen")}
-                placeholder="Ej. AlmacÃ©n A"
+                placeholder="Ej. Almacén A"
               />
 
               {errores.origen && (
@@ -449,7 +517,7 @@ export default function BoletaDetallePage() {
                 }
                 disabled={!esBorrador}
                 style={estiloCampo("destino")}
-                placeholder="Ej. Ãrea de ProducciÃ³n"
+                placeholder="Ej. Área de Producción"
               />
 
               {errores.destino && (
@@ -550,6 +618,15 @@ export default function BoletaDetallePage() {
               >
                 Guardar cabecera
               </button>
+
+              <button
+                type="button"
+                className="ts-btn ts-btn-primary"
+                onClick={emitirBoleta}
+                data-feature="ABC-234"
+              >
+                Emitir boleta
+              </button>
             </div>
           ) : (
             <p
@@ -557,7 +634,7 @@ export default function BoletaDetallePage() {
               role="status"
               style={{ marginTop: "1rem" }}
             >
-              Esta boleta estÃ¡ emitida y la cabecera
+              Esta boleta está emitida y la cabecera
               se muestra en modo consulta.
             </p>
           )}
@@ -569,7 +646,7 @@ export default function BoletaDetallePage() {
         style={{ marginTop: "1rem" }}
       >
         <div className="ts-panel-title">
-          <h3>Ãtems definitivos</h3>
+          <h3>Ítems definitivos</h3>
         </div>
 
         {items.length > 0 ? (
@@ -598,7 +675,7 @@ export default function BoletaDetallePage() {
           </div>
         ) : (
           <p>
-            No hay Ã­tems definitivos registrados en
+            No hay ítems definitivos registrados en
             esta boleta.
           </p>
         )}
