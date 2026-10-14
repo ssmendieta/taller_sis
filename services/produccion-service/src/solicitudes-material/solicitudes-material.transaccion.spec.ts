@@ -7,6 +7,9 @@ import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710
 import { SolicitudesMaterial1710000000012 } from '../database/migrations/1710000000012-SolicitudesMaterial';
 import { EventosOutbox1710000000017 } from '../database/migrations/1710000000017-EventosOutbox';
 import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
+import { OutboxPublicadorService } from '../integraciones/outbox/outbox-publicador.service';
+import { TypeOrmOutboxStore } from '../integraciones/outbox/typeorm-outbox.store';
+import { PubSubPublisherService } from '../integraciones/pubsub/pubsub-publisher.service';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
@@ -104,6 +107,46 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
     await expect(service.create(dto, 42)).rejects.toMatchObject({ status: 409 });
     await source.getRepository(SolicitudMaterial).update(solicitud.id, { estado: 'CANCELADA' });
     await expect(service.create(dto, 42)).resolves.toMatchObject({ estado: 'PENDIENTE' });
+  });
+
+  it('conserva solicitud y outbox pendientes cuando Pub/Sub falla', async () => {
+    const solicitud = await service.create(dto, 42);
+    const publishMessage = jest.fn().mockRejectedValue(new Error('Pub/Sub no disponible'));
+    const publisher = new PubSubPublisherService(
+      { enabled: true, projectId: 'proyecto', topicId: 'solicitudes' },
+      { topic: () => ({ publishMessage }) } as any,
+    );
+    const publicadorOutbox = new OutboxPublicadorService(
+      new TypeOrmOutboxStore(source),
+      publisher,
+      {
+        enabled: false,
+        batchSize: 10,
+        pollIntervalMs: 5000,
+        leaseMs: 30000,
+        retryBaseMs: 1000,
+        retryMaxMs: 60000,
+      },
+    );
+
+    await expect(publicadorOutbox.procesarPendientes()).resolves.toEqual({
+      reclamados: 1,
+      publicados: 0,
+      fallidos: 1,
+    });
+    await expect(service.findOne(solicitud.id)).resolves.toMatchObject({
+      id: solicitud.id,
+      estado: 'PENDIENTE',
+    });
+    await expect(source.getRepository(EventoOutbox).findOneByOrFail({
+      aggregateType: 'SolicitudMaterial',
+      aggregateId: solicitud.id,
+    })).resolves.toMatchObject({
+      estado: 'PENDIENTE',
+      intentos: 1,
+      messageId: null,
+      ultimoError: 'Pub/Sub no disponible',
+    });
   });
 
   it('revierte cabecera y primer item cuando PostgreSQL rechaza otro item', async () => {
