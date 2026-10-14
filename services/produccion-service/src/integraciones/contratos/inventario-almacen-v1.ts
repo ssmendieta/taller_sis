@@ -1,4 +1,4 @@
-import { PubSubEvent } from '../pubsub/pubsub.types';
+import type { PubSubEvent } from '../pubsub/pubsub.types';
 
 export const DISPONIBILIDAD_MATERIAL_SOLICITADA_V1 =
   'DisponibilidadMaterialSolicitada.v1' as const;

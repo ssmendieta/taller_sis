@@ -180,6 +180,63 @@ en la base de datos; este documento no modifica su transacción ni el stock.
   con contenido diferente es un error de integridad.
 - Una `solicitudVersion` anterior no debe retroceder el estado vigente.
 
+## Validación ejecutable del contrato (ABC-241)
+
+El archivo
+[`inventario-almacen-v1.validator.ts`](../../services/produccion-service/src/integraciones/contratos/inventario-almacen-v1.validator.ts)
+valida datos recibidos como `unknown` antes de tratarlos como eventos del
+contrato. No normaliza ni corrige silenciosamente valores externos.
+
+Reglas comunes a ambos eventos:
+
+- `eventType` debe coincidir exactamente con uno de los dos nombres v1; un
+  sufijo `.v2` no se acepta como v1.
+- `eventId` y `correlationId` deben ser UUID; `occurredAt` debe ser ISO 8601 e
+  incluir zona horaria.
+- El evento de solicitud debe usar `source: produccion-service`; la respuesta,
+  `source: almacen-service`.
+- `solicitudVersion` es un entero positivo de negocio. No es la versión v1 del
+  contrato: la respuesta puede avanzar de versión 1 a 2 sin dejar de ser un
+  evento `.v1`.
+
+La solicitud exige al menos un ítem, IDs positivos, materiales no repetidos,
+cantidad decimal positiva con hasta cuatro decimales y una unidad exacta del
+catálogo local. No se aceptan alias como `kilos`. La respuesta no lleva ítems,
+cantidades ni unidades; valida `requestEventId`, IDs, estados y fecha de
+actualización. Al relacionar ambos mensajes también deben coincidir
+`correlationId`, `requestEventId`, `solicitudId` y `ordenId`, y la versión de la
+respuesta debe avanzar.
+
+Un rechazo produce un diagnóstico estructurado sin incluir el payload completo:
+
+```json
+{
+  "codigo": "EVENTO_INVENTARIO_V1_INVALIDO",
+  "eventType": "SolicitudMaterialAlmacen.v1",
+  "eventId": "de5d85ad-f8c5-4731-a75d-d8bd25ea2bf6",
+  "errores": [
+    {
+      "campo": "data.items[0].unidad",
+      "motivo": "debe pertenecer al catalogo de unidades"
+    }
+  ]
+}
+```
+
+El publicador ejecuta esta validación para los eventos conocidos antes de llamar
+a Google Pub/Sub. Por ello, un evento de solicitud inválido queda diagnosticado
+y no se publica. El mismo validador de respuesta debe ser la primera operación
+del consumidor de ABC-244, antes de abrir la transacción que actualice la
+solicitud.
+
+### Evidencia de transporte pendiente
+
+El repositorio aún no contiene una suscripción de Producción para respuestas ni
+el simulador de Inventarios de ABC-243. La comprobación real
+`publish -> consume`, con `eventId` y `messageId`, requiere esos recursos y las
+credenciales del entorno. No se inventa un nombre de suscripción ni se presenta
+una prueba unitaria como evidencia de recepción real.
+
 Estas son reglas del contrato previo, no capacidades de recepción implementadas
 por esta subtarea. Las próximas tareas deben resolver el origen de
 `fechaNecesaria`, la conservación de versiones y metadatos, y el transporte de

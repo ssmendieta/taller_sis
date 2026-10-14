@@ -1,11 +1,18 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PubSub } from '@google-cloud/pubsub';
+import {
+  esTipoEventoSolicitudMaterialInventarioV1,
+  EventoInventarioV1InvalidoError,
+  validarEventoSolicitudMaterialInventarioV1,
+} from '../contratos/inventario-almacen-v1.validator';
 import { PUBSUB_CLIENT } from './pubsub-client.provider';
 import { PUBSUB_CONFIG, PubSubConfig } from './pubsub.config';
 import { PubSubEvent, PubSubPublicationResult } from './pubsub.types';
 
 @Injectable()
 export class PubSubPublisherService {
+  private readonly logger = new Logger(PubSubPublisherService.name);
+
   constructor(
     @Inject(PUBSUB_CONFIG) private readonly config: PubSubConfig,
     @Inject(PUBSUB_CLIENT) private readonly client: PubSub | null,
@@ -17,6 +24,7 @@ export class PubSubPublisherService {
     }
 
     this.validateEvent(event);
+    this.validateKnownContract(event);
 
     const messageId = await this.client
       .topic(this.config.topicId)
@@ -52,6 +60,19 @@ export class PubSubPublisherService {
       if (typeof value !== 'string' || !value.trim()) {
         throw new Error(`El mensaje Pub/Sub requiere ${field}`);
       }
+    }
+  }
+
+  private validateKnownContract(event: PubSubEvent<unknown>): void {
+    if (!esTipoEventoSolicitudMaterialInventarioV1(event.eventType)) return;
+
+    try {
+      validarEventoSolicitudMaterialInventarioV1(event);
+    } catch (error) {
+      if (error instanceof EventoInventarioV1InvalidoError) {
+        this.logger.warn(JSON.stringify(error.diagnostico()));
+      }
+      throw error;
     }
   }
 }
