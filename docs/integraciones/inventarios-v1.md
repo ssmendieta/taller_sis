@@ -3,8 +3,9 @@
 Este documento reutiliza el contrato de solicitudes de ABC-277, definido en
 [`inventario-almacen-v1.ts`](../../services/produccion-service/src/integraciones/contratos/inventario-almacen-v1.ts)
 y [documentado previamente](inventario-almacen-v1.md). Describe los mensajes a
-partir de las solicitudes persistidas de ABC-73. No conecta esas solicitudes al
-publicador ni implementa outbox, simulador, suscripción o consumidor.
+partir de las solicitudes persistidas de ABC-73. ABC-242 conecta las solicitudes
+al publicador mediante outbox; el simulador, la suscripción y el consumidor de
+respuestas permanecen fuera de este alcance.
 
 ## Nombres acordados y diferencias con el plan
 
@@ -159,15 +160,15 @@ necesitaría un acuerdo adicional y adaptación del tipo existente.
 | `items[].materialId`, `cantidad`, `unidad` | Registros persistidos de `SolicitudMaterialItem`. |
 | `items[].materialCodigo`, `materialNombre` | Material relacionado con cada ítem. |
 | Estado inicial | ABC-73 crea la solicitud como `PENDIENTE`; no se añade un campo de estado al mensaje de solicitud. |
-| `fechaNecesaria` | Obligatoria en el contrato previo, pero no está en `SolicitudMaterial` ni en su DTO. La implementación futura debe acordar su origen; no se confunde con `SolicitudMaterial.fecha`, que es la fecha de registro. |
-| `solicitudVersion` | Versión de negocio del contrato, distinta de `.v1`; no hay columna local de versión. El ejemplo usa 1 al solicitar y 2 al responder. |
-| `eventId`, `correlationId`, `occurredAt` | Metadatos del evento, sin columnas de persistencia en ABC-73; su generación y conservación corresponden a las siguientes subtareas. |
+| `fechaNecesaria` | ABC-242 usa `OrdenProduccion.fecha_programada`; no se confunde con `SolicitudMaterial.fecha`, que es la fecha de registro. |
+| `solicitudVersion` | Versión de negocio del contrato, distinta de `.v1`; el evento inicial usa 1 y la guarda dentro del payload inmutable de outbox. |
+| `eventId`, `correlationId`, `occurredAt` | ABC-242 los genera y conserva en `eventos_outbox`; cada reintento reutiliza los mismos valores. |
 
 Fuentes: [solicitud](../../services/produccion-service/src/solicitudes-material/entities/solicitud-material.entity.ts),
 [ítems](../../services/produccion-service/src/solicitudes-material/entities/solicitud-material-item.entity.ts)
 y [servicio de solicitudes](../../services/produccion-service/src/solicitudes-material/solicitudes-material.service.ts).
-Una publicación futura debe usar la solicitud y todos sus ítems ya confirmados
-en la base de datos; este documento no modifica su transacción ni el stock.
+La solicitud, sus ítems y el evento pendiente se guardan en una transacción. La
+publicación ocurre después del commit y no modifica el stock.
 
 ## Correlación e idempotencia para las siguientes subtareas
 
@@ -237,10 +238,9 @@ el simulador de Inventarios de ABC-243. La comprobación real
 credenciales del entorno. No se inventa un nombre de suscripción ni se presenta
 una prueba unitaria como evidencia de recepción real.
 
-Estas son reglas del contrato previo, no capacidades de recepción implementadas
-por esta subtarea. Las próximas tareas deben resolver el origen de
-`fechaNecesaria`, la conservación de versiones y metadatos, y el transporte de
-respuesta con sus suscripciones antes de integrar ambos sistemas.
+Estas son reglas del contrato y del envío durable; no son capacidades de
+recepción. Las próximas tareas deben implementar el simulador, el inbox y el
+transporte de respuesta con sus suscripciones.
 
 El [diagrama del flujo](../diagramas/inventarios-v1.md) distingue la
 infraestructura existente de los pasos pendientes.

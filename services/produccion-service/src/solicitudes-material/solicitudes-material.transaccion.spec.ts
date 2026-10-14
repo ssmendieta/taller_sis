@@ -5,6 +5,8 @@ import { AppDataSource } from '../database/data-source';
 import { ProduccionSchema1710000000002 } from '../database/migrations/1710000000002-ProduccionSchema';
 import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710000000007-OrdenesCodigoSecuencia';
 import { SolicitudesMaterial1710000000012 } from '../database/migrations/1710000000012-SolicitudesMaterial';
+import { EventosOutbox1710000000017 } from '../database/migrations/1710000000017-EventosOutbox';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
@@ -22,7 +24,7 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
 
   beforeAll(async () => {
     source = new DataSource({ ...(AppDataSource.options as PostgresConnectionOptions), schema, migrations: [],
-      entities: [SolicitudMaterial, SolicitudMaterialItem, OrdenProduccion, Material] });
+      entities: [SolicitudMaterial, SolicitudMaterialItem, OrdenProduccion, Material, EventoOutbox] });
     await source.initialize();
     const runner = source.createQueryRunner();
     await runner.startTransaction();
@@ -32,6 +34,7 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
       await new ProduccionSchema1710000000002().up(runner);
       await new OrdenesCodigoSecuencia1710000000007().up(runner);
       await new SolicitudesMaterial1710000000012().up(runner);
+      await new EventosOutbox1710000000017().up(runner);
       await runner.query("INSERT INTO materiales (codigo,nombre,unidad_medida) VALUES ('M1','Material 1','kg'), ('M2','Material 2','kg')");
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.query("INSERT INTO ordenes_produccion (codigo,receta_id,cantidad_solicitada,fecha_programada,responsable_usuario_id) VALUES ('O1',1,1,CURRENT_DATE,42)");
@@ -47,7 +50,7 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
   }, 30000);
 
   beforeEach(async () => {
-    await source.query(`TRUNCATE "${schema}".solicitud_material_items, "${schema}".solicitudes_material RESTART IDENTITY`);
+    await source.query(`TRUNCATE "${schema}".eventos_outbox, "${schema}".solicitud_material_items, "${schema}".solicitudes_material RESTART IDENTITY`);
   });
 
   afterAll(async () => {
@@ -68,6 +71,22 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
     expect(detalle.items).toHaveLength(2);
     expect(detalle.items.map((item) => item.material.codigo).sort()).toEqual(['M1', 'M2']);
     expect(await service.findAll()).toHaveLength(1);
+    const outbox = await source.getRepository(EventoOutbox).findOneByOrFail({
+      aggregateType: 'SolicitudMaterial',
+      aggregateId: solicitud.id,
+    });
+    expect(outbox.estado).toBe('PENDIENTE');
+    expect(outbox.payload).toMatchObject({
+      eventId: outbox.eventId,
+      correlationId: outbox.correlationId,
+      eventType: 'SolicitudMaterialAlmacen.v1',
+      data: {
+        solicitudId: solicitud.id,
+        solicitudVersion: 1,
+        ordenCodigo: 'O1',
+        fechaNecesaria: expect.any(String),
+      },
+    });
   });
 
   it('rechaza duplicados simultaneos con 409 y solo guarda una solicitud', async () => {
@@ -94,8 +113,21 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
       await expect(service.create({ ...dto, items: [...dto.items, { materialId: 2, cantidad: 7, unidad: 'kg' }] }, 42)).rejects.toMatchObject({ code: '23514' });
       expect(await source.getRepository(SolicitudMaterial).count()).toBe(0);
       expect(await source.getRepository(SolicitudMaterialItem).count()).toBe(0);
+      expect(await source.getRepository(EventoOutbox).count()).toBe(0);
     } finally {
       await source.query(`ALTER TABLE "${schema}".solicitud_material_items DROP CONSTRAINT fallo_prueba`);
+    }
+  });
+
+  it('revierte solicitud e items cuando PostgreSQL rechaza el evento outbox', async () => {
+    await source.query(`ALTER TABLE "${schema}".eventos_outbox ADD CONSTRAINT fallo_outbox_prueba CHECK (event_type <> 'SolicitudMaterialAlmacen.v1')`);
+    try {
+      await expect(service.create(dto, 42)).rejects.toMatchObject({ code: '23514' });
+      expect(await source.getRepository(SolicitudMaterial).count()).toBe(0);
+      expect(await source.getRepository(SolicitudMaterialItem).count()).toBe(0);
+      expect(await source.getRepository(EventoOutbox).count()).toBe(0);
+    } finally {
+      await source.query(`ALTER TABLE "${schema}".eventos_outbox DROP CONSTRAINT fallo_outbox_prueba`);
     }
   });
 });
