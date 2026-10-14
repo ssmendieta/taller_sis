@@ -29,7 +29,7 @@ function InicioRedirect() {
   return (
     <section className="ts-page" aria-labelledby="sin-funciones">
       <h1 id="sin-funciones">Sin funciones asignadas</h1>
-      <p>Tu rol aÃºn no tiene funciones. Contacta al administrador.</p>
+      <p>Tu rol aún no tiene funciones. Contacta al administrador.</p>
     </section>
   );
 }
@@ -39,8 +39,8 @@ function NoEncontrada() {
   return (
     <main className="login-page">
       <div className="ts-public" role="alert">
-        <h1>PÃ¡gina no encontrada</h1>
-        <p>La direcciÃ³n no existe o fue movida.</p>
+        <h1>Página no encontrada</h1>
+        <p>La dirección no existe o fue movida.</p>
         <Link className="ts-btn ts-btn-primary" to={usuario ? "/" : "/login"}>Volver</Link>
       </div>
     </main>
@@ -50,9 +50,9 @@ function NoEncontrada() {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* PÃºblica: sin barra lateral ni cabecera del sistema */}
+      {/* Pública: sin barra lateral ni cabecera del sistema */}
       <Route path="/login" element={<LoginPage />} />
-      {/* Autenticadas: solo aquÃ­ se monta el layout con barra lateral */}
+      {/* Autenticadas: solo aquí se monta el layout con barra lateral */}
       <Route element={<MainLayout><Outlet /></MainLayout>}>
         <Route path="/" element={<InicioRedirect />} />
         <Route path="/ordenes" element={privada(<OrdenesPage />, ["ordenes.consultar"])} />
@@ -92,7 +92,7 @@ export default function AppRoutes() {
         <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
 
       </Route>
-      {/* 404 pÃºblico: tampoco monta el layout */}
+      {/* 404 público: tampoco monta el layout */}
       <Route path="*" element={<NoEncontrada />} />
     </Routes>
   );
