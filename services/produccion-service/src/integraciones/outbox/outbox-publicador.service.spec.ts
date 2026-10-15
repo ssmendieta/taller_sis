@@ -98,6 +98,50 @@ function eventoPendiente(): EventoOutbox {
 }
 
 describe('ABC-242: publicación durable desde outbox', () => {
+  beforeEach(() => {
+    jest.useFakeTimers({ now: new Date('2026-10-11T18:15:00.000Z') });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('espera desde el fallo aunque la publicación tarde más que el backoff', async () => {
+    const evento = eventoPendiente();
+    const store = new OutboxEnMemoria([evento]);
+    const publishMessage = jest.fn()
+      .mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 15000));
+        throw new Error('Pub/Sub no disponible');
+      })
+      .mockResolvedValueOnce('mensaje-recuperado');
+    const publisher = new PubSubPublisherService(
+      { enabled: true, projectId: 'proyecto', topicId: 'solicitudes' },
+      { topic: () => ({ publishMessage }) } as any,
+    );
+    const service = new OutboxPublicadorService(store, publisher, {
+      enabled: false,
+      batchSize: 10,
+      pollIntervalMs: 5000,
+      leaseMs: 30000,
+      retryBaseMs: 5000,
+      retryMaxMs: 60000,
+    });
+
+    const ciclo = service.procesarPendientes();
+    await jest.advanceTimersByTimeAsync(15000);
+    await expect(ciclo).resolves.toMatchObject({ fallidos: 1 });
+    expect(evento.proximoIntentoEn).toEqual(new Date('2026-10-11T18:15:20.000Z'));
+
+    await jest.advanceTimersByTimeAsync(4999);
+    await expect(service.procesarPendientes()).resolves.toMatchObject({ reclamados: 0 });
+    expect(publishMessage).toHaveBeenCalledTimes(1);
+
+    await jest.advanceTimersByTimeAsync(1);
+    await expect(service.procesarPendientes()).resolves.toMatchObject({ publicados: 1 });
+    expect(publishMessage).toHaveBeenCalledTimes(2);
+  });
+
   it('guarda el messageId solo después de que Pub/Sub confirma', async () => {
     const evento = eventoPendiente();
     const store = new OutboxEnMemoria([evento]);

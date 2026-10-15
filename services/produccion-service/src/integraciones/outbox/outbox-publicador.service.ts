@@ -69,7 +69,7 @@ export class OutboxPublicadorService implements OnModuleInit, OnModuleDestroy {
         await this.store.marcarFallo(
           evento,
           mensaje,
-          new Date(ahora.getTime() + espera),
+          new Date(Date.now() + espera),
         );
         resultado.fallidos += 1;
         this.logger.warn(JSON.stringify({

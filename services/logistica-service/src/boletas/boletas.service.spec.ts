@@ -13,9 +13,9 @@ describe('ABC-213/214: creación de boletas con validación documental', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    solicitudes.findOne.mockResolvedValue({ id: '7', ordenId: '8', items: [] });
+    solicitudes.findOne.mockResolvedValue({ id: '7', ordenId: '8', items: [{ referencia: 'L-1' }] });
     produccion.consultarOrdenPorId.mockResolvedValue({ id: '8', codigo: 'ORD-7', producto_id: 3, producto: { codigo: 'P-3' } });
-    produccion.consultarPorOrden.mockResolvedValue([{ id: '4', codigo: 'L-1', ordenId: '8', cantidad: '10.0000' }]);
+    produccion.consultarPorOrden.mockResolvedValue([{ id: '4', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' }]);
   });
 
   function service() { return new BoletasService(repository, solicitudes, dataSource, produccion); }
@@ -31,6 +31,13 @@ describe('ABC-213/214: creación de boletas con validación documental', () => {
   it('rechaza una referencia que Producción no devolvió para la orden', async () => {
     await expect(service().create({ solicitudSalidaId: '7', items: [{ referencia: 'L-INVENTADO', cantidad: '1.0000' }] }, '42', 'Bearer token'))
       .rejects.toBeInstanceOf(NotFoundException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un lote cuyo producto no coincide con la orden', async () => {
+    produccion.consultarPorOrden.mockResolvedValueOnce([{ id: '4', codigo: 'L-1', ordenId: '8', productoId: '99', cantidad: '10.0000' }]);
+    await expect(service().create({ solicitudSalidaId: '7', items: [{ referencia: 'L-1', cantidad: '1.0000' }] }, '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(BadGatewayException);
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 
