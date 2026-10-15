@@ -17,6 +17,14 @@ import {
   obtenerTotalesConsumos,
   registrarConsumo,
 } from "../services/consumosService.js";
+import {
+  MAX_CAUSA_DEFECTO,
+  TIPO_CONFORME,
+  TIPO_DEFECTUOSO,
+  listarResultadosCalidad,
+  registrarDefecto,
+  resumenCalidad,
+} from "../services/calidadService.js";
 import { obtenerRecetas } from "../services/recetasService.js";
 import { tienePermiso } from "../services/permisos.js";
 import { accionesPara, puedeRegistrarAvance, puedeVerAcciones } from "../utils/ordenes.js";
@@ -52,6 +60,16 @@ function cantidadTotalDeConsumo(resumen) {
   return Number(resumen?.cantidadTotal ?? resumen?.cantidad_total ?? 0);
 }
 
+// La API solo devuelve el id del responsable; si es quien consulta se muestra su nombre.
+function responsableDeResultado(resultado, usuario) {
+  const id = resultado.responsableUsuarioId ?? resultado.responsable_usuario_id;
+  if (id == null) return "—";
+  if (usuario?.id != null && String(usuario.id) === String(id)) {
+    return usuario.nombre_completo ?? usuario.nombre ?? `Usuario ${id}`;
+  }
+  return `Usuario ${id}`;
+}
+
 export default function OrdenDetallePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -85,9 +103,39 @@ export default function OrdenDetallePage() {
   const [errorConsumo, setErrorConsumo] = useState("");
   const [avisoConsumo, setAvisoConsumo] = useState("");
 
+  // ABC-83: unidades defectuosas con causa, separadas de las conformes.
+  const [conformesCalidad, setConformesCalidad] = useState([]);
+  const [defectosCalidad, setDefectosCalidad] = useState([]);
+  const [errorCargaCalidad, setErrorCargaCalidad] = useState("");
+  const [cantidadDefecto, setCantidadDefecto] = useState("");
+  const [causaDefecto, setCausaDefecto] = useState("");
+  const [guardandoDefecto, setGuardandoDefecto] = useState(false);
+  const [errorDefecto, setErrorDefecto] = useState("");
+  const [avisoDefecto, setAvisoDefecto] = useState("");
+
   const muestraAcciones = puedeVerAcciones(usuario);
   const permiteAvance = puedeRegistrarAvance(usuario);
   const permiteConsumo = tienePermiso(usuario, "materiales.registrar_consumo");
+  const permiteDefecto = tienePermiso(usuario, "calidad.registrar_conformes");
+
+  async function cargarCalidad() {
+    try {
+      const [conformes, defectuosos] = await Promise.all([
+        listarResultadosCalidad(id, TIPO_CONFORME),
+        listarResultadosCalidad(id, TIPO_DEFECTUOSO),
+      ]);
+
+      setConformesCalidad(Array.isArray(conformes) ? conformes : []);
+      setDefectosCalidad(Array.isArray(defectuosos) ? defectuosos : []);
+      setErrorCargaCalidad("");
+    } catch (fallo) {
+      setConformesCalidad([]);
+      setDefectosCalidad([]);
+      setErrorCargaCalidad(
+        fallo.message || "No se pudieron cargar los resultados de calidad.",
+      );
+    }
+  }
 
   async function cargar() {
     setCargando(true);
@@ -137,6 +185,8 @@ export default function OrdenDetallePage() {
         setConsumos([]);
         setTotalesConsumo([]);
       }
+
+      await cargarCalidad();
 
       // Estado de la receta para explicar el bloqueo de Inicio.
       const recetaId =
@@ -213,6 +263,11 @@ export default function OrdenDetallePage() {
   const acciones = useMemo(
     () => (orden ? accionesPara(usuario, orden.estado) : []),
     [orden, usuario],
+  );
+
+  const calidad = useMemo(
+    () => resumenCalidad(total, conformesCalidad, defectosCalidad),
+    [total, conformesCalidad, defectosCalidad],
   );
 
   async function confirmarAccion(evento) {
@@ -347,6 +402,60 @@ export default function OrdenDetallePage() {
       );
     } finally {
       setGuardandoConsumo(false);
+    }
+  }
+
+  async function guardarDefecto(evento) {
+    evento.preventDefault();
+
+    if (guardandoDefecto) return;
+
+    setErrorDefecto("");
+    setAvisoDefecto("");
+
+    const cantidad = Number(cantidadDefecto);
+    const causa = causaDefecto.trim();
+
+    if (!cantidadDefecto || !Number.isFinite(cantidad) || cantidad <= 0) {
+      setErrorDefecto("La cantidad defectuosa debe ser mayor a cero.");
+      return;
+    }
+
+    if (Number(cantidad.toFixed(4)) !== cantidad) {
+      setErrorDefecto("La cantidad admite como máximo 4 decimales.");
+      return;
+    }
+
+    if (!causa) {
+      setErrorDefecto("Indica la causa del defecto.");
+      return;
+    }
+
+    if (cantidad > calidad.porClasificar) {
+      setErrorDefecto(
+        `Conformes y defectuosas no pueden superar lo producido. Quedan ${formatearCantidad(calidad.porClasificar, unidad)} por clasificar.`,
+      );
+      return;
+    }
+
+    setGuardandoDefecto(true);
+
+    try {
+      await registrarDefecto({
+        ordenId: Number(id),
+        cantidad,
+        causaDefecto: causa,
+      });
+
+      setCantidadDefecto("");
+      setCausaDefecto("");
+      setAvisoDefecto("Defecto registrado correctamente.");
+    } catch (fallo) {
+      setErrorDefecto(fallo.message || "No se pudo registrar el defecto.");
+    } finally {
+      // Con éxito o rechazo, el resumen refleja lo que guarda la API.
+      await cargarCalidad();
+      setGuardandoDefecto(false);
     }
   }
 
@@ -857,6 +966,171 @@ export default function OrdenDetallePage() {
               </table>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* ABC-83: conformes y defectuosas se muestran por separado. */}
+      <div className="ts-panel" style={{ marginBottom: 16 }}>
+        <div className="ts-panel-title">
+          <h2>Calidad del producto terminado</h2>
+          <span>{defectosCalidad.length} registros de defectos</span>
+        </div>
+
+        {errorCargaCalidad && (
+          <p className="ts-modal-error" role="alert" style={{ padding: "0 20px" }}>
+            {errorCargaCalidad}
+          </p>
+        )}
+
+        <div className="ts-table-wrap">
+          <table className="ts-table">
+            <caption>Resumen de unidades producidas, conformes y defectuosas</caption>
+            <thead>
+              <tr>
+                <th scope="col">Producidas</th>
+                <th scope="col">Conformes</th>
+                <th scope="col">Defectuosas</th>
+                <th scope="col">Por clasificar</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>{formatearCantidad(calidad.producido, unidad)}</td>
+                <td>{formatearCantidad(calidad.conformes, unidad)}</td>
+                <td>{formatearCantidad(calidad.defectuosos, unidad)}</td>
+                <td>{formatearCantidad(calidad.porClasificar, unidad)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {permiteDefecto ? (
+          <form
+            onSubmit={guardarDefecto}
+            noValidate
+            style={{ padding: "12px 20px 16px" }}
+          >
+            <label
+              htmlFor="cantidad-defecto"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                maxWidth: 320,
+                marginBottom: 12,
+              }}
+            >
+              Cantidad defectuosa{unidad ? ` (en ${unidad})` : ""}
+              <input
+                id="cantidad-defecto"
+                type="number"
+                min="0.0001"
+                max="9999999999.9999"
+                step="0.0001"
+                value={cantidadDefecto}
+                onChange={(e) => setCantidadDefecto(e.target.value)}
+                required
+                disabled={guardandoDefecto}
+                style={{
+                  minHeight: 36,
+                  padding: "7px 10px",
+                  border: "1px solid #e0e0e2",
+                  borderRadius: 5,
+                }}
+              />
+            </label>
+
+            <label
+              htmlFor="causa-defecto"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                maxWidth: 520,
+              }}
+            >
+              Causa del defecto *
+              <input
+                id="causa-defecto"
+                type="text"
+                maxLength={MAX_CAUSA_DEFECTO}
+                placeholder="Ej.: rotura, sellado incompleto"
+                value={causaDefecto}
+                onChange={(e) => setCausaDefecto(e.target.value)}
+                required
+                disabled={guardandoDefecto}
+                style={{
+                  minHeight: 36,
+                  padding: "7px 10px",
+                  border: "1px solid #e0e0e2",
+                  borderRadius: 5,
+                }}
+              />
+            </label>
+
+            {errorDefecto && (
+              <p className="ts-modal-error" role="alert">
+                {errorDefecto}
+              </p>
+            )}
+
+            {avisoDefecto && (
+              <p className="ts-success" role="status">
+                {avisoDefecto}
+              </p>
+            )}
+
+            <div className="ts-btn-group" style={{ marginTop: 12 }}>
+              <button
+                type="submit"
+                className="ts-btn ts-btn-primary"
+                disabled={guardandoDefecto}
+              >
+                {guardandoDefecto ? "Registrando…" : "Registrar defecto"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p className="ts-empty">No tienes permiso para registrar defectos.</p>
+        )}
+
+        <div className="ts-table-wrap">
+          <table className="ts-table">
+            <caption>Historial de unidades defectuosas y sus causas</caption>
+            <thead>
+              <tr>
+                <th scope="col">Producto</th>
+                <th scope="col">Cantidad</th>
+                <th scope="col">Causa</th>
+                <th scope="col">Responsable</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Hora</th>
+              </tr>
+            </thead>
+            <tbody>
+              {defectosCalidad.map((d, i) => {
+                const { fecha, hora } = mostrarFechaHora(
+                  d.fechaHora ?? d.fecha_hora,
+                );
+
+                return (
+                  <tr key={d.id ?? i}>
+                    <td>{nombreProductoOrden(orden)}</td>
+                    <td>{formatearCantidad(d.cantidad, unidad)}</td>
+                    <td>{d.causaDefecto ?? d.causa_defecto ?? "—"}</td>
+                    <td>{responsableDeResultado(d, usuario)}</td>
+                    <td>{fecha}</td>
+                    <td>{hora}</td>
+                  </tr>
+                );
+              })}
+              {defectosCalidad.length === 0 && (
+                <tr>
+                  <td colSpan={6}>Todavía no hay unidades defectuosas registradas.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
