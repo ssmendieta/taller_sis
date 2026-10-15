@@ -2,6 +2,7 @@ import { INestApplication, ServiceUnavailableException, ValidationPipe } from '@
 import { Test } from '@nestjs/testing';
 import { OrdenesController } from './ordenes.controller';
 import { OrdenesService } from './ordenes.service';
+import { MaterialCalculationService } from '../material-calculation/material-calculation.service';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { Repository } from 'typeorm';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
@@ -15,7 +16,10 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
   beforeAll(async () => {
     const modulo = await Test.createTestingModule({
       controllers: [OrdenesController],
-      providers: [{ provide: OrdenesService, useValue: { create: crear } }],
+      providers: [
+        { provide: OrdenesService, useValue: { create: crear } },
+        { provide: MaterialCalculationService, useValue: {} },
+      ],
     })
       .overrideGuard(PermisoProduccionGuard)
       .useValue({ canActivate: () => true })

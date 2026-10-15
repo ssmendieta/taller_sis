@@ -3,8 +3,9 @@
 ## Objetivo actual
 
 `produccion-service` publica mensajes en un único topic compartido de Google
-Cloud Pub/Sub. Esta etapa no crea topics ni suscripciones, no consume mensajes y
-no se comunica todavía con Inventarios o Contabilidad.
+Cloud Pub/Sub. Esta etapa no crea topics ni suscripciones y no consume mensajes.
+Los contratos de Contabilidad e Inventario/Almacén comparten este topic y se
+diferencian mediante el atributo `eventType`.
 
 ```text
 produccion-service -- publish --> projects/{projectId}/topics/{topicId}
@@ -19,6 +20,11 @@ produccion-service -- publish --> projects/{projectId}/topics/{topicId}
 | `PUBSUB_TOPIC_ID` | ID corto o nombre completo del topic existente. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Ruta que usa Application Default Credentials. |
 | `GCP_CREDENTIALS_HOST_PATH` | Ruta del JSON en el host para el montaje de Docker. |
+| `OUTBOX_BATCH_SIZE` | Máximo de eventos reclamados por ciclo. |
+| `OUTBOX_POLL_INTERVAL_MS` | Intervalo entre ciclos de publicación. |
+| `OUTBOX_LEASE_MS` | Tiempo reservado a un worker antes de permitir recuperación. |
+| `OUTBOX_RETRY_BASE_MS` | Espera inicial para reintentar una publicación fallida. |
+| `OUTBOX_RETRY_MAX_MS` | Tope de la espera exponencial entre reintentos. |
 
 El archivo JSON debe permanecer fuera del repositorio. No se deben copiar
 `private_key`, `private_key_id` ni el contenido del archivo a `.env.example`, a
@@ -71,5 +77,8 @@ después de aceptar la publicación.
 - No se crean ni administran topics.
 - No se crean suscripciones.
 - No hay consumidores, ACK/NACK ni redelivery.
-- No hay simuladores, inbox, outbox ni reintentos persistentes.
-- Los contratos de Inventarios y Contabilidad se definirán en sus tareas.
+- Existe outbox y reintento persistente para `SolicitudMaterialAlmacen.v1`.
+- No hay simuladores ni inbox; se implementan en ABC-243 y ABC-244.
+- Los contratos están documentados en `contabilidad-v1.md` e
+  `inventario-almacen-v1.md`; en este sprint solo se publican sus eventos
+  salientes y no se leen respuestas.

@@ -5,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { SolicitudMaterialItem } from './entities/solicitud-material-item.entity';
 import { SolicitudesMaterialController } from './solicitudes-material.controller';
@@ -40,13 +41,31 @@ describe('ABC-73: solicitudes de material por HTTP', () => {
       id: '42', rol: 'Encargado de Producción', permisos,
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
     manager.findOne.mockImplementation(async (entity) => {
-      if (entity === OrdenProduccion) return { id: 1 };
-      if (entity === Material) return { id: 1, unidadMedida: 'kg' };
+      if (entity === OrdenProduccion) return {
+        id: 1,
+        codigo: 'ORD-1',
+        fecha_programada: '2026-10-20',
+      };
+      if (entity === Material) return {
+        id: 1,
+        codigo: 'MAT-1',
+        nombre: 'Material 1',
+        unidadMedida: 'kg',
+      };
       return null;
     });
-    manager.save.mockImplementation(async (entity, data) => entity === SolicitudMaterial
-      ? { id: '1', fecha: new Date(), ...data }
-      : data.map((item, index) => ({ id: String(index + 1), ...item })));
+    manager.save.mockImplementation(async (entity, data) => {
+      if (entity === SolicitudMaterial) {
+        return { id: '1', fecha: new Date(), ...data };
+      }
+      if (entity === SolicitudMaterialItem) {
+        return data.map((item, index) => ({ id: String(index + 1), ...item }));
+      }
+      if (entity === EventoOutbox) {
+        return { id: '1', ...data };
+      }
+      throw new Error('Entidad inesperada');
+    });
     repository.find.mockResolvedValue([]);
     repository.findOne.mockResolvedValue(null);
   });
@@ -69,6 +88,19 @@ describe('ABC-73: solicitudes de material por HTTP', () => {
     expect(result.body.items).toHaveLength(2);
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(manager.findOne).toHaveBeenCalledWith(OrdenProduccion, expect.objectContaining({ lock: { mode: 'pessimistic_write' } }));
+    expect(manager.save).toHaveBeenCalledWith(EventoOutbox, expect.objectContaining({
+      aggregateId: '1',
+      eventType: 'SolicitudMaterialAlmacen.v1',
+      estado: 'PENDIENTE',
+      payload: expect.objectContaining({
+        data: expect.objectContaining({
+          solicitudId: '1',
+          solicitudVersion: 1,
+          ordenCodigo: 'ORD-1',
+          fechaNecesaria: '2026-10-20',
+        }),
+      }),
+    }));
   });
 
   it.each([0, -1, 0.00001, 1.12345, '2', null])('400: rechaza cantidad %s', async (cantidad) => {

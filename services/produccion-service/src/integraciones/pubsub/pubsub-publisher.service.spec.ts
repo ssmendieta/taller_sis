@@ -1,5 +1,7 @@
 import { PubSubPublisherService } from './pubsub-publisher.service';
 import { PubSubEvent } from './pubsub.types';
+import { SOLICITUD_MATERIAL_ALMACEN_V1_EJEMPLO } from '../contratos/inventario-almacen-v1';
+import { EventoInventarioV1InvalidoError } from '../contratos/inventario-almacen-v1.validator';
 
 describe('PubSubPublisherService', () => {
   const event: PubSubEvent<{ message: string }> = {
@@ -64,6 +66,57 @@ describe('PubSubPublisherService', () => {
     await expect(
       service.publish({ ...event, eventId: '' }),
     ).rejects.toThrow('requiere eventId');
+    expect(publishMessage).not.toHaveBeenCalled();
+  });
+
+  it('diagnostica y no publica un evento de Inventarios invalido', async () => {
+    const publishMessage = jest.fn();
+    const service = new PubSubPublisherService(
+      {
+        enabled: true,
+        projectId: 'proyecto-demo',
+        topicId: 'topic-unico',
+      },
+      { topic: () => ({ publishMessage }) } as any,
+    );
+    const warn = jest.fn();
+    (service as any).logger.warn = warn;
+    const evento = JSON.parse(JSON.stringify(
+      SOLICITUD_MATERIAL_ALMACEN_V1_EJEMPLO,
+    ));
+    evento.data.items[0].unidad = 'kilos';
+
+    await expect(service.publish(evento)).rejects.toBeInstanceOf(
+      EventoInventarioV1InvalidoError,
+    );
+    expect(publishMessage).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(
+      'EVENTO_INVENTARIO_V1_INVALIDO',
+    ));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(
+      'data.items[0].unidad',
+    ));
+  });
+
+  it('no publica una version no soportada del contrato de Inventarios', async () => {
+    const publishMessage = jest.fn();
+    const service = new PubSubPublisherService(
+      {
+        enabled: true,
+        projectId: 'proyecto-demo',
+        topicId: 'topic-unico',
+      },
+      { topic: () => ({ publishMessage }) } as any,
+    );
+    (service as any).logger.warn = jest.fn();
+    const evento = JSON.parse(JSON.stringify(
+      SOLICITUD_MATERIAL_ALMACEN_V1_EJEMPLO,
+    ));
+    evento.eventType = 'SolicitudMaterialAlmacen.v2';
+
+    await expect(service.publish(evento)).rejects.toBeInstanceOf(
+      EventoInventarioV1InvalidoError,
+    );
     expect(publishMessage).not.toHaveBeenCalled();
   });
 });
