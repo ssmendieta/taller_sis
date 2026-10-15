@@ -2,6 +2,12 @@ Matriz de Permisos – Sprint 1 (fuente de verdad)
 
 Roles
 
+Actualización ABC-267: `integraciones.reintentar` permite `GET /integraciones/eventos`
+y `POST /integraciones/eventos/:id/reintentar` en Producción (prefijo gateway
+`/api/produccion`). La migración `1710000000012-IntegracionesReintentar` lo asigna
+solo a Administrador inicialmente. Los demás roles no lo reciben; la autorización
+se evalúa por permiso vigente obtenido de Auth, también para roles personalizados.
+
 - Administrador
 - Encargado de Producción
 - Encargado de Logística (sin funciones en Sprint 1)
