@@ -28,6 +28,12 @@ import {
   sumarCantidades,
 } from "../services/calidadService.js";
 import { MAX_CODIGO_LOTE, crearLote, listarLotesOrden } from "../services/lotesService.js";
+import {
+  PERMISO_PREPARAR_CIERRE,
+  VERSION_CIERRE_INICIAL,
+  obtenerCierre,
+  prepararCierre,
+} from "../services/cierreProduccionService.js";
 import { obtenerRecetas } from "../services/recetasService.js";
 import { tienePermiso } from "../services/permisos.js";
 import { accionesPara, puedeRegistrarAvance, puedeVerAcciones } from "../utils/ordenes.js";
@@ -127,11 +133,20 @@ export default function OrdenDetallePage() {
   const [errorLote, setErrorLote] = useState("");
   const [avisoLote, setAvisoLote] = useState("");
 
+  // ABC-299: resumen de cierre (snapshot inmutable) de la orden FINALIZADA.
+  const [cierre, setCierre] = useState(null);
+  const [estadoCierre, setEstadoCierre] = useState("cargando");
+  const [errorCargaCierre, setErrorCargaCierre] = useState("");
+  const [preparandoCierre, setPreparandoCierre] = useState(false);
+  const [errorCierre, setErrorCierre] = useState("");
+  const [avisoCierre, setAvisoCierre] = useState("");
+
   const muestraAcciones = puedeVerAcciones(usuario);
   const permiteAvance = puedeRegistrarAvance(usuario);
   const permiteConsumo = tienePermiso(usuario, "materiales.registrar_consumo");
   // El mismo permiso de calidad registra conformes y defectuosos.
   const permiteCalidad = tienePermiso(usuario, "calidad.registrar_conformes");
+  const permiteCierre = tienePermiso(usuario, PERMISO_PREPARAR_CIERRE);
 
   async function cargarCalidad() {
     try {
@@ -175,6 +190,24 @@ export default function OrdenDetallePage() {
     } catch (fallo) {
       setLotes([]);
       setErrorCargaLotes(fallo.message || "No se pudieron cargar los lotes de la orden.");
+    }
+  }
+
+  // 404 significa que la versión todavía no se preparó; otros fallos se informan.
+  async function cargarCierre() {
+    try {
+      setCierre(await obtenerCierre(id, VERSION_CIERRE_INICIAL));
+      setEstadoCierre("preparado");
+      setErrorCargaCierre("");
+    } catch (fallo) {
+      setCierre(null);
+      if (fallo.status === 404) {
+        setEstadoCierre("sin-preparar");
+        setErrorCargaCierre("");
+      } else {
+        setEstadoCierre("error");
+        setErrorCargaCierre(fallo.message || "No se pudo cargar el resumen de cierre.");
+      }
     }
   }
 
@@ -225,6 +258,7 @@ export default function OrdenDetallePage() {
 
       await cargarCalidad();
       if (detalle?.codigo) await cargarLotes(detalle.codigo);
+      await cargarCierre();
 
       // Estado de la receta para explicar el bloqueo de Inicio.
       const recetaId =
@@ -491,6 +525,27 @@ export default function OrdenDetallePage() {
       // Con éxito o rechazo, el resumen refleja lo que guarda la API.
       await cargarCalidad();
       setGuardandoConforme(false);
+    }
+  }
+
+  async function prepararResumenCierre() {
+    if (preparandoCierre) return;
+
+    setErrorCierre("");
+    setAvisoCierre("");
+    setPreparandoCierre(true);
+
+    try {
+      const snapshot = await prepararCierre(Number(id), VERSION_CIERRE_INICIAL);
+      setAvisoCierre(
+        `Resumen de cierre versión ${snapshot?.cierreVersion ?? VERSION_CIERRE_INICIAL} preparado.`,
+      );
+    } catch (fallo) {
+      setErrorCierre(fallo.message || "No se pudo preparar el resumen de cierre.");
+    } finally {
+      // Con éxito o con 409, se muestra el snapshot que realmente guarda la API.
+      await cargarCierre();
+      setPreparandoCierre(false);
     }
   }
 
@@ -1582,6 +1637,176 @@ export default function OrdenDetallePage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* ABC-299: resumen de cierre tal como lo guardó la API, sin recalcular. */}
+      <div className="ts-panel" style={{ marginBottom: 16 }}>
+        <div className="ts-panel-title">
+          <h2>Resumen de cierre</h2>
+          <span
+            className={`ts-badge ${
+              estadoCierre === "preparado"
+                ? "ts-badge--FINALIZADA"
+                : estadoCierre === "sin-preparar" && orden.estado === "FINALIZADA"
+                  ? "ts-badge--PENDIENTE"
+                  : "ts-badge--inactivo"
+            }`}
+          >
+            {estadoCierre === "preparado"
+              ? "Preparado"
+              : estadoCierre === "cargando"
+                ? "Cargando…"
+                : estadoCierre === "sin-preparar" && orden.estado === "FINALIZADA"
+                  ? "Pendiente de preparar"
+                  : "No disponible"}
+          </span>
+        </div>
+
+        <p className="ts-field-help" role="note" style={{ padding: "0 20px" }}>
+          Estado del reporte:{" "}
+          <strong>
+            {estadoCierre === "preparado"
+              ? (() => {
+                  const { fecha, hora } = mostrarFechaHora(cierre.fechaCierre);
+                  return `preparado, versión ${cierre.cierreVersion}, el ${fecha} a las ${hora}.`;
+                })()
+              : estadoCierre === "error"
+                ? "no se pudo consultar."
+                : orden.estado === "FINALIZADA"
+                  ? `versión ${VERSION_CIERRE_INICIAL} pendiente de preparar.`
+                  : `no disponible: la orden debe estar FINALIZADA (actual: ${mostrarEstadoOrden(orden.estado).toLowerCase()}).`}
+          </strong>{" "}
+          Es una copia fija de los registros al cerrar; no incluye costos, asientos ni impuestos.
+        </p>
+
+        {errorCargaCierre && (
+          <p className="ts-modal-error" role="alert" style={{ padding: "0 20px" }}>
+            {errorCargaCierre}
+          </p>
+        )}
+
+        {estadoCierre === "preparado" && cierre ? (
+          <>
+            <div className="ts-table-wrap">
+              <table className="ts-table">
+                <caption>Datos congelados del cierre</caption>
+                <tbody>
+                  <tr>
+                    <th scope="row">Orden</th>
+                    <td className="ts-code">{cierre.ordenCodigo}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Producto</th>
+                    <td>
+                      {cierre.producto?.nombre ?? "—"}{" "}
+                      <span className="ts-code">({cierre.producto?.codigo ?? "—"})</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Finalizada</th>
+                    <td>
+                      {(() => {
+                        const { fecha, hora } = mostrarFechaHora(cierre.finalizadaAt);
+                        return `${fecha} ${hora}`;
+                      })()}
+                    </td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Versión</th>
+                    <td>{cierre.cierreVersion}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="ts-table-wrap">
+              <table className="ts-table">
+                <caption>Cantidades del cierre</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="ts-num">Solicitada</th>
+                    <th scope="col" className="ts-num">Producida</th>
+                    <th scope="col" className="ts-num">Conforme</th>
+                    <th scope="col" className="ts-num">Defectuosa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="ts-num">{formatearCantidad(cierre.cantidadSolicitada, cierre.producto?.unidad)}</td>
+                    <td className="ts-num">{formatearCantidad(cierre.cantidadProducida, cierre.producto?.unidad)}</td>
+                    <td className="ts-num">{formatearCantidad(cierre.cantidadConforme, cierre.producto?.unidad)}</td>
+                    <td className="ts-num">{formatearCantidad(cierre.cantidadDefectuosa, cierre.producto?.unidad)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="ts-table-wrap">
+              <table className="ts-table">
+                <caption>Consumo por material al cierre</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Material</th>
+                    <th scope="col" className="ts-num">Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(Array.isArray(cierre.consumos) ? cierre.consumos : []).map((c) => (
+                    <tr key={`${c.materialId}-${c.unidad}`}>
+                      <td>
+                        {c.materialNombre} <span className="ts-code">({c.materialCodigo})</span>
+                      </td>
+                      <td className="ts-num">{formatearCantidad(c.cantidad, c.unidad)}</td>
+                    </tr>
+                  ))}
+                  {!(Array.isArray(cierre.consumos) && cierre.consumos.length > 0) && (
+                    <tr>
+                      <td colSpan={2}>No había consumos registrados al cerrar.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : estadoCierre === "sin-preparar" && (
+          <div style={{ padding: "12px 20px 16px" }}>
+            {permiteCierre ? (
+              <div className="ts-btn-group">
+                <button
+                  type="button"
+                  className="ts-btn ts-btn-primary"
+                  onClick={prepararResumenCierre}
+                  disabled={preparandoCierre || orden.estado !== "FINALIZADA"}
+                  title={
+                    orden.estado !== "FINALIZADA"
+                      ? "La orden debe estar FINALIZADA para preparar su resumen."
+                      : undefined
+                  }
+                >
+                  {preparandoCierre
+                    ? "Preparando…"
+                    : `Preparar resumen de cierre (versión ${VERSION_CIERRE_INICIAL})`}
+                </button>
+              </div>
+            ) : (
+              <p className="ts-empty" style={{ padding: 0 }}>
+                Solo quien puede finalizar órdenes prepara el resumen de cierre.
+              </p>
+            )}
+          </div>
+        )}
+
+        {errorCierre && (
+          <p className="ts-modal-error" role="alert" style={{ padding: "0 20px 12px" }}>
+            {errorCierre}
+          </p>
+        )}
+
+        {avisoCierre && (
+          <p className="ts-success" role="status" style={{ margin: "0 20px 16px" }}>
+            {avisoCierre}
+          </p>
+        )}
       </div>
 
       <div className="ts-panel">
