@@ -25,7 +25,9 @@ import {
   registrarConforme,
   registrarDefecto,
   resumenCalidad,
+  sumarCantidades,
 } from "../services/calidadService.js";
+import { MAX_CODIGO_LOTE, crearLote, listarLotesOrden } from "../services/lotesService.js";
 import { obtenerRecetas } from "../services/recetasService.js";
 import { tienePermiso } from "../services/permisos.js";
 import { accionesPara, puedeRegistrarAvance, puedeVerAcciones } from "../utils/ordenes.js";
@@ -116,6 +118,15 @@ export default function OrdenDetallePage() {
   const [errorDefecto, setErrorDefecto] = useState("");
   const [avisoDefecto, setAvisoDefecto] = useState("");
 
+  // ABC-294: lotes que identifican unidades conformes.
+  const [lotes, setLotes] = useState([]);
+  const [errorCargaLotes, setErrorCargaLotes] = useState("");
+  const [codigoLote, setCodigoLote] = useState("");
+  const [cantidadLote, setCantidadLote] = useState("");
+  const [guardandoLote, setGuardandoLote] = useState(false);
+  const [errorLote, setErrorLote] = useState("");
+  const [avisoLote, setAvisoLote] = useState("");
+
   const muestraAcciones = puedeVerAcciones(usuario);
   const permiteAvance = puedeRegistrarAvance(usuario);
   const permiteConsumo = tienePermiso(usuario, "materiales.registrar_consumo");
@@ -153,6 +164,17 @@ export default function OrdenDetallePage() {
           ? `${fallo.message}. Las unidades no coinciden, así que no se suman ni se comparan.`
           : fallo.message || "No se pudo cargar la comparación de materiales.",
       );
+    }
+  }
+
+  async function cargarLotes(ordenCodigo) {
+    try {
+      const respuesta = await listarLotesOrden(ordenCodigo);
+      setLotes(Array.isArray(respuesta) ? respuesta : []);
+      setErrorCargaLotes("");
+    } catch (fallo) {
+      setLotes([]);
+      setErrorCargaLotes(fallo.message || "No se pudieron cargar los lotes de la orden.");
     }
   }
 
@@ -202,6 +224,7 @@ export default function OrdenDetallePage() {
       await cargarComparacion();
 
       await cargarCalidad();
+      if (detalle?.codigo) await cargarLotes(detalle.codigo);
 
       // Estado de la receta para explicar el bloqueo de Inicio.
       const recetaId =
@@ -284,6 +307,14 @@ export default function OrdenDetallePage() {
     () => resumenCalidad(total, conformesCalidad, defectosCalidad),
     [total, conformesCalidad, defectosCalidad],
   );
+
+  // Conformes sin asignar = conformes registrados − cantidades ya asignadas a lotes.
+  const resumenLotes = useMemo(() => {
+    const asignadas = sumarCantidades(lotes);
+    const sinAsignar =
+      (Math.round(calidad.conformes * 10000) - Math.round(asignadas * 10000)) / 10000;
+    return { asignadas, sinAsignar: Math.max(sinAsignar, 0) };
+  }, [lotes, calidad.conformes]);
 
   async function confirmarAccion(evento) {
     evento.preventDefault();
@@ -460,6 +491,57 @@ export default function OrdenDetallePage() {
       // Con éxito o rechazo, el resumen refleja lo que guarda la API.
       await cargarCalidad();
       setGuardandoConforme(false);
+    }
+  }
+
+  async function guardarLote(evento) {
+    evento.preventDefault();
+
+    if (guardandoLote) return;
+
+    setErrorLote("");
+    setAvisoLote("");
+
+    const codigo = codigoLote.trim();
+    const cantidad = Number(cantidadLote);
+
+    if (!codigo) {
+      setErrorLote("Indica el código del lote.");
+      return;
+    }
+
+    if (!cantidadLote || !Number.isFinite(cantidad) || cantidad <= 0) {
+      setErrorLote("La cantidad del lote debe ser mayor a cero.");
+      return;
+    }
+
+    if (Number(cantidad.toFixed(4)) !== cantidad) {
+      setErrorLote("La cantidad admite como máximo 4 decimales.");
+      return;
+    }
+
+    if (cantidad > resumenLotes.sinAsignar) {
+      setErrorLote(
+        `No se pueden asignar ${formatearCantidad(cantidad, unidad)}: hay ${formatearCantidad(calidad.conformes, unidad)} conformes y ${formatearCantidad(resumenLotes.asignadas, unidad)} ya asignadas a lotes, así que quedan ${formatearCantidad(resumenLotes.sinAsignar, unidad)} sin asignar.`,
+      );
+      return;
+    }
+
+    setGuardandoLote(true);
+
+    try {
+      const lote = await crearLote({ ordenId: Number(id), codigo, cantidad });
+      setCodigoLote("");
+      setCantidadLote("");
+      setAvisoLote(
+        `Lote ${lote?.codigo ?? codigo} creado con ${formatearCantidad(lote?.cantidad ?? cantidad, unidad)}.`,
+      );
+    } catch (fallo) {
+      setErrorLote(fallo.message || "No se pudo crear el lote.");
+    } finally {
+      // Con éxito o rechazo, la lista refleja lo que guarda la API.
+      await cargarLotes(orden.codigo);
+      setGuardandoLote(false);
     }
   }
 
@@ -1329,6 +1411,172 @@ export default function OrdenDetallePage() {
               {defectosCalidad.length === 0 && (
                 <tr>
                   <td colSpan={6}>Todavía no hay unidades defectuosas registradas.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ABC-294: lotes que identifican unidades conformes de la orden. */}
+      <div className="ts-panel" style={{ marginBottom: 16 }}>
+        <div className="ts-panel-title">
+          <h2>Lotes de unidades conformes</h2>
+          <span>{lotes.length} lotes</span>
+        </div>
+
+        {errorCargaLotes && (
+          <p className="ts-modal-error" role="alert" style={{ padding: "0 20px" }}>
+            {errorCargaLotes}
+          </p>
+        )}
+
+        <div className="ts-table-wrap">
+          <table className="ts-table">
+            <caption>Conformes registrados, asignados a lotes y sin asignar</caption>
+            <thead>
+              <tr>
+                <th scope="col">Conformes</th>
+                <th scope="col">Asignadas a lotes</th>
+                <th scope="col">Sin asignar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Sin conformes o lotes de la API no se calcula lo disponible. */}
+              <tr>
+                <td>{errorCargaCalidad ? "—" : formatearCantidad(calidad.conformes, unidad)}</td>
+                <td>{errorCargaLotes ? "—" : formatearCantidad(resumenLotes.asignadas, unidad)}</td>
+                <td>
+                  <strong>
+                    {errorCargaCalidad || errorCargaLotes
+                      ? "—"
+                      : formatearCantidad(resumenLotes.sinAsignar, unidad)}
+                  </strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {permiteCalidad ? (
+          <form
+            onSubmit={guardarLote}
+            noValidate
+            style={{ padding: "12px 20px 16px" }}
+          >
+            <label
+              htmlFor="codigo-lote"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                maxWidth: 320,
+                marginBottom: 12,
+              }}
+            >
+              Código de lote *
+              <input
+                id="codigo-lote"
+                type="text"
+                maxLength={MAX_CODIGO_LOTE}
+                placeholder="Ej.: L-7"
+                value={codigoLote}
+                onChange={(e) => setCodigoLote(e.target.value)}
+                required
+                disabled={guardandoLote}
+                style={{
+                  minHeight: 36,
+                  padding: "7px 10px",
+                  border: "1px solid #e0e0e2",
+                  borderRadius: 5,
+                }}
+              />
+            </label>
+
+            <label
+              htmlFor="cantidad-lote"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                maxWidth: 320,
+              }}
+            >
+              Cantidad conforme del lote{unidad ? ` (en ${unidad})` : ""}
+              <input
+                id="cantidad-lote"
+                type="number"
+                min="0.0001"
+                max="9999999999.9999"
+                step="0.0001"
+                value={cantidadLote}
+                onChange={(e) => setCantidadLote(e.target.value)}
+                required
+                disabled={guardandoLote}
+                style={{
+                  minHeight: 36,
+                  padding: "7px 10px",
+                  border: "1px solid #e0e0e2",
+                  borderRadius: 5,
+                }}
+              />
+            </label>
+
+            {errorLote && (
+              <p className="ts-modal-error" role="alert">
+                {errorLote}
+              </p>
+            )}
+
+            {avisoLote && (
+              <p className="ts-success" role="status">
+                {avisoLote}
+              </p>
+            )}
+
+            <div className="ts-btn-group" style={{ marginTop: 12 }}>
+              <button
+                type="submit"
+                className="ts-btn ts-btn-primary"
+                disabled={guardandoLote}
+              >
+                {guardandoLote ? "Creando…" : "Crear lote"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p className="ts-empty">No tienes permiso para crear lotes.</p>
+        )}
+
+        <div className="ts-table-wrap">
+          <table className="ts-table">
+            <caption>Lotes de la orden</caption>
+            <thead>
+              <tr>
+                <th scope="col">Código</th>
+                <th scope="col">Cantidad</th>
+                <th scope="col">Responsable</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Hora</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lotes.map((l) => {
+                const { fecha, hora } = mostrarFechaHora(l.fechaHora ?? l.fecha_hora);
+
+                return (
+                  <tr key={l.id ?? l.codigo}>
+                    <td className="ts-code">{l.codigo}</td>
+                    <td>{formatearCantidad(l.cantidad, unidad)}</td>
+                    <td>{responsableDeResultado(l, usuario)}</td>
+                    <td>{fecha}</td>
+                    <td>{hora}</td>
+                  </tr>
+                );
+              })}
+              {lotes.length === 0 && (
+                <tr>
+                  <td colSpan={5}>Esta orden todavía no tiene lotes.</td>
                 </tr>
               )}
             </tbody>
