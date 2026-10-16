@@ -4,6 +4,7 @@ import {
   pubSubConfigProvider,
 } from './pubsub-client.provider';
 import { PubSubPublisherService } from './pubsub-publisher.service';
+import { PUBSUB_CONFIG } from './pubsub.config';
 
 @Module({
   providers: [
@@ -11,6 +12,6 @@ import { PubSubPublisherService } from './pubsub-publisher.service';
     pubSubClientProvider,
     PubSubPublisherService,
   ],
-  exports: [PubSubPublisherService],
+  exports: [PubSubPublisherService, PUBSUB_CONFIG],
 })
 export class PubSubModule {}
