@@ -9,10 +9,12 @@ import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
 import SolicitudesMaterialPage from "../pages/SolicitudesMaterialPage.jsx";
+import IntegracionesPage from "../pages/IntegracionesPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
+import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 
 const privada = (pagina, permisos) => (
   <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>
@@ -123,6 +125,12 @@ export default function AppRoutes() {
         <Route
           path="/auditoria"
           element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])}
+        />
+
+        {/* ABC-268: solo con integraciones.reintentar; la API vuelve a exigirlo. */}
+        <Route
+          path="/integraciones"
+          element={privada(<IntegracionesPage />, [PERMISO_INTEGRACIONES])}
         />
 
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
