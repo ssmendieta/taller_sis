@@ -325,19 +325,95 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
     expect((await request(`/orden/${ordenId}`, 'GET')).body).toEqual(creado.body);
   });
 
-  it('API: GET conserva los valores antiguos y una version explicita nueva captura las correcciones', async () => {
+  it.each(['consumos', 'clasificacion'])('ABC-299 subtarea 3: corregir %s no cambia el snapshot ni genera otra version al repetir', async (origen) => {
     const ordenId = await prepararOrden();
     const primero = await request('', 'POST', { ordenId: Number(ordenId) });
     expect(primero.status).toBe(201);
-    await source.query(`UPDATE "${schema}".avances_produccion SET cantidad_producida = 30 WHERE orden_id = $1`, [ordenId]);
-    await source.query(`UPDATE "${schema}".resultados_conformes SET cantidad = 10 WHERE orden_id = $1`, [ordenId]);
-    await source.query(`UPDATE "${schema}".consumos_material SET cantidad = 1 WHERE orden_id = $1`, [ordenId]);
     expect(await request(`/orden/${ordenId}`, 'GET')).toEqual({ status: 200, body: primero.body });
+
+    // La API no expone edicion de fuentes. Estas correcciones son fixtures SQL
+    // del esquema aislado, respetando las restricciones existentes de calidad.
+    if (origen === 'consumos') {
+      await source.query(`UPDATE "${schema}".consumos_material SET cantidad = 0.5, unidad = 'kg'
+        WHERE orden_id = $1 AND material_id = 1 AND unidad = 'g'`, [ordenId]);
+      expect(await source.query(`SELECT SUM(cantidad)::text AS cantidad, unidad FROM "${schema}".consumos_material
+        WHERE orden_id = $1 AND material_id = 1 GROUP BY unidad`, [ordenId]))
+        .toEqual([{ cantidad: '23.5000', unidad: 'kg' }]);
+    } else {
+      await source.query(`UPDATE "${schema}".resultados_conformes SET tipo = 'CONFORME', causa_defecto = NULL
+        WHERE orden_id = $1 AND tipo = 'DEFECTUOSO'`, [ordenId]);
+      expect(await source.query(`SELECT tipo, SUM(cantidad)::text AS cantidad FROM "${schema}".resultados_conformes
+        WHERE orden_id = $1 GROUP BY tipo`, [ordenId]))
+        .toEqual([{ tipo: 'CONFORME', cantidad: '100.0000' }]);
+    }
+
+    const repetido = await request('', 'POST', { ordenId: Number(ordenId) });
+    expect(repetido.status).toBe(409);
+    expect(await request(`/orden/${ordenId}`, 'GET')).toEqual({ status: 200, body: primero.body });
+    expect((await request(`/orden/${ordenId}?cierreVersion=2`, 'GET')).status).toBe(404);
+    const persistidos = await source.getRepository(CierreProduccion).findBy({ ordenId });
+    expect(JSON.parse(JSON.stringify(persistidos))).toEqual([primero.body]);
+    expect(primero.body).toMatchObject({ cantidadProducida: '100.0000', cantidadConforme: '95.0000', cantidadDefectuosa: '5.0000' });
+    expect(primero.body.consumos).toEqual(expect.arrayContaining([
+      expect.objectContaining({ materialId: '1', cantidad: '23.0000', unidad: 'kg' }),
+      expect.objectContaining({ materialId: '1', cantidad: '500.0000', unidad: 'g' }),
+      expect.objectContaining({ materialId: '2', cantidad: '4.0000', unidad: 'unidad' }),
+    ]));
+  });
+
+  it('ABC-299 subtarea 3: la correccion requiere una version explicita y ambas quedan congeladas tras reiniciar', async () => {
+    const ordenId = await prepararOrden();
+    const primero = await request('', 'POST', { ordenId: Number(ordenId) });
+    expect(primero.status).toBe(201);
+    await source.query(`UPDATE "${schema}".resultados_conformes SET tipo = 'CONFORME', causa_defecto = NULL
+      WHERE orden_id = $1 AND tipo = 'DEFECTUOSO'`, [ordenId]);
+    await source.query(`UPDATE "${schema}".consumos_material SET cantidad = 0.5, unidad = 'kg'
+      WHERE orden_id = $1 AND material_id = 1 AND unidad = 'g'`, [ordenId]);
+    expect(await request(`/orden/${ordenId}`, 'GET')).toEqual({ status: 200, body: primero.body });
+    expect((await request(`/orden/${ordenId}?cierreVersion=2`, 'GET')).status).toBe(404);
     const segundo = await request('', 'POST', { ordenId: Number(ordenId), cierreVersion: 2 });
     expect(segundo.status).toBe(201);
-    expect(segundo.body).toMatchObject({ cierreVersion: 2, cantidadProducida: '60.0000', cantidadConforme: '10.0000', cantidadDefectuosa: '10.0000' });
+    expect(segundo.body.id).not.toBe(primero.body.id);
+    expect(segundo.body).toMatchObject({ cierreVersion: 2, cantidadProducida: '100.0000', cantidadConforme: '100.0000', cantidadDefectuosa: '0.0000' });
+    expect(segundo.body.consumos).toEqual([
+      expect.objectContaining({ materialId: '1', cantidad: '23.5000', unidad: 'kg' }),
+      expect.objectContaining({ materialId: '2', cantidad: '4.0000', unidad: 'unidad' }),
+    ]);
+
+    // Otra correccion de las fuentes tampoco debe recalcular versiones ya creadas.
+    await source.query(`UPDATE "${schema}".consumos_material SET cantidad = 20
+      WHERE orden_id = $1 AND material_id = 1`, [ordenId]);
+    await source.query(`UPDATE "${schema}".resultados_conformes SET tipo = 'DEFECTUOSO', causa_defecto = 'Revision posterior'
+      WHERE orden_id = $1 AND cantidad = 5`, [ordenId]);
+    for (const cierreVersion of [1, 2]) {
+      expect((await request('', 'POST', { ordenId: Number(ordenId), cierreVersion })).status).toBe(409);
+    }
+    expect((await request(`/orden/${ordenId}?cierreVersion=3`, 'GET')).status).toBe(404);
     expect(await request(`/orden/${ordenId}?cierreVersion=2`, 'GET')).toEqual({ status: 200, body: segundo.body });
-    expect((await request(`/orden/${ordenId}`, 'GET')).body).toEqual(primero.body);
+    expect(await request(`/orden/${ordenId}`, 'GET')).toEqual({ status: 200, body: primero.body });
+
+    await apiApp.close();
+    apiApp = await arrancarModulo();
+    await apiApp.listen(0, '127.0.0.1');
+    base = await apiApp.getUrl();
+    expect(await request(`/orden/${ordenId}?cierreVersion=1`, 'GET')).toEqual({ status: 200, body: primero.body });
+    expect(await request(`/orden/${ordenId}?cierreVersion=2`, 'GET')).toEqual({ status: 200, body: segundo.body });
+    const persistidos = await source.getRepository(CierreProduccion).find({ where: { ordenId }, order: { cierreVersion: 'ASC' } });
+    expect(JSON.parse(JSON.stringify(persistidos))).toEqual([primero.body, segundo.body]);
+    expect((await source.getRepository(OrdenProduccion).findOneByOrFail({ id: Number(ordenId) })).estado).toBe('FINALIZADA');
+  });
+
+  it('ABC-299 subtarea 3: una correccion inconsistente rechaza la version nueva sin alterar la anterior', async () => {
+    const ordenId = await prepararOrden();
+    const primero = await request('', 'POST', { ordenId: Number(ordenId) });
+    expect(primero.status).toBe(201);
+    await source.query(`UPDATE "${schema}".resultados_conformes SET cantidad = 101
+      WHERE orden_id = $1 AND tipo = 'CONFORME'`, [ordenId]);
+    expect((await request('', 'POST', { ordenId: Number(ordenId), cierreVersion: 2 })).status).toBe(409);
+    expect((await request(`/orden/${ordenId}?cierreVersion=2`, 'GET')).status).toBe(404);
+    expect(await request(`/orden/${ordenId}?cierreVersion=1`, 'GET')).toEqual({ status: 200, body: primero.body });
+    const persistidos = await source.getRepository(CierreProduccion).findBy({ ordenId });
+    expect(JSON.parse(JSON.stringify(persistidos))).toEqual([primero.body]);
   });
 
   it('API 404: una orden inexistente o una version no preparada no crea datos', async () => {

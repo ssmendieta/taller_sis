@@ -147,4 +147,24 @@ persistida, verifican varias unidades y materiales, rechazos 404/409 sin datos
 parciales, autorización 401/403, versiones explícitas y repetición concurrente.
 Un fallo simulado después del INSERT comprueba el rollback efectivo del snapshot.
 
+### Regresión de congelación (subtarea 3)
+
+Se amplían las pruebas existentes, sin cambiar el flujo de producción. Tras
+preparar y consultar una versión, se corrige por separado un consumo histórico
+de `500 g` a `0.5 kg` y se reclasifican defectos como conformes en los datos de
+prueba. La lectura y la fila persistida deben seguir siendo exactamente iguales
+al snapshot original, incluyendo IDs, fechas, cantidades y unidades. Repetir la
+preparación devuelve 409 y no genera otra versión automáticamente.
+
+La versión 2 se solicita con el POST existente y captura los valores corregidos.
+Se comprueba que las dos versiones siguen intactas tras otras correcciones y
+tras cerrar y arrancar la aplicación de prueba. Una corrección inconsistente
+rechaza la nueva versión y conserva la anterior.
+
+Las correcciones se simulan con SQL exclusivamente en el esquema aislado: las
+APIs actuales de consumos y calidad no ofrecen edición. Tampoco existe todavía
+un estado de reporte a Contabilidad; esta regresión verifica el snapshot
+preparado y persistido, sin simular un envío ni añadir estados. El diagrama de
+clases mantiene el mismo flujo y no requiere cambios.
+
 Diagrama: [clases del cierre](../../../../docs/diagramas/cierre-produccion-clases.md).
