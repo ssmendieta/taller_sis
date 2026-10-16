@@ -30,6 +30,14 @@ export const ESTADO_BOLETA_EMITIDA = "EMITIDA";
 
 const LOGISTICA = `${apiConfig.gatewayUrl}/api/logistica`;
 
+// Todas las boletas guardadas, de la más reciente a la más antigua.
+export async function listarBoletas() {
+  const response = await fetch(`${LOGISTICA}/boletas`, { headers: encabezados() });
+
+  await exigirOk(response, "No se pudieron cargar las boletas.");
+  return response.json();
+}
+
 // Solo lecturas: imprimir una boleta nunca cambia su estado ni sus cantidades.
 export async function obtenerBoleta(id) {
   const response = await fetch(`${LOGISTICA}/boletas/${encodeURIComponent(id)}`, {

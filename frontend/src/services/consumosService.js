@@ -15,9 +15,11 @@ async function exigirOk(response, mensaje) {
   if (!response.ok) {
     const datos = await response.json().catch(() => null);
     const detalle = datos?.message;
-    throw new Error(
+    const error = new Error(
       (Array.isArray(detalle) ? detalle.join(". ") : detalle) || mensaje
     );
+    error.status = response.status;
+    throw error;
   }
   return response;
 }
@@ -49,6 +51,19 @@ export async function obtenerTotalesConsumos(ordenId, materialId) {
   );
 
   await exigirOk(response, "No se pudieron cargar los totales de consumo.");
+  return response.json();
+}
+
+// ABC-72: el backend compara requerido (receta) y utilizado (consumos de ABC-71)
+// por material y unidad; la diferencia ya viene como utilizado menos requerido.
+// Responde 409 si las unidades no coinciden, sin sumarlas ni convertirlas.
+export async function obtenerComparacionMateriales(ordenId) {
+  const response = await fetch(
+    `${apiConfig.gatewayUrl}/api/produccion/ordenes/${ordenId}/comparacion-materiales`,
+    { headers: encabezados() }
+  );
+
+  await exigirOk(response, "No se pudo cargar la comparación de materiales.");
   return response.json();
 }
 

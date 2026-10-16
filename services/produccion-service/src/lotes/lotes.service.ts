@@ -38,6 +38,7 @@ export class LotesService {
       ordenCodigo: lote.orden.codigo,
       productoId: String(lote.orden.producto_id),
       cantidad: lote.cantidad,
+      responsableUsuarioId: String(lote.responsableUsuarioId),
       fechaHora: lote.fechaHora,
     }));
   }
