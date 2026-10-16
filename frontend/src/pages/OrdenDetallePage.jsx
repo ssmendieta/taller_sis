@@ -433,7 +433,7 @@ export default function OrdenDetallePage() {
 
     if (cantidad > calidad.porClasificar) {
       setErrorConforme(
-        `No se pueden registrar ${formatearCantidad(cantidad, unidad)}: hay ${formatearCantidad(calidad.producido, unidad)} producidas según los avances y ${formatearCantidad(calidad.producido - calidad.porClasificar, unidad)} ya clasificadas, así que quedan ${formatearCantidad(calidad.porClasificar, unidad)}.`,
+        `No se pueden registrar ${formatearCantidad(cantidad, unidad)}: hay ${formatearCantidad(calidad.producido, unidad)} producidas según los avances y ${formatearCantidad(calidad.producido - calidad.porClasificar, unidad)} ya clasificadas, así que quedan ${formatearCantidad(calidad.porClasificar, unidad)} pendientes de clasificación.`,
       );
       return;
     }
@@ -483,7 +483,7 @@ export default function OrdenDetallePage() {
 
     if (cantidad > calidad.porClasificar) {
       setErrorDefecto(
-        `Conformes y defectuosas no pueden superar lo producido. Quedan ${formatearCantidad(calidad.porClasificar, unidad)} por clasificar.`,
+        `Conformes y defectuosas no pueden superar lo producido. Quedan ${formatearCantidad(calidad.porClasificar, unidad)} pendientes de clasificación.`,
       );
       return;
     }
@@ -1043,19 +1043,34 @@ export default function OrdenDetallePage() {
                 <th scope="col">Producidas</th>
                 <th scope="col">Conformes</th>
                 <th scope="col">Defectuosas</th>
-                <th scope="col">Por clasificar</th>
+                <th scope="col">Pendientes de clasificación</th>
               </tr>
             </thead>
             <tbody>
+              {/* Sin los resultados de la API no se puede saber qué falta clasificar. */}
               <tr>
                 <td>{formatearCantidad(calidad.producido, unidad)}</td>
-                <td>{formatearCantidad(calidad.conformes, unidad)}</td>
-                <td>{formatearCantidad(calidad.defectuosos, unidad)}</td>
-                <td>{formatearCantidad(calidad.porClasificar, unidad)}</td>
+                <td>{errorCargaCalidad ? "—" : formatearCantidad(calidad.conformes, unidad)}</td>
+                <td>{errorCargaCalidad ? "—" : formatearCantidad(calidad.defectuosos, unidad)}</td>
+                <td>
+                  <strong>
+                    {errorCargaCalidad ? "—" : formatearCantidad(calidad.porClasificar, unidad)}
+                  </strong>
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
+
+        {!errorCargaCalidad && (
+          <p className="ts-field-help" role="note" style={{ padding: "0 20px" }}>
+            {calidad.porClasificar > 0
+              ? `${formatearCantidad(calidad.producido, unidad)} producidas − ${formatearCantidad(calidad.conformes, unidad)} conformes − ${formatearCantidad(calidad.defectuosos, unidad)} defectuosas = ${formatearCantidad(calidad.porClasificar, unidad)} pendientes de clasificación (aún no registradas como conformes ni como defectuosas).`
+              : calidad.producido > 0
+                ? "No hay unidades pendientes de clasificación: todo lo producido ya está registrado como conforme o defectuoso."
+                : "La orden todavía no tiene unidades producidas que clasificar."}
+          </p>
+        )}
 
         <div className="ts-panel-title">
           <h3 style={{ margin: 0, fontSize: ".88rem", fontWeight: 600 }}>
