@@ -41,7 +41,7 @@ import {
   responsableOrden,
   totalProducidoDe,
 } from "../utils/formato.js";
-import { formatearCantidad, formatearDiferencia, formatearEstadoOrden, formatearFecha } from "../utils/format.js";
+import { filasComparacionMateriales, formatearCantidad, formatearEstadoOrden, formatearFecha } from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
@@ -840,29 +840,24 @@ export default function OrdenDetallePage() {
               </tr>
             </thead>
             <tbody>
-              {comparacion.map((c) => {
-                const fueraDeReceta =
-                  Number(c.cantidadRequerida) === 0 && Number(c.cantidadConsumida) > 0;
-
-                return (
-                  <tr key={`${c.materialId}-${c.unidad}`}>
-                    <td>
-                      {c.materialNombre} <span className="ts-code">({c.materialCodigo})</span>
-                      {fueraDeReceta && (
-                        <>
-                          <br />
-                          <small>Fuera de la receta actual</small>
-                        </>
-                      )}
-                    </td>
-                    <td className="ts-num">{formatearCantidad(c.cantidadRequerida, c.unidad)}</td>
-                    <td className="ts-num">{formatearCantidad(c.cantidadConsumida, c.unidad)}</td>
-                    <td className="ts-num">
-                      <strong>{formatearDiferencia(c.diferencia, c.unidad)}</strong>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filasComparacionMateriales(comparacion).map((f) => (
+                <tr key={f.clave}>
+                  <td>
+                    {f.nombre} <span className="ts-code">({f.codigo})</span>
+                    {f.fueraDeReceta && (
+                      <>
+                        <br />
+                        <small>Fuera de la receta actual</small>
+                      </>
+                    )}
+                  </td>
+                  <td className="ts-num">{f.requerido}</td>
+                  <td className="ts-num">{f.utilizado}</td>
+                  <td className="ts-num">
+                    <strong>{f.diferencia}</strong>
+                  </td>
+                </tr>
+              ))}
               {comparacion.length === 0 && (
                 <tr>
                   <td colSpan={4}>

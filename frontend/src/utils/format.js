@@ -22,6 +22,20 @@ export function formatearDiferencia(valor, unidad) {
   return `${numero > 0 ? "+" : ""}${formatearCantidad(numero || 0, unidad)}`;
 }
 
+// Filas de la comparación ABC-72 tal como llegan de la API: cada cifra lleva la
+// unidad de su propio material y un dato ausente se muestra "—", nunca 0.
+export function filasComparacionMateriales(materiales) {
+  return (Array.isArray(materiales) ? materiales : []).map((m) => ({
+    clave: `${m.materialId}-${m.unidad}`,
+    nombre: m.materialNombre ?? "—",
+    codigo: m.materialCodigo ?? "—",
+    requerido: formatearCantidad(m.cantidadRequerida, m.unidad),
+    utilizado: formatearCantidad(m.cantidadConsumida, m.unidad),
+    diferencia: formatearDiferencia(m.diferencia, m.unidad),
+    fueraDeReceta: Number(m.cantidadRequerida) === 0 && Number(m.cantidadConsumida) > 0,
+  }));
+}
+
 export function formatearNumero(valor) {
   const numero = Number(valor);
   if (valor == null || valor === "" || !Number.isFinite(numero)) return "—";
