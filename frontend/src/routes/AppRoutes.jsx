@@ -11,6 +11,7 @@ import UsuarioPage from "../pages/UsuarioPage.jsx";
 import SolicitudesMaterialPage from "../pages/SolicitudesMaterialPage.jsx";
 import IntegracionesPage from "../pages/IntegracionesPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
+import BoletasPage from "../pages/BoletasPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
@@ -135,7 +136,12 @@ export default function AppRoutes() {
           element={privada(<IntegracionesPage />, [PERMISO_INTEGRACIONES])}
         />
 
-        {/* Vista e impresión de una boleta guardada (solo lectura). */}
+        {/* Lista de boletas y vista/impresión de una boleta guardada (solo lectura). */}
+        <Route
+          path="/logistica/boletas"
+          element={privada(<BoletasPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+
         <Route
           path="/logistica/boletas/:id"
           element={privada(<BoletaDetallePage />, [PERMISO_CONSULTAR_BOLETAS])}

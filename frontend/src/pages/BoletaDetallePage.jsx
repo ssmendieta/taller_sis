@@ -95,7 +95,7 @@ export default function BoletaDetallePage() {
         <p>{error}</p>
         <div className="ts-btn-group">
           <button type="button" className="ts-btn" onClick={cargar}>Reintentar</button>
-          <Link className="ts-btn" to="/logistica">Volver</Link>
+          <Link className="ts-btn" to="/logistica/boletas">Volver</Link>
         </div>
       </div>
     );
@@ -128,7 +128,7 @@ export default function BoletaDetallePage() {
                   Imprimir
                 </button>
               )}
-              <Link className="ts-btn" to="/logistica">Volver</Link>
+              <Link className="ts-btn" to="/logistica/boletas">Volver</Link>
             </div>
           }
         />
