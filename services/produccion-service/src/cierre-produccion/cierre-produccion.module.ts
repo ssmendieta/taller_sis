@@ -11,12 +11,13 @@ import { RecetaMaterial } from '../recetas/entities/receta-material.entity';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { CierreProduccionController } from './cierre-produccion.controller';
 import { CierreProduccionService } from './cierre-produccion.service';
+import { OutboxModule } from '../integraciones/outbox/outbox.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([
     CierreProduccion, OrdenProduccion, AvancesProduccion, ResultadoConforme,
     ConsumoMaterial, Material, Receta, RecetaMaterial,
-  ])],
+  ]), OutboxModule],
   controllers: [CierreProduccionController],
   providers: [CierreProduccionService, PermisoProduccionGuard],
   exports: [TypeOrmModule, CierreProduccionService],

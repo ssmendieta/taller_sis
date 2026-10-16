@@ -6,6 +6,8 @@ import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity
 import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad.enum';
 import { ConsumoMaterial } from '../consumos-material/entities/consumo-material.entity';
 import { ConsumoCierreV1 } from '../integraciones/contratos/contabilidad-v1';
+import { crearEventoProduccionCerrada } from '../integraciones/outbox/crear-evento-produccion-cerrada';
+import { ESTADO_OUTBOX_PENDIENTE, EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { EstadoOrden } from '../ordenes/estado-orden.enum';
@@ -95,7 +97,18 @@ export class CierreProduccionService {
           consumos: consumos.map((consumo) => ({ ...consumo, cantidad: decimalSnapshot(consumo.cantidad, false).texto })),
           finalizadaAt: orden.finalizada_en,
         }));
-        return cierres.findOneByOrFail({ id: guardado.id });
+        const snapshot = await cierres.findOneByOrFail({ id: guardado.id });
+        const evento = crearEventoProduccionCerrada(snapshot);
+        await manager.save(EventoOutbox, {
+          eventId: evento.eventId,
+          correlationId: evento.correlationId,
+          eventType: evento.eventType,
+          aggregateType: 'CierreProduccion',
+          aggregateId: snapshot.id,
+          payload: evento,
+          estado: ESTADO_OUTBOX_PENDIENTE,
+        });
+        return snapshot;
       });
     } catch (error) {
       const dbError = error?.driverError ?? error;

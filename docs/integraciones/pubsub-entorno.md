@@ -77,7 +77,8 @@ después de aceptar la publicación.
 - No se crean ni administran topics.
 - No se crean suscripciones.
 - No hay consumidores, ACK/NACK ni redelivery.
-- Existe outbox y reintento persistente para `SolicitudMaterialAlmacen.v1`.
+- Existe outbox y reintento persistente para `SolicitudMaterialAlmacen.v1`
+  y `ProduccionCerrada.v1`. Ambos reutilizan el mismo publicador y configuración.
 - No hay simuladores ni inbox; se implementan en ABC-243 y ABC-244.
 - Los contratos están documentados en `contabilidad-v1.md` e
   `inventario-almacen-v1.md`; en este sprint solo se publican sus eventos
