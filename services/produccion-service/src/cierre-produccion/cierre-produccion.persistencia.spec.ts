@@ -12,6 +12,14 @@ import { ConsumosMaterial1710000000013 } from '../database/migrations/1710000000
 import { ResultadosConformes1710000000014 } from '../database/migrations/1710000000014-ResultadosConformes';
 import { TipoResultadoCalidad1710000000015 } from '../database/migrations/1710000000015-TipoResultadoCalidad';
 import { CierresProduccion1710000000018 } from '../database/migrations/1710000000018-CierresProduccion';
+import { EventosOutbox1710000000017 } from '../database/migrations/1710000000017-EventosOutbox';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
+import { loadOutboxConfig, OUTBOX_CONFIG } from '../integraciones/outbox/outbox.config';
+import { OutboxPublicadorService } from '../integraciones/outbox/outbox-publicador.service';
+import { TypeOrmOutboxStore } from '../integraciones/outbox/typeorm-outbox.store';
+import { PUBSUB_CONFIG } from '../integraciones/pubsub/pubsub.config';
+import { PubSubPublisherService } from '../integraciones/pubsub/pubsub-publisher.service';
+import { PRODUCCION_CERRADA_V1 } from '../integraciones/contratos/contabilidad-v1';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { AvancesProduccion } from '../avances_produccion/entities/avances_produccion.entity';
 import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity';
@@ -54,7 +62,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
   const options = (): PostgresConnectionOptions => ({
     ...(AppDataSource.options as PostgresConnectionOptions), schema,
     entities: [CierreProduccion, OrdenProduccion, AvancesProduccion, ResultadoConforme,
-      ConsumoMaterial, Material, Receta, RecetaMaterial], migrations: [],
+      ConsumoMaterial, Material, Receta, RecetaMaterial, EventoOutbox], migrations: [],
   });
 
   beforeAll(async () => {
@@ -71,6 +79,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
       await new ConsumosMaterial1710000000013().up(runner);
       await new ResultadosConformes1710000000014().up(runner);
       await new TipoResultadoCalidad1710000000015().up(runner);
+      await new EventosOutbox1710000000017().up(runner);
       await new CierresProduccion1710000000018().up(runner);
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.query("INSERT INTO materiales (codigo,nombre,unidad_medida) VALUES ('M1','Harina','kg'),('M2','Envase','unidad')");
@@ -149,7 +158,10 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
   }
 
   async function arrancarModulo() {
-    const module = await Test.createTestingModule({ imports: [TypeOrmModule.forRoot(options()), CierreProduccionModule] }).compile();
+    const module = await Test.createTestingModule({ imports: [TypeOrmModule.forRoot(options()), CierreProduccionModule] })
+      .overrideProvider(PUBSUB_CONFIG).useValue({ enabled: false, projectId: 'test', topicId: 'eventos' })
+      .overrideProvider(OUTBOX_CONFIG).useValue(loadOutboxConfig({ PUBSUB_ENABLED: 'false' }))
+      .compile();
     const app = module.createNestApplication();
     await app.init();
     return app;
@@ -494,5 +506,174 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
     expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(500);
     expect(insertEjecutado).toBe(true);
     expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(0);
+  });
+
+  describe('ABC-121: cierre y publicacion confiable mediante outbox', () => {
+    beforeEach(async () => {
+      // Aisla los trabajos pendientes de los fixtures anteriores en este esquema de prueba.
+      await source.query(`TRUNCATE "${schema}".eventos_outbox RESTART IDENTITY`);
+    });
+
+    function publicador(publishMessage: jest.Mock, store = new TypeOrmOutboxStore(source)) {
+      const publisher = new PubSubPublisherService(
+        { enabled: true, projectId: 'test', topicId: 'eventos' },
+        { topic: () => ({ publishMessage }) } as any,
+      );
+      return new OutboxPublicadorService(store, publisher, {
+        ...loadOutboxConfig({ PUBSUB_ENABLED: 'false' }), retryBaseMs: 60000, retryMaxMs: 60000,
+      });
+    }
+
+    it('201: prepara snapshot y un unico evento pendiente con las cantidades y unidades congeladas', async () => {
+      const ordenId = await prepararOrden();
+      const creado = await request('', 'POST', { ordenId: Number(ordenId) });
+      expect(creado.status).toBe(201);
+      const [evento] = await source.getRepository(EventoOutbox).find();
+      expect(evento).toMatchObject({
+        aggregateType: 'CierreProduccion', aggregateId: creado.body.id,
+        eventType: PRODUCCION_CERRADA_V1, estado: 'PENDIENTE', intentos: 0, messageId: null, publicadoEn: null,
+        payload: {
+          eventId: evento.eventId, correlationId: evento.correlationId,
+          eventType: PRODUCCION_CERRADA_V1, source: 'produccion-service', occurredAt: creado.body.fechaCierre,
+          data: {
+            cierreId: creado.body.id, resumenId: creado.body.id, cierreVersion: 1,
+            ordenId: Number(ordenId), ordenCodigo: creado.body.ordenCodigo,
+            producto: creado.body.producto, cantidadSolicitada: '100.0000', cantidadConforme: '95.0000',
+            consumos: creado.body.consumos, finalizadaAt: creado.body.finalizadaAt,
+          },
+        },
+      });
+      expect(evento.payload.data).not.toHaveProperty('estado', 'RECIBIDO');
+      expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(409);
+      expect(await source.getRepository(EventoOutbox).find()).toEqual([evento]);
+      expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(1);
+    });
+
+    it('404/409: una orden inexistente o no finalizada no deja snapshot ni evento', async () => {
+      const ordenId = await prepararOrden('EN_PRODUCCION');
+      expect((await request('', 'POST', { ordenId: 999999 })).status).toBe(404);
+      expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(409);
+      expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(0);
+      expect(await source.getRepository(EventoOutbox).count()).toBe(0);
+    });
+
+    it('revierte tambien el snapshot cuando la BD rechaza el INSERT del evento', async () => {
+      const ordenId = await prepararOrden();
+      await source.query(`ALTER TABLE "${schema}".eventos_outbox ADD CONSTRAINT ck_abc121_fallo
+        CHECK (event_type <> 'ProduccionCerrada.v1')`);
+      try {
+        expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(500);
+        expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(0);
+        expect(await source.getRepository(EventoOutbox).count()).toBe(0);
+      } finally {
+        await source.query(`ALTER TABLE "${schema}".eventos_outbox DROP CONSTRAINT ck_abc121_fallo`);
+      }
+      expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(201);
+      expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(1);
+      expect(await source.getRepository(EventoOutbox).count()).toBe(1);
+    });
+
+    it('el publicador no puede ver ni enviar el evento antes del commit de negocio', async () => {
+      const ordenId = await prepararOrden();
+      const publishMessage = jest.fn().mockResolvedValue('mensaje-despues-del-commit');
+      const worker = publicador(publishMessage);
+      const appSource = apiApp.get(DataSource);
+      const originalRunner = appSource.createQueryRunner.bind(appSource);
+      let verificadoAntesDelCommit = false;
+      jest.spyOn(appSource, 'createQueryRunner').mockImplementation((mode) => {
+        const runner = originalRunner(mode);
+        const commit = runner.commitTransaction.bind(runner);
+        jest.spyOn(runner, 'commitTransaction').mockImplementation(async () => {
+          expect(await runner.query(`SELECT COUNT(*)::int AS total FROM "${schema}".eventos_outbox`))
+            .toEqual([{ total: 1 }]);
+          expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(0);
+          await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0 });
+          expect(publishMessage).not.toHaveBeenCalled();
+          verificadoAntesDelCommit = true;
+          await commit();
+        });
+        return runner;
+      });
+      expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(201);
+      expect(verificadoAntesDelCommit).toBe(true);
+      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+      expect(publishMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('con broker caido conserva el evento; tras reiniciar publica el mismo payload sin repetir el cierre', async () => {
+      const ordenId = await prepararOrden();
+      const creado = await request('', 'POST', { ordenId: Number(ordenId) });
+      expect(creado.status).toBe(201);
+      const repository = source.getRepository(EventoOutbox);
+      const [original] = await repository.find();
+      const publishMessage = jest.fn().mockRejectedValueOnce(new Error('Pub/Sub no disponible'))
+        .mockResolvedValue('mensaje-cierre-recuperado');
+      await expect(publicador(publishMessage).procesarPendientes())
+        .resolves.toEqual({ reclamados: 1, publicados: 0, fallidos: 1 });
+      const pendiente = await repository.findOneByOrFail({ id: original.id });
+      expect(pendiente).toMatchObject({ estado: 'PENDIENTE', intentos: 1,
+        eventId: original.eventId, correlationId: original.correlationId, payload: original.payload,
+        messageId: null, publicadoEn: null, ultimoError: 'Pub/Sub no disponible' });
+
+      await source.query(`UPDATE "${schema}".consumos_material SET cantidad = 1 WHERE orden_id = $1`, [ordenId]);
+      await source.query(`UPDATE "${schema}".resultados_conformes SET tipo = 'CONFORME', causa_defecto = NULL
+        WHERE orden_id = $1 AND tipo = 'DEFECTUOSO'`, [ordenId]);
+      await apiApp.close();
+      apiApp = await arrancarModulo();
+      await apiApp.listen(0, '127.0.0.1');
+      base = await apiApp.getUrl();
+      expect(await request(`/orden/${ordenId}`, 'GET')).toEqual({ status: 200, body: creado.body });
+      expect(await repository.findOneByOrFail({ id: original.id })).toEqual(pendiente);
+
+      const workerReiniciado = publicador(publishMessage, new TypeOrmOutboxStore(apiApp.get(DataSource)));
+      await expect(workerReiniciado.procesarPendientes(pendiente.proximoIntentoEn))
+        .resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+      const publicado = await repository.findOneByOrFail({ id: original.id });
+      expect(publicado).toMatchObject({ estado: 'PUBLICADO', intentos: 2,
+        messageId: 'mensaje-cierre-recuperado', ultimoError: null,
+        eventId: original.eventId, correlationId: original.correlationId, payload: original.payload });
+      expect(publicado.publicadoEn).toBeInstanceOf(Date);
+      expect(publishMessage.mock.calls[0][0]).toEqual(publishMessage.mock.calls[1][0]);
+      const mensaje = publishMessage.mock.calls[1][0];
+      expect(JSON.parse(mensaje.data.toString('utf8'))).toEqual(original.payload);
+      expect(mensaje.attributes.eventId).toBe(original.eventId);
+      expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(409);
+      await expect(workerReiniciado.procesarPendientes()).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0 });
+      expect(publishMessage).toHaveBeenCalledTimes(2);
+      expect(await repository.count()).toBe(1);
+      expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(1);
+      expect((await source.getRepository(OrdenProduccion).findOneByOrFail({ id: Number(ordenId) })).estado).toBe('FINALIZADA');
+    });
+
+    it('dos POST simultaneos dejan un solo cierre y un solo evento', async () => {
+      const ordenId = await prepararOrden();
+      const respuestas = await Promise.all([
+        request('', 'POST', { ordenId: Number(ordenId) }), request('', 'POST', { ordenId: Number(ordenId) }),
+      ]);
+      expect(respuestas.map(({ status }) => status).sort()).toEqual([201, 409]);
+      expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(1);
+      expect(await source.getRepository(EventoOutbox).count()).toBe(1);
+    });
+
+    it('si se pierde la confirmacion local de Google, reenvia el mismo eventId sin otro efecto de negocio', async () => {
+      const ordenId = await prepararOrden();
+      expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(201);
+      const repository = source.getRepository(EventoOutbox);
+      const [original] = await repository.find();
+      const store = new TypeOrmOutboxStore(source);
+      jest.spyOn(store, 'marcarPublicado').mockRejectedValueOnce(new Error('Fallo temporal al guardar confirmacion'));
+      const publishMessage = jest.fn().mockResolvedValueOnce('mensaje-1').mockResolvedValueOnce('mensaje-2');
+      const worker = publicador(publishMessage, store);
+      await expect(worker.procesarPendientes()).resolves.toMatchObject({ fallidos: 1, publicados: 0 });
+      const pendiente = await repository.findOneByOrFail({ id: original.id });
+      expect(pendiente).toMatchObject({ estado: 'PENDIENTE', eventId: original.eventId, messageId: null });
+      await expect(worker.procesarPendientes(pendiente.proximoIntentoEn)).resolves.toMatchObject({ publicados: 1, fallidos: 0 });
+      expect(publishMessage.mock.calls[0][0]).toEqual(publishMessage.mock.calls[1][0]);
+      expect(await repository.findOneByOrFail({ id: original.id })).toMatchObject({
+        estado: 'PUBLICADO', eventId: original.eventId, messageId: 'mensaje-2', intentos: 2,
+      });
+      expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(1);
+      expect(await repository.count()).toBe(1);
+    });
   });
 });

@@ -92,9 +92,15 @@ El contrato `ProduccionCerrada.v1` ya contiene `cierreVersion`, conformes,
 consumos y metadatos de orden/producto. No incluye producidas ni defectuosas:
 esas cantidades se guardan en el modelo solicitado por ABC-299 sin cambiar el
 contrato de otra historia. El identificador persistido es `id` (BIGINT como texto);
-la asignación de `cierreId`/`resumenId` al mensaje queda para la integración.
-No se conecta el outbox ni se publican mensajes. No hay asientos, costos,
-impuestos ni cambios de inventario.
+ABC-121 asigna ese mismo `id` a `cierreId` y `resumenId`, porque cierre y resumen
+son una sola entidad persistida. El POST guarda también `ProduccionCerrada.v1`
+pendiente en el outbox, dentro de la misma transacción. Si ese INSERT falla,
+tampoco queda el snapshot. El publicador existente envía el payload después del
+commit y reintenta con el mismo `eventId`; una caída de Pub/Sub no revierte el
+cierre confirmado ni exige repetir el POST. `PUBLICADO` solo confirma la entrega
+a Google, sin marcar recepción por Contabilidad. Los cierres anteriores a esta
+integración no se encolan automáticamente. No hay asientos, costos, impuestos ni
+cambios de inventario. Detalles: [outbox de cierre](../../../../docs/integraciones/contabilidad-v1.md).
 
 ## Migración y verificación
 
@@ -128,6 +134,7 @@ Pruebas:
 ```powershell
 $env:DB_DATABASE = 'produccion_db'
 $env:CIERRE_DB_REAL = '1'
+$env:PUBSUB_ENABLED = 'false'
 npm test -- --runInBand cierre-produccion
 npm run build
 ```
@@ -163,8 +170,10 @@ rechaza la nueva versión y conserva la anterior.
 
 Las correcciones se simulan con SQL exclusivamente en el esquema aislado: las
 APIs actuales de consumos y calidad no ofrecen edición. Tampoco existe todavía
-un estado de reporte a Contabilidad; esta regresión verifica el snapshot
-preparado y persistido, sin simular un envío ni añadir estados. El diagrama de
-clases mantiene el mismo flujo y no requiere cambios.
+un estado de recepción por Contabilidad; esta regresión verifica el snapshot
+preparado y persistido. ABC-121 añade pruebas de envío mediante el outbox y un
+cliente Google simulado, sin introducir ese estado en el cierre. El diagrama de
+clases mantiene las mismas entidades; el flujo de publicación se documenta en
+[Contabilidad v1](../../../../docs/diagramas/contabilidad-v1.md).
 
 Diagrama: [clases del cierre](../../../../docs/diagramas/cierre-produccion-clases.md).
