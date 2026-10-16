@@ -39,6 +39,11 @@ function InicioRedirect() {
     return <Navigate to="/ordenes" replace />;
   }
 
+  // Logística y roles de solo lectura de boletas (consultar no permite crear ni emitir).
+  if (tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS)) {
+    return <Navigate to="/logistica/boletas" replace />;
+  }
+
   if (tienePermiso(usuario, "auditoria.consultar")) {
     return <Navigate to="/auditoria" replace />;
   }
