@@ -15,6 +15,7 @@ import { ConsumosMaterialModule } from './consumos-material/consumos-material.mo
 import { CalidadModule } from './calidad/calidad.module';
 import { LotesModule } from './lotes/lotes.module';
 import { IntegracionesModule } from './integraciones/integraciones.module';
+import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { IntegracionesModule } from './integraciones/integraciones.module';
     ConsumosMaterialModule,
     MaterialCalculationModule,
     LotesModule,
+    CierreProduccionModule,
     CalidadModule,
     PubSubModule,
     CalidadModule,
