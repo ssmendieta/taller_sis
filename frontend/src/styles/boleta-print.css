@@ -1,0 +1,174 @@
+/* Boleta de envío: vista previa en pantalla y formato de impresión (CSS print). */
+
+.boleta-documento {
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 28px 32px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-control);
+  background: #fff;
+  color: #1d1d1f;
+  font-size: 0.86rem;
+}
+
+.boleta-documento--no-emitida {
+  border-style: dashed;
+  color: var(--ts-secondary);
+}
+
+.boleta-documento__cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid #1d1d1f;
+}
+
+.boleta-documento__tipo {
+  margin: 0 0 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.boleta-documento__cabecera h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.boleta-documento__estado {
+  padding: 3px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.boleta-documento__datos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+  margin: 18px 0;
+}
+
+.boleta-documento__datos dt {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ts-secondary);
+}
+
+.boleta-documento__datos dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.boleta-documento__items {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.boleta-documento__items caption {
+  padding-bottom: 6px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.boleta-documento__items th,
+.boleta-documento__items td {
+  padding: 7px 8px;
+  border: 1px solid #c7c7cc;
+  text-align: left;
+}
+
+.boleta-documento__items th {
+  background: #f2f2f4;
+  font-size: 0.74rem;
+}
+
+.boleta-documento__items .boleta-documento__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.boleta-documento__pie {
+  margin-top: 18px;
+  padding-top: 10px;
+  border-top: 1px solid #c7c7cc;
+  font-size: 0.72rem;
+  color: var(--ts-secondary);
+}
+
+.boleta-no-imprimible {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .boleta-documento { padding: 18px 16px; }
+  .boleta-documento__datos { grid-template-columns: 1fr; }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+
+  /* Solo se imprime el documento: sin menú, encabezado de la app ni botones.
+     `:has` limita estos cambios a la página de la boleta; el CSS se carga global. */
+  .layout:has(.boleta-documento) .sidebar,
+  .boleta-pantalla {
+    display: none !important;
+  }
+
+  .layout:has(.boleta-documento),
+  .layout:has(.boleta-documento) .layout-main,
+  .layout:has(.boleta-documento) .content,
+  .layout:has(.boleta-documento) .content-inner {
+    display: block;
+    min-height: 0;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+
+  .boleta-documento {
+    max-width: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    color: #000;
+    font-size: 11pt;
+  }
+
+  .boleta-documento__datos dt,
+  .boleta-documento__pie {
+    color: #000;
+  }
+
+  .boleta-documento__items th {
+    background: #e5e5e5;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .boleta-documento__items tr {
+    break-inside: avoid;
+  }
+
+  /* Una boleta que no está EMITIDA no tiene formato de envío. */
+  .boleta-documento--no-emitida {
+    display: none;
+  }
+
+  .boleta-no-imprimible {
+    display: block;
+    font-size: 12pt;
+  }
+}

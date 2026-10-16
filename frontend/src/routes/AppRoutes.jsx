@@ -10,11 +10,13 @@ import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
 import SolicitudesMaterialPage from "../pages/SolicitudesMaterialPage.jsx";
 import IntegracionesPage from "../pages/IntegracionesPage.jsx";
+import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
+import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 
 const privada = (pagina, permisos) => (
   <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>
@@ -131,6 +133,12 @@ export default function AppRoutes() {
         <Route
           path="/integraciones"
           element={privada(<IntegracionesPage />, [PERMISO_INTEGRACIONES])}
+        />
+
+        {/* Vista e impresión de una boleta guardada (solo lectura). */}
+        <Route
+          path="/logistica/boletas/:id"
+          element={privada(<BoletaDetallePage />, [PERMISO_CONSULTAR_BOLETAS])}
         />
 
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
