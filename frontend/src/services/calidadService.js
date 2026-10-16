@@ -40,6 +40,18 @@ export async function listarResultadosCalidad(ordenId, tipo = TIPO_CONFORME) {
   return response.json();
 }
 
+// ABC-82: sin `tipo` el backend registra un conforme; responsable y fecha los pone el servidor.
+export async function registrarConforme({ ordenId, cantidad }) {
+  const response = await fetch(BASE, {
+    method: "POST",
+    headers: encabezados({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ ordenId, cantidad }),
+  });
+
+  await exigirOk(response, "No se pudieron registrar las unidades conformes.");
+  return response.json();
+}
+
 export async function registrarDefecto({ ordenId, cantidad, causaDefecto }) {
   const response = await fetch(BASE, {
     method: "POST",

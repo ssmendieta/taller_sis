@@ -22,6 +22,7 @@ import {
   TIPO_CONFORME,
   TIPO_DEFECTUOSO,
   listarResultadosCalidad,
+  registrarConforme,
   registrarDefecto,
   resumenCalidad,
 } from "../services/calidadService.js";
@@ -103,10 +104,14 @@ export default function OrdenDetallePage() {
   const [errorConsumo, setErrorConsumo] = useState("");
   const [avisoConsumo, setAvisoConsumo] = useState("");
 
-  // ABC-83: unidades defectuosas con causa, separadas de las conformes.
+  // ABC-82 y ABC-83: unidades conformes y defectuosas con causa, por separado.
   const [conformesCalidad, setConformesCalidad] = useState([]);
   const [defectosCalidad, setDefectosCalidad] = useState([]);
   const [errorCargaCalidad, setErrorCargaCalidad] = useState("");
+  const [cantidadConforme, setCantidadConforme] = useState("");
+  const [guardandoConforme, setGuardandoConforme] = useState(false);
+  const [errorConforme, setErrorConforme] = useState("");
+  const [avisoConforme, setAvisoConforme] = useState("");
   const [cantidadDefecto, setCantidadDefecto] = useState("");
   const [causaDefecto, setCausaDefecto] = useState("");
   const [guardandoDefecto, setGuardandoDefecto] = useState(false);
@@ -116,7 +121,8 @@ export default function OrdenDetallePage() {
   const muestraAcciones = puedeVerAcciones(usuario);
   const permiteAvance = puedeRegistrarAvance(usuario);
   const permiteConsumo = tienePermiso(usuario, "materiales.registrar_consumo");
-  const permiteDefecto = tienePermiso(usuario, "calidad.registrar_conformes");
+  // El mismo permiso de calidad registra conformes y defectuosos.
+  const permiteCalidad = tienePermiso(usuario, "calidad.registrar_conformes");
 
   async function cargarCalidad() {
     try {
@@ -402,6 +408,50 @@ export default function OrdenDetallePage() {
       );
     } finally {
       setGuardandoConsumo(false);
+    }
+  }
+
+  async function guardarConforme(evento) {
+    evento.preventDefault();
+
+    if (guardandoConforme) return;
+
+    setErrorConforme("");
+    setAvisoConforme("");
+
+    const cantidad = Number(cantidadConforme);
+
+    if (!cantidadConforme || !Number.isFinite(cantidad) || cantidad <= 0) {
+      setErrorConforme("La cantidad conforme debe ser mayor a cero.");
+      return;
+    }
+
+    if (Number(cantidad.toFixed(4)) !== cantidad) {
+      setErrorConforme("La cantidad admite como máximo 4 decimales.");
+      return;
+    }
+
+    if (cantidad > calidad.porClasificar) {
+      setErrorConforme(
+        `No se pueden registrar ${formatearCantidad(cantidad, unidad)}: hay ${formatearCantidad(calidad.producido, unidad)} producidas según los avances y ${formatearCantidad(calidad.producido - calidad.porClasificar, unidad)} ya clasificadas, así que quedan ${formatearCantidad(calidad.porClasificar, unidad)}.`,
+      );
+      return;
+    }
+
+    setGuardandoConforme(true);
+
+    try {
+      await registrarConforme({ ordenId: Number(id), cantidad });
+      setCantidadConforme("");
+      setAvisoConforme("Unidades conformes registradas correctamente.");
+    } catch (fallo) {
+      setErrorConforme(
+        fallo.message || "No se pudieron registrar las unidades conformes.",
+      );
+    } finally {
+      // Con éxito o rechazo, el resumen refleja lo que guarda la API.
+      await cargarCalidad();
+      setGuardandoConforme(false);
     }
   }
 
@@ -969,11 +1019,14 @@ export default function OrdenDetallePage() {
         </div>
       </div>
 
-      {/* ABC-83: conformes y defectuosas se muestran por separado. */}
+      {/* ABC-82 y ABC-83: conformes y defectuosas se muestran por separado. */}
       <div className="ts-panel" style={{ marginBottom: 16 }}>
         <div className="ts-panel-title">
           <h2>Calidad del producto terminado</h2>
-          <span>{defectosCalidad.length} registros de defectos</span>
+          <span>
+            {conformesCalidad.length} registros conformes ·{" "}
+            {defectosCalidad.length} de defectos
+          </span>
         </div>
 
         {errorCargaCalidad && (
@@ -1004,7 +1057,121 @@ export default function OrdenDetallePage() {
           </table>
         </div>
 
-        {permiteDefecto ? (
+        <div className="ts-panel-title">
+          <h3 style={{ margin: 0, fontSize: ".88rem", fontWeight: 600 }}>
+            Unidades conformes
+          </h3>
+          <span>
+            Acumulado: {formatearCantidad(calidad.conformes, unidad)}
+          </span>
+        </div>
+
+        {permiteCalidad ? (
+          <form
+            onSubmit={guardarConforme}
+            noValidate
+            style={{ padding: "12px 20px 16px" }}
+          >
+            <label
+              htmlFor="cantidad-conforme"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                maxWidth: 320,
+              }}
+            >
+              Cantidad conforme{unidad ? ` (en ${unidad})` : ""}
+              <input
+                id="cantidad-conforme"
+                type="number"
+                min="0.0001"
+                max="9999999999.9999"
+                step="0.0001"
+                value={cantidadConforme}
+                onChange={(e) => setCantidadConforme(e.target.value)}
+                required
+                disabled={guardandoConforme}
+                style={{
+                  minHeight: 36,
+                  padding: "7px 10px",
+                  border: "1px solid #e0e0e2",
+                  borderRadius: 5,
+                }}
+              />
+            </label>
+
+            {errorConforme && (
+              <p className="ts-modal-error" role="alert">
+                {errorConforme}
+              </p>
+            )}
+
+            {avisoConforme && (
+              <p className="ts-success" role="status">
+                {avisoConforme}
+              </p>
+            )}
+
+            <div className="ts-btn-group" style={{ marginTop: 12 }}>
+              <button
+                type="submit"
+                className="ts-btn ts-btn-primary"
+                disabled={guardandoConforme}
+              >
+                {guardandoConforme ? "Registrando…" : "Registrar conformes"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p className="ts-empty">No tienes permiso para registrar conformes.</p>
+        )}
+
+        <div className="ts-table-wrap">
+          <table className="ts-table">
+            <caption>Historial de unidades conformes</caption>
+            <thead>
+              <tr>
+                <th scope="col">Cantidad</th>
+                <th scope="col">Responsable</th>
+                <th scope="col">Fecha</th>
+                <th scope="col">Hora</th>
+              </tr>
+            </thead>
+            <tbody>
+              {conformesCalidad.map((c, i) => {
+                const { fecha, hora } = mostrarFechaHora(
+                  c.fechaHora ?? c.fecha_hora,
+                );
+
+                return (
+                  <tr key={c.id ?? i}>
+                    <td>{formatearCantidad(c.cantidad, unidad)}</td>
+                    <td>{responsableDeResultado(c, usuario)}</td>
+                    <td>{fecha}</td>
+                    <td>{hora}</td>
+                  </tr>
+                );
+              })}
+              {conformesCalidad.length === 0 && (
+                <tr>
+                  <td colSpan={4}>Todavía no hay unidades conformes registradas.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="ts-panel-title">
+          <h3 style={{ margin: 0, fontSize: ".88rem", fontWeight: 600 }}>
+            Unidades defectuosas
+          </h3>
+          <span>
+            Acumulado: {formatearCantidad(calidad.defectuosos, unidad)}
+          </span>
+        </div>
+
+        {permiteCalidad ? (
           <form
             onSubmit={guardarDefecto}
             noValidate
