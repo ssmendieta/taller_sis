@@ -10,14 +10,18 @@ export interface ReclamarEventosOptions {
 
 export interface OutboxStore {
   reclamarPendientes(options: ReclamarEventosOptions): Promise<EventoOutbox[]>;
+  // Devuelve false cuando el lease ya pertenece a otro worker y la escritura
+  // condicional no modificó el evento.
   marcarPublicado(
     evento: EventoOutbox,
     messageId: string,
     publicadoEn: Date,
-  ): Promise<void>;
+  ): Promise<boolean>;
+  // Igual que marcarPublicado: false identifica un resultado tardío que debe
+  // diagnosticarse sin alterar al propietario actual del evento.
   marcarFallo(
     evento: EventoOutbox,
     error: string,
     proximoIntentoEn: Date,
-  ): Promise<void>;
+  ): Promise<boolean>;
 }

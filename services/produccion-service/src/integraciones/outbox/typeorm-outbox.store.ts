@@ -54,8 +54,8 @@ export class TypeOrmOutboxStore implements OutboxStore {
     evento: EventoOutbox,
     messageId: string,
     publicadoEn: Date,
-  ): Promise<void> {
-    await this.dataSource.getRepository(EventoOutbox).update(
+  ): Promise<boolean> {
+    const resultado = await this.dataSource.getRepository(EventoOutbox).update(
       {
         id: evento.id,
         estado: ESTADO_OUTBOX_PROCESANDO,
@@ -70,14 +70,15 @@ export class TypeOrmOutboxStore implements OutboxStore {
         bloqueoHasta: null,
       },
     );
+    return resultado.affected === 1;
   }
 
   async marcarFallo(
     evento: EventoOutbox,
     error: string,
     proximoIntentoEn: Date,
-  ): Promise<void> {
-    await this.dataSource.getRepository(EventoOutbox).update(
+  ): Promise<boolean> {
+    const resultado = await this.dataSource.getRepository(EventoOutbox).update(
       {
         id: evento.id,
         estado: ESTADO_OUTBOX_PROCESANDO,
@@ -91,5 +92,6 @@ export class TypeOrmOutboxStore implements OutboxStore {
         bloqueoHasta: null,
       },
     );
+    return resultado.affected === 1;
   }
 }

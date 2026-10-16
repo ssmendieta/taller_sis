@@ -13,6 +13,7 @@ export interface ResultadoProcesamientoOutbox {
   reclamados: number;
   publicados: number;
   fallidos: number;
+  resultadosObsoletos: number;
 }
 
 @Injectable()
@@ -53,25 +54,38 @@ export class OutboxPublicadorService implements OnModuleInit, OnModuleDestroy {
       reclamados: eventos.length,
       publicados: 0,
       fallidos: 0,
+      resultadosObsoletos: 0,
     };
 
     for (const evento of eventos) {
       try {
         const confirmacion = await this.publisher.publish(evento.payload);
-        await this.store.marcarPublicado(evento, confirmacion.messageId, new Date());
+        const aplicado = await this.store.marcarPublicado(
+          evento,
+          confirmacion.messageId,
+          new Date(),
+        );
         resultado.publicados += 1;
+        if (!aplicado) {
+          resultado.resultadosObsoletos += 1;
+          this.registrarResultadoObsoleto(evento, 'PUBLICACION_CONFIRMADA');
+        }
       } catch (error) {
         const mensaje = this.mensajeSeguro(error);
         const espera = Math.min(
           this.config.retryBaseMs * (2 ** Math.max(0, evento.intentos - 1)),
           this.config.retryMaxMs,
         );
-        await this.store.marcarFallo(
+        const aplicado = await this.store.marcarFallo(
           evento,
           mensaje,
           new Date(Date.now() + espera),
         );
         resultado.fallidos += 1;
+        if (!aplicado) {
+          resultado.resultadosObsoletos += 1;
+          this.registrarResultadoObsoleto(evento, 'PUBLICACION_FALLIDA');
+        }
         this.logger.warn(JSON.stringify({
           codigo: 'PUBLICACION_OUTBOX_FALLIDA',
           eventId: evento.eventId,
@@ -83,6 +97,19 @@ export class OutboxPublicadorService implements OnModuleInit, OnModuleDestroy {
     }
 
     return resultado;
+  }
+
+  private registrarResultadoObsoleto(
+    evento: { eventId: string; eventType: string; intentos: number },
+    resultado: 'PUBLICACION_CONFIRMADA' | 'PUBLICACION_FALLIDA',
+  ): void {
+    this.logger.warn(JSON.stringify({
+      codigo: 'RESULTADO_OUTBOX_OBSOLETO',
+      eventId: evento.eventId,
+      eventType: evento.eventType,
+      intento: evento.intentos,
+      resultado,
+    }));
   }
 
   private async ejecutarCicloProtegido(): Promise<void> {
