@@ -14,7 +14,7 @@ import {
 } from "../services/ordenesService.js";
 import {
   listarConsumosOrden,
-  obtenerTotalesConsumos,
+  obtenerComparacionMateriales,
   registrarConsumo,
 } from "../services/consumosService.js";
 import {
@@ -41,7 +41,7 @@ import {
   responsableOrden,
   totalProducidoDe,
 } from "../utils/formato.js";
-import { formatearCantidad, formatearEstadoOrden, formatearFecha } from "../utils/format.js";
+import { formatearCantidad, formatearDiferencia, formatearEstadoOrden, formatearFecha } from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
@@ -55,10 +55,6 @@ const ETIQUETAS = {
 
 function materialIdDeConsumo(consumo) {
   return Number(consumo.materialId ?? consumo.material_id ?? consumo.material?.id);
-}
-
-function cantidadTotalDeConsumo(resumen) {
-  return Number(resumen?.cantidadTotal ?? resumen?.cantidad_total ?? 0);
 }
 
 // La API solo devuelve el id del responsable; si es quien consulta se muestra su nombre.
@@ -97,7 +93,9 @@ export default function OrdenDetallePage() {
 
   // ABC: captura y consulta del consumo real de materiales.
   const [consumos, setConsumos] = useState([]);
-  const [totalesConsumo, setTotalesConsumo] = useState([]);
+  // ABC-72: comparación requerido/utilizado calculada por la API.
+  const [comparacion, setComparacion] = useState([]);
+  const [errorComparacion, setErrorComparacion] = useState("");
   const [materialConsumo, setMaterialConsumo] = useState("");
   const [cantidadConsumo, setCantidadConsumo] = useState("");
   const [guardandoConsumo, setGuardandoConsumo] = useState(false);
@@ -143,6 +141,21 @@ export default function OrdenDetallePage() {
     }
   }
 
+  async function cargarComparacion() {
+    try {
+      const respuesta = await obtenerComparacionMateriales(id);
+      setComparacion(Array.isArray(respuesta?.materiales) ? respuesta.materiales : []);
+      setErrorComparacion("");
+    } catch (fallo) {
+      setComparacion([]);
+      setErrorComparacion(
+        fallo.status === 409
+          ? `${fallo.message}. Las unidades no coinciden, así que no se suman ni se comparan.`
+          : fallo.message || "No se pudo cargar la comparación de materiales.",
+      );
+    }
+  }
+
   async function cargar() {
     setCargando(true);
     setError("");
@@ -178,19 +191,15 @@ export default function OrdenDetallePage() {
         setAvances([]);
       }
 
-      // Carga de registros y totales de consumo.
+      // Registros de consumo y comparación con lo requerido por la receta.
       try {
-        const [registros, resumen] = await Promise.all([
-          listarConsumosOrden(id),
-          obtenerTotalesConsumos(id),
-        ]);
-
+        const registros = await listarConsumosOrden(id);
         setConsumos(Array.isArray(registros) ? registros : []);
-        setTotalesConsumo(Array.isArray(resumen) ? resumen : []);
       } catch {
         setConsumos([]);
-        setTotalesConsumo([]);
       }
+
+      await cargarComparacion();
 
       await cargarCalidad();
 
@@ -395,13 +404,12 @@ export default function OrdenDetallePage() {
       setCantidadConsumo("");
       setAvisoConsumo("Consumo registrado correctamente.");
 
-      const [registros, resumen] = await Promise.all([
+      const [registros] = await Promise.all([
         listarConsumosOrden(id),
-        obtenerTotalesConsumos(id),
+        cargarComparacion(),
       ]);
 
       setConsumos(Array.isArray(registros) ? registros : []);
-      setTotalesConsumo(Array.isArray(resumen) ? resumen : []);
     } catch (fallo) {
       setErrorConsumo(
         fallo.message || "No se pudo registrar el consumo.",
@@ -809,42 +817,59 @@ export default function OrdenDetallePage() {
           </p>
         )}
 
+        <p className="ts-field-help" role="note" style={{ padding: "0 20px" }}>
+          Diferencia = utilizado − requerido. Positiva (+): se usó más de lo
+          requerido por la receta; negativa (-): se usó menos.
+        </p>
+
+        {errorComparacion && (
+          <p className="ts-modal-error" role="alert" style={{ padding: "0 20px" }}>
+            {errorComparacion}
+          </p>
+        )}
+
         <div className="ts-table-wrap">
           <table className="ts-table">
-            <caption>Consumos acumulados y desviación frente a lo requerido</caption>
+            <caption>Requerido por receta frente a utilizado por material y unidad</caption>
             <thead>
               <tr>
                 <th scope="col">Material</th>
-                <th scope="col">Requerido</th>
-                <th scope="col">Consumido</th>
-                <th scope="col">Desviación</th>
+                <th scope="col" className="ts-num">Requerido</th>
+                <th scope="col" className="ts-num">Utilizado</th>
+                <th scope="col" className="ts-num">Diferencia (utilizado − requerido)</th>
               </tr>
             </thead>
             <tbody>
-              {materiales.map((m) => {
-                const resumen = totalesConsumo.find(
-                  (t) =>
-                    Number(t.materialId ?? t.material_id) === Number(m.id),
-                );
-                const consumido = cantidadTotalDeConsumo(resumen);
-                const requerido = Number(m.requerida ?? 0);
-                const desviacion = consumido - requerido;
+              {comparacion.map((c) => {
+                const fueraDeReceta =
+                  Number(c.cantidadRequerida) === 0 && Number(c.cantidadConsumida) > 0;
 
                 return (
-                  <tr key={m.id}>
-                    <td>{m.nombre}</td>
-                    <td>{mostrarCantidad(requerido)} {m.unidad}</td>
-                    <td>{mostrarCantidad(consumido)} {m.unidad}</td>
+                  <tr key={`${c.materialId}-${c.unidad}`}>
                     <td>
-                      {desviacion > 0 ? "+" : ""}
-                      {mostrarCantidad(desviacion)} {m.unidad}
+                      {c.materialNombre} <span className="ts-code">({c.materialCodigo})</span>
+                      {fueraDeReceta && (
+                        <>
+                          <br />
+                          <small>Fuera de la receta actual</small>
+                        </>
+                      )}
+                    </td>
+                    <td className="ts-num">{formatearCantidad(c.cantidadRequerida, c.unidad)}</td>
+                    <td className="ts-num">{formatearCantidad(c.cantidadConsumida, c.unidad)}</td>
+                    <td className="ts-num">
+                      <strong>{formatearDiferencia(c.diferencia, c.unidad)}</strong>
                     </td>
                   </tr>
                 );
               })}
-              {materiales.length === 0 && (
+              {comparacion.length === 0 && (
                 <tr>
-                  <td colSpan={4}>No hay materiales asociados a esta orden.</td>
+                  <td colSpan={4}>
+                    {errorComparacion
+                      ? "Comparación no disponible."
+                      : "La receta de esta orden no tiene materiales."}
+                  </td>
                 </tr>
               )}
             </tbody>

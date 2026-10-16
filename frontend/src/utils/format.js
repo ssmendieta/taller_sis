@@ -14,6 +14,14 @@ export function formatearCantidad(valor, unidad) {
   return `${texto}${sufijo}`;
 }
 
+// Diferencia con signo visible: "+3 kg", "-2,5 kg" o "0 kg".
+export function formatearDiferencia(valor, unidad) {
+  const numero = Number(valor);
+  if (valor == null || valor === "" || !Number.isFinite(numero)) return "—";
+  // `|| 0` evita mostrar "-0".
+  return `${numero > 0 ? "+" : ""}${formatearCantidad(numero || 0, unidad)}`;
+}
+
 export function formatearNumero(valor) {
   const numero = Number(valor);
   if (valor == null || valor === "" || !Number.isFinite(numero)) return "—";
