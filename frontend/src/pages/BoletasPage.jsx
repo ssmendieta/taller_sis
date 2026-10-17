@@ -8,7 +8,7 @@ const solicitudesDemo = [
     orden: "ORD-2026-00001",
     cantidad: 10,
     unidad: "cajas",
-    destino: "Almacen B",
+    destino: "Almacén B",
   },
 ];
 
@@ -16,7 +16,7 @@ const naturalezas = [
   {
     codigo: "TRASLADO",
     descripcion:
-      "Movimiento interno de materiales entre areas o ubicaciones.",
+      "Movimiento interno de materiales entre áreas o ubicaciones.",
   },
   {
     codigo: "DESPACHO",
@@ -99,7 +99,6 @@ export default function BoletasPage() {
             <h2 id="boletas-title">
               Crear boleta
             </h2>
-
             <p>
               La boleta se genera inicialmente en estado BORRADOR.
             </p>
@@ -129,7 +128,7 @@ export default function BoletasPage() {
                     key={solicitud.id}
                     value={solicitud.id}
                   >
-                    {solicitud.id} - {solicitud.orden}
+                    {solicitud.id} — {solicitud.orden}
                   </option>
                 ))}
               </select>
@@ -167,7 +166,9 @@ export default function BoletasPage() {
               style={{ marginTop: "1rem" }}
             >
               <div className="ts-panel-title">
-                <h3>Datos de la solicitud</h3>
+                <h3>
+                  Datos de la solicitud
+                </h3>
               </div>
 
               <div className="ts-filters">
@@ -198,14 +199,14 @@ export default function BoletasPage() {
           )}
 
           <label style={{ marginTop: "1rem" }}>
-            Observacion
+            Observación
             <textarea
               rows="3"
               value={observacion}
               onChange={(e) =>
                 setObservacion(e.target.value)
               }
-              placeholder="Observacion opcional"
+              placeholder="Observación opcional"
             />
           </label>
 
@@ -214,7 +215,9 @@ export default function BoletasPage() {
             style={{ marginTop: "1rem" }}
           >
             <div className="ts-panel-title">
-              <h3>Naturaleza documental</h3>
+              <h3>
+                Naturaleza documental
+              </h3>
             </div>
 
             <div className="ts-filters">

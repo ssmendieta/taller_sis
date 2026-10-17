@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { guardarBoletaLocal } from "../services/logisticaService.js";
@@ -69,7 +69,7 @@ function fechaParaInput(fecha) {
 
 function fechaParaMostrar(fecha) {
   if (!fecha) {
-    return "—";
+    return "-";
   }
 
   const valor = String(fecha);
@@ -136,6 +136,35 @@ export default function BoletaDetallePage() {
   ).toUpperCase();
 
   const esBorrador = estado === "BORRADOR";
+  const ordenIdAsociada =
+    boleta?.ordenId ??
+    boleta?.orden_id ??
+    (
+      boleta?.orden != null &&
+      String(boleta.orden).trim() !== "" &&
+      Number.isFinite(Number(boleta.orden))
+        ? Number(boleta.orden)
+        : null
+    );
+
+  const loteAsociado =
+    boleta?.loteId ??
+    boleta?.lote_id ??
+    boleta?.loteCodigo ??
+    boleta?.lote_codigo ??
+    boleta?.lote ??
+    "";
+
+  const retornoTrazabilidad =
+    location.state?.retornoTrazabilidad ?? null;
+
+  const destinoTrazabilidad =
+    retornoTrazabilidad?.pathname
+      ? {
+          pathname: retornoTrazabilidad.pathname,
+          search: retornoTrazabilidad.search ?? "",
+        }
+      : "/logistica/trazabilidad";
 
   const [lineas, setLineas] = useState(() => {
     const iniciales = Array.isArray(boletaInicial?.items)
@@ -606,7 +635,7 @@ export default function BoletaDetallePage() {
         <div className="ts-panel-title">
           <div>
             <h2 id="boleta-title">
-              Boleta {boleta.numero ?? "—"}
+              Boleta {boleta.numero ?? "-"}
             </h2>
 
             <p>Documento de salida</p>
@@ -618,28 +647,122 @@ export default function BoletaDetallePage() {
         <div className="ts-filters">
           <div>
             <strong>Número</strong>
-            <p>{boleta.numero ?? "—"}</p>
+            <p>{boleta.numero ?? "-"}</p>
           </div>
 
           <div>
             <strong>Responsable</strong>
-            <p>{boleta.responsable ?? "—"}</p>
+            <p>{boleta.responsable ?? "-"}</p>
           </div>
 
           <div>
             <strong>Naturaleza documental</strong>
-            <p>{boleta.naturaleza ?? "—"}</p>
+            <p>{boleta.naturaleza ?? "-"}</p>
           </div>
 
           <div>
             <strong>Solicitud</strong>
-            <p>{boleta.solicitudId ?? "—"}</p>
+            <p>{boleta.solicitudId ?? "-"}</p>
           </div>
 
           <div>
             <strong>Orden</strong>
-            <p>{boleta.orden ?? "—"}</p>
+            <p>{boleta.orden ?? "-"}</p>
           </div>
+        </div>
+      </div>
+      <div
+        className="ts-panel"
+        style={{ marginTop: "1rem" }}
+        data-feature="ABC-308"
+      >
+        <div className="ts-panel-title">
+          <div>
+            <h3>Vinculación documental</h3>
+            <p>
+              Navega entre la boleta, la orden de producción
+              y el lote asociado.
+            </p>
+          </div>
+        </div>
+
+        <div className="ts-filters">
+
+          <div>
+            <strong>Orden de producción</strong>
+
+            {ordenIdAsociada ? (
+              <div style={{ marginTop: "0.5rem" }}>
+                <Link
+                  className="ts-btn"
+                  to={`/ordenes/${encodeURIComponent(
+                    ordenIdAsociada
+                  )}`}
+                  state={{
+                    retornoTrazabilidad,
+                  }}
+                >
+                  Consultar orden
+                </Link>
+              </div>
+            ) : (
+              <p>No existe orden asociada</p>
+            )}
+          </div>
+
+          <div>
+            <strong>Lote</strong>
+
+            {loteAsociado ? (
+              <div style={{ marginTop: "0.5rem" }}>
+                <Link
+                  className="ts-btn"
+                  to={`/logistica/trazabilidad?loteId=${encodeURIComponent(
+                    loteAsociado
+                  )}`}
+                  state={{
+                    retornoBoleta: location.pathname,
+                  }}
+                >
+                  Consultar lote
+                </Link>
+              </div>
+            ) : (
+              <p>No existe lote asociado</p>
+            )}
+          </div>
+
+          <div>
+            <strong>Trazabilidad</strong>
+
+            <div style={{ marginTop: "0.5rem" }}>
+              <Link
+                className="ts-btn"
+                to="/logistica/trazabilidad"
+                state={{
+                  retornoBoleta: location.pathname,
+                }}
+              >
+                Ver trazabilidad
+              </Link>
+            </div>
+          </div>
+
+          {retornoTrazabilidad && (
+            <div>
+              <strong>Retorno</strong>
+
+              <div style={{ marginTop: "0.5rem" }}>
+                <Link
+                  className="ts-btn ts-btn-primary"
+                  to={destinoTrazabilidad}
+                >
+                  Volver a trazabilidad
+                </Link>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
 

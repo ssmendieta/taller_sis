@@ -11,21 +11,48 @@ import LogisticaPage from "../pages/LogisticaPage.jsx";
 import BoletasPage from "../pages/BoletasPage.jsx";
 import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
+import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 
-const privada = (pagina, permisos) => <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>;
+const privada = (pagina, permisos) => (
+  <ProtectedRoute permisos={permisos}>
+    {pagina}
+  </ProtectedRoute>
+);
 
 function InicioRedirect() {
   const { usuario } = useSesion();
   const location = useLocation();
-  if (!usuario) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
-  if (tienePermiso(usuario, "usuarios.gestionar")) return <Navigate to="/usuarios" replace />;
-  if (tienePermiso(usuario, "ordenes.consultar")) return <Navigate to="/ordenes" replace />;
-  if (tienePermiso(usuario, "auditoria.consultar")) return <Navigate to="/auditoria" replace />;
-  if (tienePermiso(usuario, "roles_permisos.gestionar")) return <Navigate to="/roles" replace />;
+
+  if (!usuario) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location.pathname }}
+        replace
+      />
+    );
+  }
+
+  if (tienePermiso(usuario, "usuarios.gestionar")) {
+    return <Navigate to="/usuarios" replace />;
+  }
+
+  if (tienePermiso(usuario, "ordenes.consultar")) {
+    return <Navigate to="/ordenes" replace />;
+  }
+
+  if (tienePermiso(usuario, "auditoria.consultar")) {
+    return <Navigate to="/auditoria" replace />;
+  }
+
+  if (tienePermiso(usuario, "roles_permisos.gestionar")) {
+    return <Navigate to="/roles" replace />;
+  }
+
   return (
     <section className="ts-page" aria-labelledby="sin-funciones">
       <h1 id="sin-funciones">Sin funciones asignadas</h1>
@@ -36,12 +63,19 @@ function InicioRedirect() {
 
 function NoEncontrada() {
   const { usuario } = useSesion();
+
   return (
     <main className="login-page">
       <div className="ts-public" role="alert">
         <h1>Página no encontrada</h1>
         <p>La dirección no existe o fue movida.</p>
-        <Link className="ts-btn ts-btn-primary" to={usuario ? "/" : "/login"}>Volver</Link>
+
+        <Link
+          className="ts-btn ts-btn-primary"
+          to={usuario ? "/" : "/login"}
+        >
+          Volver
+        </Link>
       </div>
     </main>
   );
@@ -50,50 +84,161 @@ function NoEncontrada() {
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Pública: sin barra lateral ni cabecera del sistema */}
       <Route path="/login" element={<LoginPage />} />
-      {/* Autenticadas: solo aquí se monta el layout con barra lateral */}
+
       <Route element={<MainLayout><Outlet /></MainLayout>}>
+
         <Route path="/" element={<InicioRedirect />} />
-        <Route path="/ordenes" element={privada(<OrdenesPage />, ["ordenes.consultar"])} />
-        <Route path="/ordenes/:id" element={privada(<OrdenDetallePage />, ["ordenes.consultar"])} />
-        <Route path="/logistica" element={<LogisticaPage />} />
+
         <Route
-  path="/logistica/boletas"
-  element={
-    <ProtectedRoute roles={["Administrador", "Encargado de Logística"]}>
-      <BoletasPage />
-    </ProtectedRoute>
-  }
-/>
+          path="/ordenes"
+          element={privada(
+            <OrdenesPage />,
+            ["ordenes.consultar"]
+          )}
+        />
+
         <Route
-          path="/logistica/boletas/consulta"
+          path="/ordenes/:id"
+          element={privada(
+            <OrdenDetallePage />,
+            ["ordenes.consultar"]
+          )}
+        />
+
+        {/* =========================
+            LOGÍSTICA
+           ========================= */}
+
+        <Route
+          path="/logistica"
+          element={<LogisticaPage />}
+        />
+
+        <Route
+          path="/logistica/boletas"
           element={
-            <ProtectedRoute roles={["Administrador", "Encargado de Log\u00edstica"]}>
-              <ConsultaBoletasPage />
+            <ProtectedRoute
+              roles={[
+                "Administrador",
+                "Encargado de Logística"
+              ]}
+            >
+              <BoletasPage />
             </ProtectedRoute>
           }
         />
+
         <Route
-  path="/logistica/boletas/:id"
-  element={
-    <ProtectedRoute roles={["Administrador", "Encargado de Logística"]}>
-      <BoletaDetallePage />
-    </ProtectedRoute>
-  }
-/>
-        <Route path="/recetas" element={privada(<RecetasPage />, ["recetas.gestionar"])} />
-        <Route path="/materiales" element={privada(<MaterialesPage />, ["materiales.consultar_disponibilidad", "recetas.gestionar"])} />
-        <Route path="/usuarios" element={privada(<UsuarioPage />, ["usuarios.gestionar"])} />
-        <Route path="/roles" element={privada(<RolesPage />, ["roles_permisos.gestionar"])} />
-        <Route path="/auditoria" element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])} />
-        <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
-        <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
-        <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
+          path="/logistica/boletas/consulta"
+          element={
+            <ProtectedRoute
+              roles={[
+                "Administrador",
+                "Encargado de Logística"
+              ]}
+            >
+                            <ConsultaBoletasPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/logistica/boletas/:id"
+          element={
+            <ProtectedRoute
+              roles={[
+                "Administrador",
+                "Encargado de Logística"
+              ]}
+            >
+              <BoletaDetallePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/logistica/trazabilidad"
+          element={
+            <ProtectedRoute
+              roles={[
+                "Administrador",
+                "Encargado de Logística"
+              ]}
+            >
+              <TrazabilidadPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* =========================
+            RESTO DEL SISTEMA
+           ========================= */}
+
+        <Route
+          path="/recetas"
+          element={privada(
+            <RecetasPage />,
+            ["recetas.gestionar"]
+          )}
+        />
+
+        <Route
+          path="/materiales"
+          element={privada(
+            <MaterialesPage />,
+            [
+              "materiales.consultar_disponibilidad",
+              "recetas.gestionar"
+            ]
+          )}
+        />
+
+        <Route
+          path="/usuarios"
+          element={privada(
+            <UsuarioPage />,
+            ["usuarios.gestionar"]
+          )}
+        />
+
+        <Route
+          path="/roles"
+          element={privada(
+            <RolesPage />,
+            ["roles_permisos.gestionar"]
+          )}
+        />
+
+        <Route
+          path="/auditoria"
+          element={privada(
+            <ConsultaAuditoriaPage />,
+            ["auditoria.consultar"]
+          )}
+        />
+
+        <Route
+          path="/produccion"
+          element={<Navigate to="/ordenes" replace />}
+        />
+
+        <Route
+          path="/produccion/ordenes"
+          element={<Navigate to="/ordenes" replace />}
+        />
+
+        <Route
+          path="/produccion/avances"
+          element={<Navigate to="/ordenes" replace />}
+        />
 
       </Route>
-      {/* 404 público: tampoco monta el layout */}
-      <Route path="*" element={<NoEncontrada />} />
+
+      <Route
+        path="*"
+        element={<NoEncontrada />}
+      />
     </Routes>
   );
 }
