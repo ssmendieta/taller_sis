@@ -59,4 +59,32 @@ describe('ABC-209: saldo documental', () => {
       .rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(getRawOne).not.toHaveBeenCalled();
   });
+
+  it('maneja una orden con cero conformes y calcula saldo correctamente', async () => {
+    produccion.consultarConformesPorOrden.mockResolvedValueOnce([]);
+    getRawOne.mockResolvedValueOnce({ total: '0' });
+    const result = await new DisponibilidadDocumentalService(boletas, produccion).consultar('ORD-7', 'Bearer token');
+    expect(result).toMatchObject({ totalConforme: '0.0000', totalEmitido: '0.0000', saldoDocumental: '0.0000' });
+  });
+
+  it('formatea correctamente un saldo negativo si las emitidas superan los conformes', async () => {
+    produccion.consultarConformesPorOrden.mockResolvedValueOnce([{ cantidad: '5.0000' }]);
+    getRawOne.mockResolvedValueOnce({ total: '8.2500' });
+    const result = await new DisponibilidadDocumentalService(boletas, produccion).consultar('ORD-7', 'Bearer token');
+    expect(result).toMatchObject({ totalConforme: '5.0000', totalEmitido: '8.2500', saldoDocumental: '-3.2500' });
+  });
+
+  it('maneja cantidades grandes y cuatro decimales sin pérdida de precisión de punto flotante', async () => {
+    produccion.consultarConformesPorOrden.mockResolvedValueOnce([{ cantidad: '100000000.1234' }]);
+    getRawOne.mockResolvedValueOnce({ total: '50000000.0001' });
+    const result = await new DisponibilidadDocumentalService(boletas, produccion).consultar('ORD-7', 'Bearer token');
+    expect(result.saldoDocumental).toBe('50000000.1233');
+  });
+
+  it('propaga ServiceUnavailableException si la consulta de conformes falla por timeout o caída externa', async () => {
+    produccion.consultarConformesPorOrden.mockRejectedValueOnce(new ServiceUnavailableException('Producción no está disponible'));
+    await expect(new DisponibilidadDocumentalService(boletas, produccion).consultar('ORD-7', 'Bearer token'))
+      .rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(getRawOne).not.toHaveBeenCalled();
+  });
 });
