@@ -19,7 +19,7 @@ export class SolicitudesSalidaController {
   constructor(private readonly service: SolicitudesSalidaService) {}
 
   @Post()
-  @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.gestionar')
+  @SetMetadata(PERMISO_LOGISTICA, 'logistica.solicitudes.gestionar')
   create(
     @Body(new ValidarSolicitudSalidaPipe()) dto: CrearSolicitudSalidaDto,
     @Req() request: { usuarioId: string },
@@ -28,13 +28,13 @@ export class SolicitudesSalidaController {
   }
 
   @Get()
-  @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.consultar')
+  @SetMetadata(PERMISO_LOGISTICA, 'logistica.solicitudes.consultar')
   findAll() {
     return this.service.findAll();
   }
 
   @Get(':id')
-  @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.consultar')
+  @SetMetadata(PERMISO_LOGISTICA, 'logistica.solicitudes.consultar')
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
   }

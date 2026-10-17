@@ -5,9 +5,9 @@ describe('SolicitudesSalidaController', () => {
   it('protege las tres rutas y asigna permisos por operación', () => {
     const controller = Reflect.getMetadata('__guards__', SolicitudesSalidaController) as unknown[];
     expect(controller).toHaveLength(1);
-    expect(Reflect.getMetadata(PERMISO_LOGISTICA, SolicitudesSalidaController.prototype.create)).toBe('logistica.boletas.gestionar');
-    expect(Reflect.getMetadata(PERMISO_LOGISTICA, SolicitudesSalidaController.prototype.findAll)).toBe('logistica.boletas.consultar');
-    expect(Reflect.getMetadata(PERMISO_LOGISTICA, SolicitudesSalidaController.prototype.findOne)).toBe('logistica.boletas.consultar');
+    expect(Reflect.getMetadata(PERMISO_LOGISTICA, SolicitudesSalidaController.prototype.create)).toBe('logistica.solicitudes.gestionar');
+    expect(Reflect.getMetadata(PERMISO_LOGISTICA, SolicitudesSalidaController.prototype.findAll)).toBe('logistica.solicitudes.consultar');
+    expect(Reflect.getMetadata(PERMISO_LOGISTICA, SolicitudesSalidaController.prototype.findOne)).toBe('logistica.solicitudes.consultar');
   });
 
   it('toma el responsable de la sesión y delega la creación al servicio', async () => {
