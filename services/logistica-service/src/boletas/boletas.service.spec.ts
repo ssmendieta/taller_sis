@@ -56,4 +56,44 @@ describe('ABC-213/214: creación de boletas con validación documental', () => {
       .rejects.toBeInstanceOf(ServiceUnavailableException);
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
+
+  it('rechaza cuando Producción devuelve lotes que pertenecen a otra orden', async () => {
+    produccion.consultarPorOrden.mockResolvedValueOnce([
+      { id: '4', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' },
+      { id: '5', codigo: 'L-2', ordenId: '99', productoId: '3', cantidad: '5.0000' },
+    ]);
+    await expect(service().create({ solicitudSalidaId: '7', items: [{ referencia: 'L-1', cantidad: '1.0000' }] }, '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(BadGatewayException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza ítems presentes en la solicitud pero que no existen en los lotes de la orden en Producción', async () => {
+    solicitudes.findOne.mockResolvedValueOnce({
+      id: '7', ordenId: '8',
+      items: [{ referencia: 'L-1' }, { referencia: 'L-2' }],
+    });
+    produccion.consultarPorOrden.mockResolvedValueOnce([
+      { id: '4', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' },
+    ]);
+    await expect(service().create({ solicitudSalidaId: '7', items: [{ referencia: 'L-2', cantidad: '1.0000' }] }, '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(NotFoundException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza cuando la orden no existe en Producción (404) y no abre transacción', async () => {
+    produccion.consultarOrdenPorId.mockRejectedValueOnce(new NotFoundException('Orden no encontrada en Producción'));
+    await expect(service().create({ solicitudSalidaId: '7', items: [{ referencia: 'L-1', cantidad: '1.0000' }] }, '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(NotFoundException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('aborta la transacción (rollback) y propaga el error si falla el guardado de los ítems', async () => {
+    const errorPersistencia = new Error('Violación de restricción en base de datos');
+    manager.save.mockImplementationOnce((_type: any, val: any) => Promise.resolve({ id: '10', numero: 'BOL-2026-00001', ...val }));
+    manager.save.mockRejectedValueOnce(errorPersistencia);
+
+    await expect(service().create({ solicitudSalidaId: '7', items: [{ referencia: 'L-1', cantidad: '1.0000' }] }, '42', 'Bearer token'))
+      .rejects.toThrow(errorPersistencia);
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+  });
 });
