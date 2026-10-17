@@ -5,9 +5,9 @@ transacción. No admite que el cliente elija el estado o al responsable.
 
 ## Rutas
 
-- `POST /solicitudes-salida`: requiere `logistica.boletas.gestionar`.
-- `GET /solicitudes-salida`: requiere `logistica.boletas.consultar`.
-- `GET /solicitudes-salida/:id`: requiere `logistica.boletas.consultar`.
+- `POST /solicitudes-salida`: requiere `logistica.solicitudes.gestionar`.
+- `GET /solicitudes-salida`: requiere `logistica.solicitudes.consultar`.
+- `GET /solicitudes-salida/:id`: requiere `logistica.solicitudes.consultar`.
 
 El `POST` recibe `ordenId`, `destinoDocumental`, `motivo` e `items`, donde cada
 ítem tiene `referencia` y `cantidad` como texto decimal de hasta cuatro lugares.
