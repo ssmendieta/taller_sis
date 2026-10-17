@@ -1,9 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PubSub } from '@google-cloud/pubsub';
 import {
-  esTipoEventoSolicitudMaterialInventarioV1,
+  esTipoEventoInventarioV1,
   EventoInventarioV1InvalidoError,
-  validarEventoSolicitudMaterialInventarioV1,
+  validarEventoInventarioV1,
 } from '../contratos/inventario-almacen-v1.validator';
 import { PUBSUB_CLIENT } from './pubsub-client.provider';
 import { PUBSUB_CONFIG, PubSubConfig } from './pubsub.config';
@@ -64,10 +64,10 @@ export class PubSubPublisherService {
   }
 
   private validateKnownContract(event: PubSubEvent<unknown>): void {
-    if (!esTipoEventoSolicitudMaterialInventarioV1(event.eventType)) return;
+    if (!esTipoEventoInventarioV1(event.eventType)) return;
 
     try {
-      validarEventoSolicitudMaterialInventarioV1(event);
+      validarEventoInventarioV1(event);
     } catch (error) {
       if (error instanceof EventoInventarioV1InvalidoError) {
         this.logger.warn(JSON.stringify(error.diagnostico()));

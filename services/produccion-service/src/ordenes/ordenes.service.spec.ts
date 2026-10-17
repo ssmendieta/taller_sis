@@ -7,6 +7,8 @@ import { OrdenesService } from './ordenes.service';
 import { EstadoOrden } from './estado-orden.enum';
 import { RecetasService } from '../recetas/recetas.service';
 import { UsuarioAutenticadoProduccion } from './ordenes.service';
+import { ConsultaDisponibilidad } from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
+import { ConsultaDisponibilidadItem } from '../integraciones/disponibilidad/entities/consulta-disponibilidad-item.entity';
 
 describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   let service: OrdenesService;
@@ -20,6 +22,11 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   const transaction = jest.fn();
   const historialFind = jest.fn();
   const recetaFindOne = jest.fn();
+  const consultaFindOne = jest.fn();
+  const consultaItemsFind = jest.fn();
+  const managerGetRepository = jest.fn((entity: unknown) => entity === ConsultaDisponibilidad
+    ? { findOne: consultaFindOne }
+    : { find: consultaItemsFind });
 
   const repositorioMock = {
     find,
@@ -28,6 +35,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     query: jest.fn(),
     manager: {
       transaction,
+      getRepository: managerGetRepository,
     },
   };
 
@@ -91,6 +99,11 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       orden_codigo: 'OP-001',
       cantidad_producir: 10,
       unidad_producto: 'unidad',
+      estado_consulta: 'RESPONDIDA',
+      consulta_id: 'DISP-ORD-1-V1',
+      consulta_version: 1,
+      request_event_id: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      vigente_en: '2026-10-17T12:00:00.000Z',
       materiales: [],
     });
     managerFindOne.mockResolvedValue({ ...ordenBase(EstadoOrden.EN_PRODUCCION) });
@@ -130,6 +143,11 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       orden_codigo: 'OP-001',
       cantidad_producir: 10,
       unidad_producto: 'unidad',
+      estado_consulta: 'RESPONDIDA',
+      consulta_id: 'DISP-ORD-1-V1',
+      consulta_version: 1,
+      request_event_id: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      vigente_en: '2026-10-17T12:00:00.000Z',
       materiales: [],
     });
     managerFindOne.mockResolvedValue({});
@@ -189,6 +207,27 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       expect(transaction).not.toHaveBeenCalled();
     });
 
+    it('rechaza iniciar mientras la disponibilidad externa sigue pendiente', async () => {
+      prepararInicio();
+      jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
+        orden_id: 1, orden_codigo: 'OP-001', cantidad_producir: 10, unidad_producto: 'unidad',
+        estado_consulta: 'PENDIENTE', consulta_id: 'DISP-ORD-1-V1', consulta_version: 1,
+        request_event_id: 'd59541e7-d44c-4138-92e1-3432310cd1aa', vigente_en: null,
+        materiales: [],
+      });
+
+      const error = await service.cambiarEstado(1, {
+        nuevoEstado: EstadoOrden.EN_PRODUCCION,
+        usuarioResponsableId: 7,
+      }, usuarioProduccion).catch((resultado) => resultado);
+
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toMatchObject({
+        estado_consulta: 'PENDIENTE', consulta_id: 'DISP-ORD-1-V1',
+      });
+      expect(transaction).not.toHaveBeenCalled();
+    });
+
     it.each(['FALTANTE', 'INSUFICIENTE'])(
       'rechaza materiales %s y devuelve su detalle exacto', async (estado) => {
         prepararInicio();
@@ -199,13 +238,18 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
           unidad_medida: 'kg',
           cantidad_requerida: 20,
           cantidad_disponible: estado === 'FALTANTE' ? 0 : 8,
-          estado,
+          estado: estado as 'FALTANTE' | 'INSUFICIENTE',
         };
         jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
           orden_id: 1,
           orden_codigo: 'OP-001',
           cantidad_producir: 10,
           unidad_producto: 'unidad',
+          estado_consulta: 'RESPONDIDA',
+          consulta_id: 'DISP-ORD-1-V1',
+          consulta_version: 1,
+          request_event_id: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+          vigente_en: '2026-10-17T12:00:00.000Z',
           materiales: [material],
         });
 
@@ -536,23 +580,14 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   });
 
 
-  it('ABC-172: devuelve DISPONIBLE cuando hay suficiente material', async () => {
+  it('ABC-278: devuelve SUFICIENTE desde el ultimo snapshot externo', async () => {
     findOne.mockResolvedValue(ordenBase('PENDIENTE'));
-
-    repositorioMock.query = jest.fn().mockResolvedValue([
-      {
-        material_id: 1,
-        codigo: 'MAT-001',
-        nombre: 'Acero',
-        unidad_medida: 'kg',
-        cantidad_requerida: 2,
-      },
-    ]);
-
-    inventarioRepositorioMock.findOne.mockResolvedValue({
-      materialId: 1,
-      cantidadDisponible: 25,
-    });
+    consultaFindOne.mockResolvedValue({ id: '4', consultaId: 'DISP-ORD-1-V1',
+      consultaVersion: 1, requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      estado: 'RESPONDIDA', vigenteEn: new Date('2026-10-17T12:00:00.000Z') });
+    consultaItemsFind.mockResolvedValue([{ materialId: '1', materialCodigo: 'MAT-001',
+      materialNombre: 'Acero', unidad: 'kg', cantidadRequerida: '20.0000',
+      cantidadDisponible: '25.0000', estado: 'SUFICIENTE' }]);
 
     const resultado = await service.compararDisponibilidadMateriales(1);
 
@@ -561,28 +596,20 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
         material_id: 1,
         cantidad_requerida: 20,
         cantidad_disponible: 25,
-        estado: 'DISPONIBLE',
+        estado: 'SUFICIENTE',
       }),
     );
+    expect(inventarioRepositorioMock.findOne).not.toHaveBeenCalled();
   });
 
-  it('ABC-172: devuelve INSUFICIENTE cuando el material disponible no alcanza', async () => {
+  it('ABC-278: devuelve INSUFICIENTE desde el ultimo snapshot externo', async () => {
     findOne.mockResolvedValue(ordenBase('PENDIENTE'));
-
-    repositorioMock.query = jest.fn().mockResolvedValue([
-      {
-        material_id: 1,
-        codigo: 'MAT-001',
-        nombre: 'Acero',
-        unidad_medida: 'kg',
-        cantidad_requerida: 2,
-      },
-    ]);
-
-    inventarioRepositorioMock.findOne.mockResolvedValue({
-      materialId: 1,
-      cantidadDisponible: 15,
-    });
+    consultaFindOne.mockResolvedValue({ id: '4', consultaId: 'DISP-ORD-1-V1',
+      consultaVersion: 1, requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      estado: 'RESPONDIDA', vigenteEn: new Date('2026-10-17T12:00:00.000Z') });
+    consultaItemsFind.mockResolvedValue([{ materialId: '1', materialCodigo: 'MAT-001',
+      materialNombre: 'Acero', unidad: 'kg', cantidadRequerida: '20.0000',
+      cantidadDisponible: '15.0000', estado: 'INSUFICIENTE' }]);
 
     const resultado = await service.compararDisponibilidadMateriales(1);
 
@@ -595,20 +622,14 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     );
   });
 
-  it('ABC-172: devuelve FALTANTE cuando no existe inventario para el material', async () => {
+  it('ABC-278: devuelve FALTANTE desde el ultimo snapshot externo', async () => {
     findOne.mockResolvedValue(ordenBase('PENDIENTE'));
-
-    repositorioMock.query = jest.fn().mockResolvedValue([
-      {
-        material_id: 1,
-        codigo: 'MAT-001',
-        nombre: 'Acero',
-        unidad_medida: 'kg',
-        cantidad_requerida: 2,
-      },
-    ]);
-
-    inventarioRepositorioMock.findOne.mockResolvedValue(null);
+    consultaFindOne.mockResolvedValue({ id: '4', consultaId: 'DISP-ORD-1-V1',
+      consultaVersion: 1, requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      estado: 'RESPONDIDA', vigenteEn: new Date('2026-10-17T12:00:00.000Z') });
+    consultaItemsFind.mockResolvedValue([{ materialId: '1', materialCodigo: 'MAT-001',
+      materialNombre: 'Acero', unidad: 'kg', cantidadRequerida: '20.0000',
+      cantidadDisponible: '0.0000', estado: 'FALTANTE' }]);
 
     const resultado = await service.compararDisponibilidadMateriales(1);
 

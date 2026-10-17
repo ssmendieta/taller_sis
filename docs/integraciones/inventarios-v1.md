@@ -4,8 +4,7 @@ Este documento reutiliza el contrato de solicitudes de ABC-277, definido en
 [`inventario-almacen-v1.ts`](../../services/produccion-service/src/integraciones/contratos/inventario-almacen-v1.ts)
 y [documentado previamente](inventario-almacen-v1.md). Describe los mensajes a
 partir de las solicitudes persistidas de ABC-73. ABC-242 conecta las solicitudes
-al publicador mediante outbox; el simulador, la suscripción y el consumidor de
-respuestas permanecen fuera de este alcance.
+al publicador mediante outbox y ABC-278 consume sus respuestas con inbox.
 
 ## Nombres acordados y diferencias con el plan
 
@@ -37,7 +36,7 @@ genérico usa ese mismo topic para todos los tipos de eventos.
 | Topic de salida de Producción | El existente indicado por `PUBSUB_TOPIC_ID`; puede ser ID corto o `projects/{projectId}/topics/{topicId}`. |
 | Suscripción de Inventarios a solicitudes | Sin nombre ni configuración en el repositorio; pendiente de coordinación con Inventarios. |
 | Topic o ruta de respuesta de Inventarios | Sin configuración en Producción; pendiente de coordinación con Inventarios. |
-| Suscripción de Producción a respuestas | Sin nombre ni configuración en el repositorio; pendiente de las subtareas de recepción. |
+| Suscripción de Producción a respuestas | Recurso existente configurado mediante `PUBSUB_SUBSCRIPTION_ID`; la aplicación no lo crea. |
 
 No se adopta ningún nombre de topic o suscripción del plan que no esté en la
 configuración real. `.env.example` contiene `topic-id-de-ejemplo`, un marcador,
@@ -229,18 +228,21 @@ a Google Pub/Sub. Por ello, un evento de solicitud inválido queda diagnosticado
 y no se publica. El consumidor de ABC-244 aplica el mismo validador antes de la
 transacción que actualiza la solicitud.
 
-### Evidencia de transporte pendiente
+### Transporte y disponibilidad
 
 El repositorio contiene el consumidor y el inbox, pero no provisiona una
-suscripción de Producción ni contiene el simulador de Inventarios de ABC-243.
-La comprobación real
-`publish -> consume`, con `eventId` y `messageId`, requiere esos recursos y las
-credenciales del entorno. No se inventa un nombre de suscripción ni se presenta
-una prueba unitaria como evidencia de recepción real.
+suscripción de Producción ni contiene el simulador de Inventarios. La
+comprobación real `publish -> consume`, con `eventId` y `messageId`, requiere una
+suscripción existente, credenciales y un emisor externo de respuestas.
 
 El inbox garantiza que una redelivery exacta no repita efectos y rechaza el
 mismo `eventId` con contenido diferente. La solicitud y el inbox se confirman en
 una sola transacción; el ACK se envía después del commit.
 
+ABC-278 aplica las mismas garantías a `DisponibilidadMaterialRespondida.v1`.
+La consulta, sus materiales requeridos y el outbox se guardan juntos; la
+respuesta actualiza el snapshot y el inbox en otra transacción. Una versión
+anterior queda registrada como `IGNORADO` y no reemplaza la vigente.
+
 El [diagrama del flujo](../diagramas/inventarios-v1.md) distingue la
-infraestructura existente de los pasos pendientes.
+infraestructura existente de los recursos externos que deben provisionarse.

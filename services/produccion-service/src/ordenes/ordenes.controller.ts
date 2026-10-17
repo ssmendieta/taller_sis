@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -84,6 +86,14 @@ export class OrdenesController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.ordenesService.compararDisponibilidadMateriales(id);
+  }
+
+  @Post(':id/disponibilidad-materiales/consultar')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'materiales.consultar_disponibilidad')
+  solicitarDisponibilidadMateriales(@Param('id', ParseIntPipe) id: number) {
+    return this.ordenesService.solicitarDisponibilidadMateriales(id);
   }
 
   @Get(':id/materiales')

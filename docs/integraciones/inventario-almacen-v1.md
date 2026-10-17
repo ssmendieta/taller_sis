@@ -1,8 +1,9 @@
 # Contratos Inventario/Almacén v1
 
-Contratos de ABC-277. En este sprint Producción solo envía mensajes al topic
-existente de `PUBSUB_TOPIC_ID`. Los mensajes de respuesta se documentan para
-trabajo futuro, pero no se crean suscripciones ni consumidores.
+Contratos de ABC-277 implementados por ABC-278. Producción envía mensajes al
+topic existente de `PUBSUB_TOPIC_ID` y consume respuestas desde la suscripción
+configurada en `PUBSUB_SUBSCRIPTION_ID`. La aplicación usa outbox e inbox; no
+crea recursos de Google Cloud ni accede a la base de datos externa.
 
 ## Mensajes salientes de este sprint
 
@@ -62,7 +63,7 @@ trabajo futuro, pero no se crean suscripciones ni consumidores.
 `solicitudId` corresponde a la solicitud local persistida. El contrato conserva
 los estados locales existentes `PENDIENTE`, `APROBADA` y `CANCELADA`.
 
-## Mensajes definidos para una fase futura
+## Mensajes entrantes
 
 ### DisponibilidadMaterialRespondida.v1
 
@@ -117,7 +118,7 @@ de los estados `SUFICIENTE`, `INSUFICIENTE` o `FALTANTE`.
 }
 ```
 
-## Reglas de estado e idempotencia futuras
+## Reglas de estado e idempotencia
 
 - La disponibilidad global es suficiente solo cuando todos los materiales son
   `SUFICIENTE`.
@@ -129,8 +130,20 @@ de los estados `SUFICIENTE`, `INSUFICIENTE` o `FALTANTE`.
 - Una actualización con `solicitudVersion` anterior no retrocede el estado.
 - Reintentar un mensaje saliente conserva `eventId` y la identidad de negocio.
 
-Estas reglas no implican un consumidor en este sprint; quedan fijadas para que
-backend y frontend puedan avanzar sobre la misma semántica.
+El consumidor confirma los mensajes permanentes inválidos para evitar poison
+messages y solicita redelivery cuando el fallo es transitorio. El inbox y la
+actualización de negocio se confirman en una misma transacción.
+
+## API y persistencia en Producción
+
+- `POST /ordenes/:id/disponibilidad-materiales/consultar` crea o reutiliza una
+  consulta `PENDIENTE` y guarda su evento outbox atómicamente.
+- `GET /ordenes/:id/disponibilidad-materiales` devuelve el snapshot externo más
+  reciente; no consulta `inventario_material` ni produce mensajes.
+- `consultas_disponibilidad` conserva versión, correlación, eventos y vigencia.
+- `consulta_disponibilidad_items` conserva el snapshot requerido y respondido.
+- Una orden no puede iniciar sin una respuesta vigente, ni cuando algún material
+  está `INSUFICIENTE` o `FALTANTE`.
 
 ## Campos obligatorios
 

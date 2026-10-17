@@ -81,11 +81,13 @@ después de aceptar la publicación.
 
 - No se crean ni administran topics.
 - No se crean suscripciones.
-- ABC-244 consume `SolicitudMaterialAlmacenEstadoActualizado.v1`, confirma
-  mensajes permanentes y solicita redelivery ante fallos transitorios.
+- El consumidor recibe `SolicitudMaterialAlmacenEstadoActualizado.v1` y
+  `DisponibilidadMaterialRespondida.v1`, confirma mensajes permanentes y
+  solicita redelivery ante fallos transitorios.
 - Existe outbox y reintento persistente para `SolicitudMaterialAlmacen.v1`
   y `ProduccionCerrada.v1`. Ambos reutilizan el mismo publicador y configuración.
-- Existe inbox persistente para evitar efectos duplicados. El simulador de
-  Inventarios continúa fuera del alcance y corresponde a ABC-243.
+- Existe inbox persistente para evitar efectos duplicados y snapshots
+  versionados de disponibilidad. El simulador de Inventarios continúa fuera
+  del alcance.
 - Los contratos están documentados en `contabilidad-v1.md` e
   `inventario-almacen-v1.md`.
