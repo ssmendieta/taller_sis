@@ -12,6 +12,7 @@ import "../styles/layout.css";
 const iconos = {
   ordenes: <><rect x="5" y="3" width="14" height="18" rx="1" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
   recetas: <><path d="M5 4h14v12H5z" /><path d="M5 16h14v4H5zM9 8h6M9 11h6" /></>,
+  solicitudes: <><path d="M4 6h16v14H4z" /><path d="M8 3h8v6H8zM8 13h8m-8 4h5" /></>,
   auditoria: <><path d="M5 3h14v18H5zM9 8h6m-6 4h6m-6 4h3" /></>,
   roles: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4l5 5m0-5l-5 5" /></>,
   usuarios: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8a3 3 0 1 1 2 5M21 20c0-2.8-1.9-5.1-4.5-5.8" /></>,
@@ -31,6 +32,7 @@ export default function MainLayout({ children }) {
   const [abierto, setAbierto] = useState(false);
   const puedeOrdenes = tienePermiso(usuario, "ordenes.consultar");
   const puedeRecetas = tienePermiso(usuario, "recetas.gestionar");
+  const puedeSolicitarMateriales = tienePermiso(usuario, "materiales.solicitar");
   const puedeRoles = tienePermiso(usuario, "roles_permisos.gestionar");
   const puedeUsuarios = tienePermiso(usuario, "usuarios.gestionar");
   const puedeAuditoria = tienePermiso(usuario, "auditoria.consultar");
@@ -53,6 +55,7 @@ export default function MainLayout({ children }) {
         <nav className="navbar" aria-label="Navegación principal">
           {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
           {puedeRecetas && <Link className={activo("/recetas")} to="/recetas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recetas" />Recetas</Link>}
+          {puedeSolicitarMateriales && <Link className={activo("/solicitudes-material")} to="/solicitudes-material" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de materiales</Link>}
           {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios" onClick={() => setAbierto(false)}><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
           {puedeRoles && <Link className={activo("/roles")} to="/roles" onClick={() => setAbierto(false)}><IconoNavegacion nombre="roles" />Roles y permisos</Link>}
           {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria" onClick={() => setAbierto(false)}><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
