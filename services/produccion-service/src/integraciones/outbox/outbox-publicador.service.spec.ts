@@ -31,25 +31,27 @@ class OutboxEnMemoria implements OutboxStore {
     evento: EventoOutbox,
     messageId: string,
     publicadoEn: Date,
-  ): Promise<void> {
+  ): Promise<boolean> {
     evento.estado = ESTADO_OUTBOX_PUBLICADO;
     evento.messageId = messageId;
     evento.publicadoEn = publicadoEn;
     evento.ultimoError = null;
     evento.bloqueoToken = null;
     evento.bloqueoHasta = null;
+    return true;
   }
 
   async marcarFallo(
     evento: EventoOutbox,
     error: string,
     proximoIntentoEn: Date,
-  ): Promise<void> {
+  ): Promise<boolean> {
     evento.estado = ESTADO_OUTBOX_PENDIENTE;
     evento.ultimoError = error;
     evento.proximoIntentoEn = proximoIntentoEn;
     evento.bloqueoToken = null;
     evento.bloqueoHasta = null;
+    return true;
   }
 }
 
@@ -97,7 +99,7 @@ function eventoPendiente(): EventoOutbox {
   };
 }
 
-describe('ABC-242: publicación durable desde outbox', () => {
+describe('ABC-242/275: publicación durable y reintentos desde outbox', () => {
   beforeEach(() => {
     jest.useFakeTimers({ now: new Date('2026-10-11T18:15:00.000Z') });
   });
@@ -163,6 +165,7 @@ describe('ABC-242: publicación durable desde outbox', () => {
       reclamados: 1,
       publicados: 1,
       fallidos: 0,
+      resultadosObsoletos: 0,
     });
     expect(evento).toMatchObject({
       estado: ESTADO_OUTBOX_PUBLICADO,
@@ -198,6 +201,7 @@ describe('ABC-242: publicación durable desde outbox', () => {
       reclamados: 1,
       publicados: 0,
       fallidos: 1,
+      resultadosObsoletos: 0,
     });
     expect(evento).toMatchObject({
       estado: ESTADO_OUTBOX_PENDIENTE,
@@ -212,7 +216,12 @@ describe('ABC-242: publicación durable desde outbox', () => {
     )).resolves.toMatchObject({ reclamados: 0 });
     await expect(service.procesarPendientes(
       new Date('2026-10-11T18:15:01.000Z'),
-    )).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+    )).resolves.toEqual({
+      reclamados: 1,
+      publicados: 1,
+      fallidos: 0,
+      resultadosObsoletos: 0,
+    });
     expect(evento).toMatchObject({
       estado: ESTADO_OUTBOX_PUBLICADO,
       intentos: 2,
@@ -254,12 +263,65 @@ describe('ABC-242: publicación durable desde outbox', () => {
     )).resolves.toMatchObject({ reclamados: 0 });
     await expect(service.procesarPendientes(
       new Date('2026-10-11T18:15:30.000Z'),
-    )).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+    )).resolves.toEqual({
+      reclamados: 1,
+      publicados: 1,
+      fallidos: 0,
+      resultadosObsoletos: 0,
+    });
     expect(evento).toMatchObject({
       eventId: 'de5d85ad-f8c5-4731-a75d-d8bd25ea2bf6',
       estado: ESTADO_OUTBOX_PUBLICADO,
       intentos: 2,
       messageId: 'mensaje-recuperado',
+    });
+  });
+
+  it('diagnostica una confirmación que llega después de perder el lease', async () => {
+    const evento = eventoPendiente();
+    const store = new OutboxEnMemoria([evento]);
+    jest.spyOn(store, 'marcarPublicado').mockResolvedValue(false);
+    const publisher = {
+      publish: jest.fn().mockResolvedValue({ messageId: 'mensaje-tardio' }),
+    } as unknown as PubSubPublisherService;
+    const service = new OutboxPublicadorService(store, publisher, {
+      enabled: false,
+      batchSize: 10,
+      pollIntervalMs: 5000,
+      leaseMs: 30000,
+      retryBaseMs: 1000,
+      retryMaxMs: 60000,
+    });
+
+    await expect(service.procesarPendientes()).resolves.toEqual({
+      reclamados: 1,
+      publicados: 1,
+      fallidos: 0,
+      resultadosObsoletos: 1,
+    });
+  });
+
+  it('diagnostica un fallo que llega después de perder el lease', async () => {
+    const evento = eventoPendiente();
+    const store = new OutboxEnMemoria([evento]);
+    jest.spyOn(store, 'marcarFallo').mockResolvedValue(false);
+    const publisher = {
+      publish: jest.fn().mockRejectedValue(new Error('timeout tardio')),
+    } as unknown as PubSubPublisherService;
+    const service = new OutboxPublicadorService(store, publisher, {
+      enabled: false,
+      batchSize: 10,
+      pollIntervalMs: 5000,
+      leaseMs: 30000,
+      retryBaseMs: 1000,
+      retryMaxMs: 60000,
+    });
+
+    await expect(service.procesarPendientes()).resolves.toEqual({
+      reclamados: 1,
+      publicados: 0,
+      fallidos: 1,
+      resultadosObsoletos: 1,
     });
   });
 });

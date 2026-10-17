@@ -24,6 +24,15 @@ export class SolicitudMaterial {
   @Column({ type: 'varchar', length: 20, default: 'PENDIENTE' })
   estado: string;
 
+  @Column({ name: 'solicitud_version', type: 'integer', default: 1 })
+  solicitudVersion: number;
+
+  @Column({ name: 'estado_actualizado_en', type: 'timestamptz', nullable: true })
+  estadoActualizadoEn: Date | null;
+
+  @Column({ name: 'motivo_estado', type: 'varchar', length: 500, nullable: true })
+  motivoEstado: string | null;
+
   @OneToMany(() => SolicitudMaterialItem, (item) => item.solicitud)
   items: SolicitudMaterialItem[];
 }

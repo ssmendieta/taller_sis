@@ -587,7 +587,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
           expect(await runner.query(`SELECT COUNT(*)::int AS total FROM "${schema}".eventos_outbox`))
             .toEqual([{ total: 1 }]);
           expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(0);
-          await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0 });
+          await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0, resultadosObsoletos: 0 });
           expect(publishMessage).not.toHaveBeenCalled();
           verificadoAntesDelCommit = true;
           await commit();
@@ -596,7 +596,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
       });
       expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(201);
       expect(verificadoAntesDelCommit).toBe(true);
-      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0, resultadosObsoletos: 0 });
       expect(publishMessage).toHaveBeenCalledTimes(1);
     });
 
@@ -609,7 +609,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
       const publishMessage = jest.fn().mockRejectedValueOnce(new Error('Pub/Sub no disponible'))
         .mockResolvedValue('mensaje-cierre-recuperado');
       await expect(publicador(publishMessage).procesarPendientes())
-        .resolves.toEqual({ reclamados: 1, publicados: 0, fallidos: 1 });
+        .resolves.toEqual({ reclamados: 1, publicados: 0, fallidos: 1, resultadosObsoletos: 0 });
       const pendiente = await repository.findOneByOrFail({ id: original.id });
       expect(pendiente).toMatchObject({ estado: 'PENDIENTE', intentos: 1,
         eventId: original.eventId, correlationId: original.correlationId, payload: original.payload,
@@ -627,7 +627,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
 
       const workerReiniciado = publicador(publishMessage, new TypeOrmOutboxStore(apiApp.get(DataSource)));
       await expect(workerReiniciado.procesarPendientes(pendiente.proximoIntentoEn))
-        .resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+        .resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0, resultadosObsoletos: 0 });
       const publicado = await repository.findOneByOrFail({ id: original.id });
       expect(publicado).toMatchObject({ estado: 'PUBLICADO', intentos: 2,
         messageId: 'mensaje-cierre-recuperado', ultimoError: null,
@@ -638,7 +638,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
       expect(JSON.parse(mensaje.data.toString('utf8'))).toEqual(original.payload);
       expect(mensaje.attributes.eventId).toBe(original.eventId);
       expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(409);
-      await expect(workerReiniciado.procesarPendientes()).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0 });
+      await expect(workerReiniciado.procesarPendientes()).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0, resultadosObsoletos: 0 });
       expect(publishMessage).toHaveBeenCalledTimes(2);
       expect(await repository.count()).toBe(1);
       expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(1);

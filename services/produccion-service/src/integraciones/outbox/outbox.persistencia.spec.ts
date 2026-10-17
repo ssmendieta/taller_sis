@@ -30,7 +30,7 @@ describe('ABC-242: metadatos de persistencia outbox', () => {
 
 const describeReal = process.env.OUTBOX_DB_REAL === '1' ? describe : describe.skip;
 
-describeReal('ABC-242: almacenamiento PostgreSQL y leases de outbox', () => {
+describeReal('ABC-242/275: almacenamiento PostgreSQL y leases de outbox', () => {
   const schema = `abc242_test_${process.pid}_${Date.now()}`;
   let source: DataSource;
   let store: TypeOrmOutboxStore;
@@ -106,15 +106,57 @@ describeReal('ABC-242: almacenamiento PostgreSQL y leases de outbox', () => {
       leaseMs: 30000,
     });
     expect(recuperado).toMatchObject({ eventId, intentos: 2 });
-    await store.marcarPublicado(
+    await expect(store.marcarPublicado(
       recuperado,
       'mensaje-google-1',
       new Date('2026-10-11T18:15:31.000Z'),
-    );
+    )).resolves.toBe(true);
+    await expect(store.marcarPublicado(
+      primero,
+      'confirmacion-obsoleta',
+      new Date('2026-10-11T18:15:32.000Z'),
+    )).resolves.toBe(false);
     await expect(repository.findOneByOrFail({ eventId })).resolves.toMatchObject({
       estado: ESTADO_OUTBOX_PUBLICADO,
       messageId: 'mensaje-google-1',
       intentos: 2,
+    });
+  });
+
+  it('permite que solo un worker reclame el evento pendiente', async () => {
+    const repository = source.getRepository(EventoOutbox);
+    const eventId = '2f1cced4-e07f-41b0-acf8-09c467ae05cc';
+    await repository.save(repository.create({
+      eventId,
+      correlationId: 'c525accc-1a52-473a-bcf7-89676959bd10',
+      eventType: 'SolicitudMaterialAlmacen.v1',
+      aggregateType: 'SolicitudMaterial',
+      aggregateId: '28',
+      payload: {
+        eventId,
+        eventType: 'SolicitudMaterialAlmacen.v1',
+        occurredAt: '2026-10-15T18:15:00.000Z',
+        source: 'produccion-service',
+        correlationId: 'c525accc-1a52-473a-bcf7-89676959bd10',
+        data: {},
+      },
+      proximoIntentoEn: new Date('2026-10-15T18:15:00.000Z'),
+    }));
+    const opciones = {
+      ahora: new Date('2026-10-15T18:15:00.000Z'),
+      limite: 1,
+      leaseMs: 30000,
+    };
+
+    const reclamos = await Promise.all([
+      store.reclamarPendientes(opciones),
+      store.reclamarPendientes(opciones),
+    ]);
+
+    expect(reclamos.flat()).toHaveLength(1);
+    await expect(repository.findOneByOrFail({ eventId })).resolves.toMatchObject({
+      estado: ESTADO_OUTBOX_PROCESANDO,
+      intentos: 1,
     });
   });
 });

@@ -56,14 +56,16 @@ class OutboxEnMemoria implements OutboxStore {
       });
   }
 
-  async marcarPublicado(evento: EventoOutbox, messageId: string, publicadoEn: Date): Promise<void> {
+  async marcarPublicado(evento: EventoOutbox, messageId: string, publicadoEn: Date): Promise<boolean> {
     const actual = this.vigente(evento);
     if (actual) Object.assign(actual, { estado: ESTADO_OUTBOX_PUBLICADO, messageId, publicadoEn, ultimoError: null, bloqueoToken: null, bloqueoHasta: null });
+    return Boolean(actual);
   }
 
-  async marcarFallo(evento: EventoOutbox, error: string, proximoIntentoEn: Date): Promise<void> {
+  async marcarFallo(evento: EventoOutbox, error: string, proximoIntentoEn: Date): Promise<boolean> {
     const actual = this.vigente(evento);
     if (actual) Object.assign(actual, { estado: ESTADO_OUTBOX_PENDIENTE, ultimoError: error, proximoIntentoEn, bloqueoToken: null, bloqueoHasta: null });
+    return Boolean(actual);
   }
 
   private vigente(evento: EventoOutbox) {
@@ -207,8 +209,8 @@ describe('Integraciones: caída de Pub/Sub, mensaje repetido y permisos', () => 
       })]);
 
       pubsubConfig.enabled = true;
-      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
-      await expect(worker.procesarPendientes(despuesDe(60000))).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0 });
+      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0, resultadosObsoletos: 0 });
+      await expect(worker.procesarPendientes(despuesDe(60000))).resolves.toEqual({ reclamados: 0, publicados: 0, fallidos: 0, resultadosObsoletos: 0 });
 
       const restaurado = await panel('Publicador restaurado: el evento sale y no se vuelve a publicar');
       expect(restaurado.body.items).toEqual([expect.objectContaining({
@@ -223,7 +225,7 @@ describe('Integraciones: caída de Pub/Sub, mensaje repetido y permisos', () => 
     it('conserva el evento pendiente con intento y error, respeta la espera y al volver Pub/Sub lo publica una vez', async () => {
       pubsubConfig.enabled = true;
       pubsub.caido = true;
-      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 0, fallidos: 1 });
+      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 0, fallidos: 1, resultadosObsoletos: 0 });
       await expect(worker.procesarPendientes()).resolves.toMatchObject({ reclamados: 0 });
 
       const caido = await panel('Pub/Sub caído: el evento sigue pendiente con el error');
@@ -234,7 +236,7 @@ describe('Integraciones: caída de Pub/Sub, mensaje repetido y permisos', () => 
       expect(new Date(caido.body.items[0].proximoIntentoEn).getTime()).toBeGreaterThan(Date.now());
 
       pubsub.caido = false;
-      await expect(worker.procesarPendientes(despuesDe(1000))).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+      await expect(worker.procesarPendientes(despuesDe(1000))).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0, resultadosObsoletos: 0 });
       const recuperado = await panel('Pub/Sub recuperado: publicado con el mismo eventId');
       expect(recuperado.body.items).toEqual([expect.objectContaining({ eventId: EVENT_ID, estado: 'PUBLICADO', intentos: 2, ultimoError: null })]);
       expect(pubsub.suscripcion.map((m) => m.evento.eventId)).toEqual([EVENT_ID]);
@@ -252,7 +254,7 @@ describe('Integraciones: caída de Pub/Sub, mensaje repetido y permisos', () => 
       expect(publishMessage).toHaveBeenCalledTimes(1);
 
       pubsub.caido = false;
-      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0, resultadosObsoletos: 0 });
       expect(pubsub.suscripcion).toHaveLength(1);
     });
   });
@@ -300,9 +302,9 @@ describe('Integraciones: caída de Pub/Sub, mensaje repetido y permisos', () => 
       pubsubConfig.enabled = true;
       jest.spyOn(store, 'marcarPublicado').mockRejectedValueOnce(new Error('Conexión con PostgreSQL perdida'));
 
-      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 0, fallidos: 1 });
+      await expect(worker.procesarPendientes()).resolves.toEqual({ reclamados: 1, publicados: 0, fallidos: 1, resultadosObsoletos: 0 });
       expect(eventos[0]).toMatchObject({ estado: 'PENDIENTE', ultimoError: 'Conexión con PostgreSQL perdida' });
-      await expect(worker.procesarPendientes(despuesDe(1000))).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0 });
+      await expect(worker.procesarPendientes(despuesDe(1000))).resolves.toEqual({ reclamados: 1, publicados: 1, fallidos: 0, resultadosObsoletos: 0 });
 
       await panel('Mensaje repetido: confirmación perdida y reenvío con el mismo eventId');
       expect(pubsub.suscripcion).toHaveLength(2);
