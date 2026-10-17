@@ -6,6 +6,7 @@ import { ProduccionSchema1710000000002 } from '../database/migrations/1710000000
 import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710000000007-OrdenesCodigoSecuencia';
 import { SolicitudesMaterial1710000000012 } from '../database/migrations/1710000000012-SolicitudesMaterial';
 import { EventosOutbox1710000000017 } from '../database/migrations/1710000000017-EventosOutbox';
+import { EventosInbox1710000000019 } from '../database/migrations/1710000000019-EventosInbox';
 import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { OutboxPublicadorService } from '../integraciones/outbox/outbox-publicador.service';
 import { TypeOrmOutboxStore } from '../integraciones/outbox/typeorm-outbox.store';
@@ -38,6 +39,7 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
       await new OrdenesCodigoSecuencia1710000000007().up(runner);
       await new SolicitudesMaterial1710000000012().up(runner);
       await new EventosOutbox1710000000017().up(runner);
+      await new EventosInbox1710000000019().up(runner);
       await runner.query("INSERT INTO materiales (codigo,nombre,unidad_medida) VALUES ('M1','Material 1','kg'), ('M2','Material 2','kg')");
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.query("INSERT INTO ordenes_produccion (codigo,receta_id,cantidad_solicitada,fecha_programada,responsable_usuario_id) VALUES ('O1',1,1,CURRENT_DATE,42)");
@@ -133,6 +135,7 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
       reclamados: 1,
       publicados: 0,
       fallidos: 1,
+      resultadosObsoletos: 0,
     });
     await expect(service.findOne(solicitud.id)).resolves.toMatchObject({
       id: solicitud.id,

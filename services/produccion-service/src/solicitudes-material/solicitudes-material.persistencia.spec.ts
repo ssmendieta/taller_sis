@@ -4,6 +4,7 @@ import { AppDataSource } from '../database/data-source';
 import { ProduccionSchema1710000000002 } from '../database/migrations/1710000000002-ProduccionSchema';
 import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710000000007-OrdenesCodigoSecuencia';
 import { SolicitudesMaterial1710000000012 } from '../database/migrations/1710000000012-SolicitudesMaterial';
+import { EventosInbox1710000000019 } from '../database/migrations/1710000000019-EventosInbox';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
@@ -45,6 +46,7 @@ describeReal('SolicitudMaterial: persistencia PostgreSQL', () => {
     await new ProduccionSchema1710000000002().up(runner);
     await new OrdenesCodigoSecuencia1710000000007().up(runner);
     await new SolicitudesMaterial1710000000012().up(runner);
+    await new EventosInbox1710000000019().up(runner);
   }, 30000);
 
   afterAll(async () => {
@@ -87,9 +89,11 @@ describeReal('SolicitudMaterial: persistencia PostgreSQL', () => {
     await rechaza('DELETE FROM ordenes_produccion WHERE id = 1', '23503');
     await rechaza('DELETE FROM materiales WHERE id = 1', '23503');
     await rechaza('DELETE FROM solicitudes_material WHERE id = 1', '23503');
+    await new EventosInbox1710000000019().down(runner);
     await new SolicitudesMaterial1710000000012().down(runner);
     const [tables] = await runner.query("SELECT to_regclass('solicitudes_material') AS solicitud, to_regclass('solicitud_material_items') AS items");
     expect(tables).toEqual({ solicitud: null, items: null });
     await new SolicitudesMaterial1710000000012().up(runner);
+    await new EventosInbox1710000000019().up(runner);
   });
 });
