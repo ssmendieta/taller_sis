@@ -89,6 +89,30 @@ describe('PermisoLogisticaGuard (unitario; Auth simulado)', () => {
     await expect(guard.canActivate(context())).resolves.toBe(true);
   });
 
+  it('permite gestionar y consultar solicitudes al Encargado de Logística con permisos reales (ABC-273)', async () => {
+    reflector.get.mockReturnValue('logistica.solicitudes.gestionar');
+    fetchMock.mockResolvedValue(respuesta(200, {
+      id: '8', rol: 'Encargado de Logística', permisos: [
+        { codigo: 'logistica.solicitudes.gestionar' }, { codigo: 'logistica.solicitudes.consultar' },
+      ],
+    }));
+    await expect(guard.canActivate(context())).resolves.toBe(true);
+
+    reflector.get.mockReturnValue('logistica.solicitudes.consultar');
+    await expect(guard.canActivate(context())).resolves.toBe(true);
+  });
+
+  it('permite consultar pero rechaza gestionar solicitudes al Supervisor (ABC-273)', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, {
+      id: '5', rol: 'Supervisor', permisos: [{ codigo: 'logistica.solicitudes.consultar' }],
+    }));
+    reflector.get.mockReturnValue('logistica.solicitudes.consultar');
+    await expect(guard.canActivate(context())).resolves.toBe(true);
+
+    reflector.get.mockReturnValue('logistica.solicitudes.gestionar');
+    await expect(guard.canActivate(context())).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('distingue token inválido (401), ausencia de permiso (403) y Auth no disponible (503)', async () => {
     fetchMock.mockResolvedValueOnce(respuesta(401, {}));
     await expect(guard.canActivate(context())).rejects.toBeInstanceOf(UnauthorizedException);
