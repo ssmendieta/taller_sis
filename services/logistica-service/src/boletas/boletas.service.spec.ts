@@ -762,3 +762,104 @@ describe('ABC-226: bloqueo concurrente y orden de operaciones (pruebas unitarias
     expect(manager.save).not.toHaveBeenCalled();
   });
 });
+
+describe('ABC-232 / ABC-235: transición a EMITIDA, responsable emisor y precondiciones (pruebas unitarias con mocks)', () => {
+  let boletaMock: any;
+  let boletas: any;
+  let solicitudes: any;
+  let manager: any;
+  let dataSource: any;
+  let produccion: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    boletaMock = {
+      id: '25',
+      solicitudSalidaId: '16',
+      estado: EstadoBoleta.BORRADOR,
+      responsableUsuarioId: '10',
+      solicitudSalida: { id: '16', ordenId: '9' },
+      items: [{ id: '1', referencia: 'LOT-99', cantidad: '5.0000' }],
+    };
+    boletas = { findOne: jest.fn().mockResolvedValue(boletaMock) };
+    solicitudes = { findOne: jest.fn() };
+    manager = {
+      findOne: jest.fn().mockResolvedValue(boletaMock),
+      query: jest.fn().mockImplementation(async (sql: string) => {
+        if (sql.includes('INSERT INTO boleta_emision_bloqueos')) return [];
+        if (sql.includes('SELECT orden_id') && sql.includes('FOR UPDATE')) return [{ orden_id: '9' }];
+        if (sql.includes('COALESCE(SUM(item.cantidad)')) return [{ total: '0' }];
+        return [];
+      }),
+      save: jest.fn().mockImplementation(async (_entity: unknown, value: unknown) => value),
+    };
+    dataSource = {
+      transaction: jest.fn(async (callback: any) => callback(manager)),
+    };
+    produccion = {
+      consultarOrdenPorId: jest.fn().mockResolvedValue({
+        id: '9', codigo: 'ORD-9', producto_id: 5, producto: { codigo: 'P-5' },
+      }),
+      consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
+    };
+  });
+
+  function crearServicio() {
+    return new BoletasService(boletas, solicitudes, dataSource, produccion);
+  }
+
+  it('rechaza con 409 Conflict si la boleta en borrador tiene items: [] y no llega a guardarse como emitida', async () => {
+    boletaMock.items = [];
+
+    const service = crearServicio();
+    await expect(service.emitir('25', '99', 'Bearer token'))
+      .rejects.toThrow(new ConflictException('No se puede emitir una boleta sin ítems'));
+
+    expect(produccion.consultarConformesPorOrden).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(boletaMock.estado).toBe(EstadoBoleta.BORRADOR);
+    expect(boletaMock.responsableUsuarioId).toBe('10');
+  });
+
+  it('rechaza con 409 Conflict si la boleta en borrador tiene items undefined o null y conserva su estado', async () => {
+    boletaMock.items = undefined;
+
+    const service = crearServicio();
+    await expect(service.emitir('25', '99', 'Bearer token'))
+      .rejects.toThrow(new ConflictException('No se puede emitir una boleta sin ítems'));
+
+    expect(produccion.consultarConformesPorOrden).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(boletaMock.estado).toBe(EstadoBoleta.BORRADOR);
+    expect(boletaMock.responsableUsuarioId).toBe('10');
+  });
+
+  it('al emitir una boleta válida con usuarioId = 99, el objeto entregado a manager.save contiene responsableUsuarioId = 99', async () => {
+    const service = crearServicio();
+    const resultado = await service.emitir('25', '99', 'Bearer token');
+
+    expect(resultado.estado).toBe(EstadoBoleta.EMITIDA);
+    expect(resultado.responsableUsuarioId).toBe('99');
+    expect(manager.save).toHaveBeenCalledTimes(1);
+    expect(manager.save).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        id: '25',
+        estado: EstadoBoleta.EMITIDA,
+        responsableUsuarioId: '99',
+      }),
+    );
+  });
+
+  it('conserva el responsable original y no vuelve a guardar si la boleta ya estaba EMITIDA (idempotente)', async () => {
+    boletaMock.estado = EstadoBoleta.EMITIDA;
+    boletaMock.responsableUsuarioId = '42';
+
+    const service = crearServicio();
+    const resultado = await service.emitir('25', '99', 'Bearer token');
+
+    expect(resultado.estado).toBe(EstadoBoleta.EMITIDA);
+    expect(resultado.responsableUsuarioId).toBe('42');
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+});

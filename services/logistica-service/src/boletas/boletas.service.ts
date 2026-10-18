@@ -127,7 +127,7 @@ export class BoletasService {
     });
   }
 
-  async emitir(id: string, _usuarioId: string, authorization: string): Promise<BoletaEnvio> {
+  async emitir(id: string, usuarioId: string, authorization: string): Promise<BoletaEnvio> {
     if (!/^\d+$/.test(id) || BigInt(id) < BigInt('1') || BigInt(id) > BigInt('9223372036854775807')) {
       throw new NotFoundException('Boleta no encontrada');
     }
@@ -173,6 +173,9 @@ export class BoletasService {
       if (actual.estado !== EstadoBoleta.BORRADOR) {
         throw new ConflictException('Solo una boleta BORRADOR puede emitirse');
       }
+      if (!actual.items || actual.items.length === 0) {
+        throw new ConflictException('No se puede emitir una boleta sin ítems');
+      }
 
       const conformes = await this.produccion.consultarConformesPorOrden(ordenId, authorization);
       const totalConforme = conformes.reduce(
@@ -197,6 +200,7 @@ export class BoletasService {
       }
 
       actual.estado = EstadoBoleta.EMITIDA;
+      actual.responsableUsuarioId = usuarioId;
       return manager.save(BoletaEnvio, actual);
     });
   }
