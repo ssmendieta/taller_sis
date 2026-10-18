@@ -516,3 +516,249 @@ describe('ABC-224: regla de concurrencia documental', () => {
     expect(manager.save).not.toHaveBeenCalled();
   });
 });
+
+describe('ABC-225: validación de saldo documental y preservación de estado (pruebas unitarias con mocks)', () => {
+  let boletaMock: any;
+  let boletas: any;
+  let solicitudes: any;
+  let manager: any;
+  let dataSource: any;
+  let produccion: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    boletaMock = {
+      id: '20',
+      solicitudSalidaId: '15',
+      estado: EstadoBoleta.BORRADOR,
+      solicitudSalida: { id: '15', ordenId: '9' },
+      items: [{ id: '1', referencia: 'LOT-99', cantidad: '8.0000' }],
+    };
+    boletas = { findOne: jest.fn().mockResolvedValue(boletaMock) };
+    solicitudes = { findOne: jest.fn() };
+    manager = {
+      findOne: jest.fn().mockResolvedValue(boletaMock),
+      query: jest.fn(),
+      save: jest.fn().mockImplementation(async (_entity: unknown, value: unknown) => value),
+    };
+    dataSource = {
+      transaction: jest.fn(async (callback: any) => callback(manager)),
+    };
+    produccion = {
+      consultarOrdenPorId: jest.fn().mockResolvedValue({
+        id: '9', codigo: 'ORD-9', producto_id: 5, producto: { codigo: 'P-5' },
+      }),
+      consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
+    };
+  });
+
+  function crearServicio() {
+    return new BoletasService(boletas, solicitudes, dataSource, produccion);
+  }
+
+  it('rechaza con 409 Conflict si la cantidad solicitada excede el saldo conforme (sin emisiones previas) y preserva BORRADOR e ítems originales', async () => {
+    const itemsOriginales = [
+      { id: '1', referencia: 'LOT-99', cantidad: '12.0000' },
+      { id: '2', referencia: 'LOT-88', cantidad: '3.0000' },
+    ];
+    boletaMock.items = JSON.parse(JSON.stringify(itemsOriginales));
+    manager.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '9' }])
+      .mockResolvedValueOnce([{ total: '0' }]);
+
+    const service = crearServicio();
+    await expect(service.emitir('20', 'user-1', 'Bearer token'))
+      .rejects.toThrow(new ConflictException('La cantidad solicitada supera el saldo documental disponible'));
+
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(boletaMock.estado).toBe(EstadoBoleta.BORRADOR);
+    expect(boletaMock.items).toEqual(itemsOriginales);
+    expect(boletaMock.items).toHaveLength(2);
+    expect(boletaMock.items[0]).toEqual(expect.objectContaining({ referencia: 'LOT-99', cantidad: '12.0000' }));
+    expect(boletaMock.items[1]).toEqual(expect.objectContaining({ referencia: 'LOT-88', cantidad: '3.0000' }));
+  });
+
+  it('rechaza con 409 Conflict si lo emitido previamente más lo solicitado supera el conforme y no persiste cambios', async () => {
+    const itemsOriginales = [{ id: '1', referencia: 'LOT-99', cantidad: '8.0000' }];
+    boletaMock.items = JSON.parse(JSON.stringify(itemsOriginales));
+    manager.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '9' }])
+      .mockResolvedValueOnce([{ total: '6.0000' }]);
+
+    const service = crearServicio();
+    await expect(service.emitir('20', 'user-1', 'Bearer token'))
+      .rejects.toThrow(new ConflictException('La cantidad solicitada supera el saldo documental disponible'));
+
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(boletaMock.estado).toBe(EstadoBoleta.BORRADOR);
+    expect(boletaMock.items).toEqual(itemsOriginales);
+    expect(boletaMock.items[0].cantidad).toBe('8.0000');
+    expect(boletaMock.items[0].referencia).toBe('LOT-99');
+  });
+
+  it('rechaza con 409 Conflict si la boleta no se encuentra en estado BORRADOR (ej. ANULADA) y no toca Producción', async () => {
+    boletaMock.estado = EstadoBoleta.ANULADA;
+    const itemsOriginales = [{ id: '1', referencia: 'LOT-99', cantidad: '8.0000' }];
+    boletaMock.items = JSON.parse(JSON.stringify(itemsOriginales));
+    manager.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '9' }]);
+
+    const service = crearServicio();
+    await expect(service.emitir('20', 'user-1', 'Bearer token'))
+      .rejects.toThrow(new ConflictException('Solo una boleta BORRADOR puede emitirse'));
+
+    expect(produccion.consultarConformesPorOrden).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(boletaMock.estado).toBe(EstadoBoleta.ANULADA);
+    expect(boletaMock.items).toEqual(itemsOriginales);
+  });
+
+  it('emite satisfactoriamente y actualiza estado a EMITIDA cuando cabe exactamente en el saldo disponible', async () => {
+    manager.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '9' }])
+      .mockResolvedValueOnce([{ total: '2.0000' }]);
+
+    const service = crearServicio();
+    const resultado = await service.emitir('20', 'user-1', 'Bearer token');
+
+    expect(resultado.estado).toBe(EstadoBoleta.EMITIDA);
+    expect(manager.save).toHaveBeenCalledTimes(1);
+    expect(manager.save).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ id: '20', estado: EstadoBoleta.EMITIDA }),
+    );
+  });
+});
+
+describe('ABC-226: bloqueo concurrente y orden de operaciones (pruebas unitarias con mocks)', () => {
+  let boletaMock: any;
+  let boletas: any;
+  let solicitudes: any;
+  let manager: any;
+  let dataSource: any;
+  let produccion: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    boletaMock = {
+      id: '30',
+      solicitudSalidaId: '18',
+      estado: EstadoBoleta.BORRADOR,
+      solicitudSalida: { id: '18', ordenId: '12' },
+      items: [{ id: '1', referencia: 'LOT-A', cantidad: '4.0000' }],
+    };
+    boletas = { findOne: jest.fn().mockResolvedValue(boletaMock) };
+    solicitudes = { findOne: jest.fn() };
+    manager = {
+      findOne: jest.fn().mockResolvedValue(boletaMock),
+      query: jest.fn(),
+      save: jest.fn().mockImplementation(async (_entity: unknown, value: unknown) => value),
+    };
+    dataSource = {
+      transaction: jest.fn(async (callback: any) => callback(manager)),
+    };
+    produccion = {
+      consultarOrdenPorId: jest.fn().mockResolvedValue({
+        id: '12', codigo: 'ORD-12', producto_id: 7, producto: { codigo: 'P-7' },
+      }),
+      consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
+    };
+  });
+
+  function crearServicio() {
+    return new BoletasService(boletas, solicitudes, dataSource, produccion);
+  }
+
+  it('ejecuta en orden estricto: inserción de bloqueo, SELECT FOR UPDATE, y re-validación de saldo POST-bloqueo', async () => {
+    const sequenceOfOperations: string[] = [];
+
+    manager.query.mockImplementation(async (sql: string, _params: any[]) => {
+      if (sql.includes('INSERT INTO boleta_emision_bloqueos')) {
+        sequenceOfOperations.push('INSERT_LOCK');
+        return [];
+      }
+      if (sql.includes('SELECT orden_id') && sql.includes('boleta_emision_bloqueos') && sql.includes('FOR UPDATE')) {
+        sequenceOfOperations.push('SELECT_LOCK_FOR_UPDATE');
+        return [{ orden_id: '12' }];
+      }
+      if (sql.includes('COALESCE(SUM(item.cantidad)')) {
+        sequenceOfOperations.push('QUERY_EMITIDAS_POST_LOCK');
+        return [{ total: '0' }];
+      }
+      return [];
+    });
+
+    manager.findOne.mockImplementation(async () => {
+      sequenceOfOperations.push('FIND_BOLETA_POST_LOCK');
+      return boletaMock;
+    });
+
+    produccion.consultarConformesPorOrden.mockImplementation(async () => {
+      sequenceOfOperations.push('QUERY_CONFORMES_POST_LOCK');
+      return [{ cantidad: '10.0000' }];
+    });
+
+    manager.save.mockImplementation(async (_entity: any, val: any) => {
+      sequenceOfOperations.push('SAVE_EMITIDA');
+      return val;
+    });
+
+    const service = crearServicio();
+    await service.emitir('30', 'user-1', 'Bearer token');
+
+    expect(sequenceOfOperations).toEqual([
+      'INSERT_LOCK',
+      'SELECT_LOCK_FOR_UPDATE',
+      'FIND_BOLETA_POST_LOCK',
+      'QUERY_CONFORMES_POST_LOCK',
+      'QUERY_EMITIDAS_POST_LOCK',
+      'SAVE_EMITIDA',
+    ]);
+  });
+
+  it('verifica que las consultas de bloqueo usan los parámetros correctos (orden_id y producto_id)', async () => {
+    manager.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '12' }])
+      .mockResolvedValueOnce([{ total: '0' }]);
+
+    const service = crearServicio();
+    await service.emitir('30', 'user-1', 'Bearer token');
+
+    expect(manager.query).toHaveBeenNthCalledWith(
+      1,
+      expect.stringMatching(/INSERT\s+INTO\s+boleta_emision_bloqueos\s*\(orden_id,\s*producto_id\)/),
+      ['12', '7'],
+    );
+    expect(manager.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/SELECT\s+orden_id[\s\S]*FROM\s+boleta_emision_bloqueos[\s\S]*FOR\s+UPDATE/),
+      ['12', '7'],
+    );
+    expect(manager.query).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining('WHERE solicitud.orden_id = $1 AND boleta.estado = $2'),
+      ['12', EstadoBoleta.EMITIDA],
+    );
+  });
+
+  it('comportamiento idempotente: si tras adquirir el lock la boleta ya fue EMITIDA por otra transacción, no duplica guardado ni compromiso', async () => {
+    manager.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '12' }]);
+
+    const boletaYaEmitida = { ...boletaMock, estado: EstadoBoleta.EMITIDA };
+    manager.findOne.mockResolvedValueOnce(boletaYaEmitida);
+
+    const service = crearServicio();
+    const resultado = await service.emitir('30', 'user-1', 'Bearer token');
+
+    expect(resultado.estado).toBe(EstadoBoleta.EMITIDA);
+    expect(produccion.consultarConformesPorOrden).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+});
