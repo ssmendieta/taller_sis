@@ -9,6 +9,10 @@ import { OrdenesService } from './ordenes.service';
 import { OrdenesController } from './ordenes.controller';
 import { RecetasModule } from '../recetas/recetas.module';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
+import { MaterialCalculationModule } from '../material-calculation/material-calculation.module';
+import { ConsultaDisponibilidad } from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
+import { ConsultaDisponibilidadItem } from '../integraciones/disponibilidad/entities/consulta-disponibilidad-item.entity';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 
 @Module({
   imports: [
@@ -16,8 +20,12 @@ import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
       OrdenProduccion,
       HistorialEstadoOrden,
       Inventario,
+      ConsultaDisponibilidad,
+      ConsultaDisponibilidadItem,
+      EventoOutbox,
     ]),
     RecetasModule,
+    MaterialCalculationModule,
   ],
   controllers: [OrdenesController],
   providers: [OrdenesService, PermisoProduccionGuard],

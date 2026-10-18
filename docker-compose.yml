@@ -1,4 +1,19 @@
 ﻿services:
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    container_name: taller_pubsub_emulator
+    command:
+      - gcloud
+      - beta
+      - emulators
+      - pubsub
+      - start
+      - --project=${TALLER_PUBSUB_PROJECT_ID:-taller-local}
+      - --host-port=0.0.0.0:8085
+    ports:
+      - "${PUBSUB_EMULATOR_PORT:-8085}:8085"
+    profiles: ["emulator"]
+
   postgres:
     image: postgres:15-alpine
     container_name: taller_postgres
@@ -76,6 +91,26 @@
       - DB_DATABASE=${DB_PRODUCCION_DATABASE:-produccion_db}
       - SKIP_DB=${SKIP_DB:-false}
       - AUTH_SERVICE_URL=http://auth-service:3001
+      - PUBSUB_ENABLED=${PUBSUB_ENABLED:-false}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-}
+      - PUBSUB_TOPIC_ID=${PUBSUB_TOPIC_ID:-}
+      - PUBSUB_CONSUMER_ENABLED=${PUBSUB_CONSUMER_ENABLED:-false}
+      - PUBSUB_SUBSCRIPTION_ID=${PUBSUB_SUBSCRIPTION_ID:-}
+      - PUBSUB_CONTABILIDAD_CONSUMER_ENABLED=${PUBSUB_CONTABILIDAD_CONSUMER_ENABLED:-false}
+      - PUBSUB_CONTABILIDAD_RESULTADOS_TOPIC_ID=${PUBSUB_CONTABILIDAD_RESULTADOS_TOPIC_ID:-}
+      - PUBSUB_CONTABILIDAD_RESULTADOS_SUBSCRIPTION_ID=${PUBSUB_CONTABILIDAD_RESULTADOS_SUBSCRIPTION_ID:-}
+      - PUBSUB_EMULATOR_HOST=${PUBSUB_EMULATOR_HOST:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp/pubsub-service-account.json
+      - OUTBOX_BATCH_SIZE=${OUTBOX_BATCH_SIZE:-20}
+      - OUTBOX_POLL_INTERVAL_MS=${OUTBOX_POLL_INTERVAL_MS:-5000}
+      - OUTBOX_LEASE_MS=${OUTBOX_LEASE_MS:-30000}
+      - OUTBOX_RETRY_BASE_MS=${OUTBOX_RETRY_BASE_MS:-5000}
+      - OUTBOX_RETRY_MAX_MS=${OUTBOX_RETRY_MAX_MS:-300000}
+    volumes:
+      - type: bind
+        source: ${GCP_CREDENTIALS_HOST_PATH}
+        target: /run/secrets/gcp/pubsub-service-account.json
+        read_only: true
     depends_on:
       postgres:
         condition: service_healthy

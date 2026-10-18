@@ -1,0 +1,13 @@
+{
+  "name": "simulador-contabilidad-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulador local de Contabilidad para ProduccionCerrada.v1",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test --test-isolation=none"
+  },
+  "dependencies": {
+    "@google-cloud/pubsub": "5.3.1"
+  }
+}

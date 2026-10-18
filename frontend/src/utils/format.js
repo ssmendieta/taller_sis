@@ -14,6 +14,68 @@ export function formatearCantidad(valor, unidad) {
   return `${texto}${sufijo}`;
 }
 
+// Diferencia con signo visible: "+3 kg", "-2,5 kg" o "0 kg".
+export function formatearDiferencia(valor, unidad) {
+  const numero = Number(valor);
+  if (valor == null || valor === "" || !Number.isFinite(numero)) return "—";
+  // `|| 0` evita mostrar "-0".
+  return `${numero > 0 ? "+" : ""}${formatearCantidad(numero || 0, unidad)}`;
+}
+
+// Filas de la comparación ABC-72 tal como llegan de la API: cada cifra lleva la
+// unidad de su propio material y un dato ausente se muestra "—", nunca 0.
+export function filasComparacionMateriales(materiales) {
+  return (Array.isArray(materiales) ? materiales : []).map((m) => ({
+    clave: `${m.materialId}-${m.unidad}`,
+    nombre: m.materialNombre ?? "—",
+    codigo: m.materialCodigo ?? "—",
+    requerido: formatearCantidad(m.cantidadRequerida, m.unidad),
+    utilizado: formatearCantidad(m.cantidadConsumida, m.unidad),
+    diferencia: formatearDiferencia(m.diferencia, m.unidad),
+    fueraDeReceta: Number(m.cantidadRequerida) === 0 && Number(m.cantidadConsumida) > 0,
+  }));
+}
+
+// Estado contable que guarda nuestra API en el cierre: `estadoContable` es PENDIENTE
+// hasta que llega RegistroContableResultado.v1 y solo entonces pasa a RECIBIDO o
+// RECHAZADO. PENDIENTE sigue así aunque la respuesta tarde (simulador detenido) y un
+// valor desconocido no se interpreta.
+const ESTADOS_CONTABLES = {
+  PENDIENTE: { etiqueta: "Pendiente · sin respuesta", clase: "ts-badge--PENDIENTE" },
+  RECIBIDO: { etiqueta: "Recibido", clase: "ts-badge--FINALIZADA" },
+  RECHAZADO: { etiqueta: "Rechazado", clase: "ts-badge--CANCELADA" },
+};
+export const MAX_CAUSA_RECHAZO_RESUMIDA = 100;
+
+export function resumenReporteContable(cierre) {
+  const estado = cierre?.estadoContable;
+  const base = ESTADOS_CONTABLES[estado];
+  if (!base) {
+    return {
+      estado: null, etiqueta: "Sin estado informado", clase: "ts-badge--inactivo",
+      pendiente: false, actualizadoEn: null, causaResumida: null, causaCompleta: null,
+    };
+  }
+
+  const pendiente = estado === "PENDIENTE";
+  const resumen = {
+    estado, ...base, pendiente,
+    actualizadoEn: pendiente ? null : cierre.resultadoContableEn ?? null,
+    causaResumida: null, causaCompleta: null,
+  };
+  if (estado === "RECHAZADO") {
+    const causa = [cierre.codigoRechazoContable, cierre.detalleContable]
+      .map((parte) => (parte == null ? "" : String(parte).trim()))
+      .filter(Boolean)
+      .join(": ") || "Contabilidad no informó la causa.";
+    resumen.causaCompleta = causa;
+    resumen.causaResumida = causa.length > MAX_CAUSA_RECHAZO_RESUMIDA
+      ? `${causa.slice(0, MAX_CAUSA_RECHAZO_RESUMIDA).trimEnd()}…`
+      : causa;
+  }
+  return resumen;
+}
+
 export function formatearNumero(valor) {
   const numero = Number(valor);
   if (valor == null || valor === "" || !Number.isFinite(numero)) return "—";

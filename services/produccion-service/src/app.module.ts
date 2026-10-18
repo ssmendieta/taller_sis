@@ -8,12 +8,19 @@ import { RecetasModule } from './recetas/recetas.module';
 import { MaterialesModule } from './materiales/materiales.module';
 import { InventarioModule } from './inventario/inventario.module';
 import { UnidadesModule } from './unidades/unidades.module';
-import { MaterialCalculationService } from './material-calculation/material-calculation.service';
-import { MaterialCalculationController } from './material-calculation/material-calculation.controller';
+import { MaterialCalculationModule } from './material-calculation/material-calculation.module';
+import { PubSubModule } from './integraciones/pubsub/pubsub.module';
+import { SolicitudesMaterialModule } from './solicitudes-material/solicitudes-material.module';
+import { ConsumosMaterialModule } from './consumos-material/consumos-material.module';
+import { CalidadModule } from './calidad/calidad.module';
+import { LotesModule } from './lotes/lotes.module';
+import { IntegracionesModule } from './integraciones/integraciones.module';
+import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.module';
 
 @Module({
   imports: [
     DatabaseModule,
+    IntegracionesModule,
     HealthModule,
     AvancesProduccionModule,
     OrdenesModule,
@@ -21,10 +28,15 @@ import { MaterialCalculationController } from './material-calculation/material-c
     MaterialesModule,
     InventarioModule,
     UnidadesModule,
+    SolicitudesMaterialModule,
+    ConsumosMaterialModule,
+    MaterialCalculationModule,
+    LotesModule,
+    CierreProduccionModule,
+    CalidadModule,
+    PubSubModule,
+    CalidadModule,
   ],
-  controllers: [AppController, MaterialCalculationController],
-  providers: [
-    MaterialCalculationService,
-  ],
+  controllers: [AppController],
 })
 export class AppModule {}

@@ -1,4 +1,5 @@
-import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+
+import { Link, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import LoginPage from "../pages/LoginPage.jsx";
 import OrdenesPage from "../pages/OrdenesPage.jsx";
 import OrdenDetallePage from "../pages/OrdenDetallePage.jsx";
@@ -7,20 +8,33 @@ import RecetasPage from "../pages/RecetasPage.jsx";
 import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
+<<<<<<< HEAD
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import BoletasPage from "../pages/BoletasPage.jsx";
 import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
+=======
+import SolicitudesMaterialPage from "../pages/SolicitudesMaterialPage.jsx";
+import IntegracionesPage from "../pages/IntegracionesPage.jsx";
+import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
+import BoletasPage from "../pages/BoletasPage.jsx";
+>>>>>>> origin/develop
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
+import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
+import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 
 const privada = (pagina, permisos) => (
+<<<<<<< HEAD
   <ProtectedRoute permisos={permisos}>
     {pagina}
   </ProtectedRoute>
+=======
+  <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>
+>>>>>>> origin/develop
 );
 
 function InicioRedirect() {
@@ -28,6 +42,7 @@ function InicioRedirect() {
   const location = useLocation();
 
   if (!usuario) {
+<<<<<<< HEAD
     return (
       <Navigate
         to="/login"
@@ -35,6 +50,9 @@ function InicioRedirect() {
         replace
       />
     );
+=======
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+>>>>>>> origin/develop
   }
 
   if (tienePermiso(usuario, "usuarios.gestionar")) {
@@ -45,6 +63,14 @@ function InicioRedirect() {
     return <Navigate to="/ordenes" replace />;
   }
 
+<<<<<<< HEAD
+=======
+  // Logística y roles de solo lectura de boletas (consultar no permite crear ni emitir).
+  if (tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS)) {
+    return <Navigate to="/logistica/boletas" replace />;
+  }
+
+>>>>>>> origin/develop
   if (tienePermiso(usuario, "auditoria.consultar")) {
     return <Navigate to="/auditoria" replace />;
   }
@@ -61,6 +87,24 @@ function InicioRedirect() {
   );
 }
 
+// Consulta documental orden → lotes → boletas: la pantalla es de otra subtarea de la HU.
+// Al integrarla, reemplazar este aviso por esa página en la misma ruta y permiso.
+function TrazabilidadPendiente() {
+  const { id } = useParams();
+
+  return (
+    <section className="ts-page" aria-labelledby="trazabilidad-titulo">
+      <div className="ts-feedback ts-notice" role="status">
+        <h1 id="trazabilidad-titulo">Trazabilidad documental</h1>
+        <p>La consulta de lotes y boletas de esta orden todavía no está disponible.</p>
+        <Link className="ts-btn" to={`/ordenes/${id}`}>
+          Volver a la orden
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 function NoEncontrada() {
   const { usuario } = useSesion();
 
@@ -69,7 +113,10 @@ function NoEncontrada() {
       <div className="ts-public" role="alert">
         <h1>Página no encontrada</h1>
         <p>La dirección no existe o fue movida.</p>
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/develop
         <Link
           className="ts-btn ts-btn-primary"
           to={usuario ? "/" : "/login"}
@@ -84,22 +131,34 @@ function NoEncontrada() {
 export default function AppRoutes() {
   return (
     <Routes>
+<<<<<<< HEAD
       <Route path="/login" element={<LoginPage />} />
 
+=======
+      {/* Página pública */}
+      <Route path="/login" element={<LoginPage />} />
+
+      {/* Páginas autenticadas */}
+>>>>>>> origin/develop
       <Route element={<MainLayout><Outlet /></MainLayout>}>
 
         <Route path="/" element={<InicioRedirect />} />
 
         <Route
           path="/ordenes"
+<<<<<<< HEAD
           element={privada(
             <OrdenesPage />,
             ["ordenes.consultar"]
           )}
+=======
+          element={privada(<OrdenesPage />, ["ordenes.consultar"])}
+>>>>>>> origin/develop
         />
 
         <Route
           path="/ordenes/:id"
+<<<<<<< HEAD
           element={privada(
             <OrdenDetallePage />,
             ["ordenes.consultar"]
@@ -181,37 +240,72 @@ export default function AppRoutes() {
             <RecetasPage />,
             ["recetas.gestionar"]
           )}
+=======
+          element={privada(<OrdenDetallePage />, ["ordenes.consultar"])}
+        />
+
+        {/* Enlace desde el detalle de la orden; ve boletas, así que exige su permiso de consulta. */}
+        <Route
+          path="/ordenes/:id/trazabilidad"
+          element={privada(<TrazabilidadPendiente />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+
+        <Route
+          path="/recetas"
+          element={privada(<RecetasPage />, ["recetas.gestionar"])}
+>>>>>>> origin/develop
         />
 
         <Route
           path="/materiales"
           element={privada(
             <MaterialesPage />,
+<<<<<<< HEAD
             [
               "materiales.consultar_disponibilidad",
               "recetas.gestionar"
             ]
+=======
+            ["materiales.consultar_disponibilidad", "recetas.gestionar"]
+          )}
+        />
+
+        <Route
+          path="/solicitudes-material"
+          element={privada(
+            <SolicitudesMaterialPage />,
+            ["materiales.solicitar", "materiales.consultar_disponibilidad"]
+>>>>>>> origin/develop
           )}
         />
 
         <Route
           path="/usuarios"
+<<<<<<< HEAD
           element={privada(
             <UsuarioPage />,
             ["usuarios.gestionar"]
           )}
+=======
+          element={privada(<UsuarioPage />, ["usuarios.gestionar"])}
+>>>>>>> origin/develop
         />
 
         <Route
           path="/roles"
+<<<<<<< HEAD
           element={privada(
             <RolesPage />,
             ["roles_permisos.gestionar"]
           )}
+=======
+          element={privada(<RolesPage />, ["roles_permisos.gestionar"])}
+>>>>>>> origin/develop
         />
 
         <Route
           path="/auditoria"
+<<<<<<< HEAD
           element={privada(
             <ConsultaAuditoriaPage />,
             ["auditoria.consultar"]
@@ -239,6 +333,36 @@ export default function AppRoutes() {
         path="*"
         element={<NoEncontrada />}
       />
+=======
+          element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])}
+        />
+
+        {/* ABC-268: solo con integraciones.reintentar; la API vuelve a exigirlo. */}
+        <Route
+          path="/integraciones"
+          element={privada(<IntegracionesPage />, [PERMISO_INTEGRACIONES])}
+        />
+
+        {/* Lista de boletas y vista/impresión de una boleta guardada (solo lectura). */}
+        <Route
+          path="/logistica/boletas"
+          element={privada(<BoletasPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+
+        <Route
+          path="/logistica/boletas/:id"
+          element={privada(<BoletaDetallePage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+
+        <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
+        <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
+        <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
+        <Route path="/logistica" element={<Navigate to="/" replace />} />
+      </Route>
+
+      {/* Página no encontrada */}
+      <Route path="*" element={<NoEncontrada />} />
+>>>>>>> origin/develop
     </Routes>
   );
 }

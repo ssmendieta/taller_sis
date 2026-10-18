@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseIntPipe,
   Patch,
@@ -19,12 +21,16 @@ import { OrdenesService, UsuarioAutenticadoProduccion } from './ordenes.service'
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { PermisoProduccionGuard, PERMISO_PRODUCCION } from '../auth/permiso-produccion.guard';
+import { MaterialCalculationService } from '../material-calculation/material-calculation.service';
 
 // Prefijo corto 'ordenes': el gateway reescribe /api/produccion -> '',
 // un prefijo 'api/produccion/ordenes' quedaria duplicado e inaccesible.
 @Controller('ordenes')
 export class OrdenesController {
-  constructor(private readonly ordenesService: OrdenesService) {}
+  constructor(
+    private readonly ordenesService: OrdenesService,
+    private readonly materialCalculationService: MaterialCalculationService,
+  ) {}
 
   // Alta de ordenes (aporte de develop, conservado).
   @Post()
@@ -82,11 +88,26 @@ export class OrdenesController {
     return this.ordenesService.compararDisponibilidadMateriales(id);
   }
 
+  @Post(':id/disponibilidad-materiales/consultar')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'materiales.consultar_disponibilidad')
+  solicitarDisponibilidadMateriales(@Param('id', ParseIntPipe) id: number) {
+    return this.ordenesService.solicitarDisponibilidadMateriales(id);
+  }
+
   @Get(':id/materiales')
   @UseGuards(PermisoProduccionGuard)
   @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   obtenerMateriales(@Param('id') id: string) {
     return this.ordenesService.obtenerMateriales(Number(id));
+  }
+
+  @Get(':id/comparacion-materiales')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
+  compararMateriales(@Param('id', ParseIntPipe) id: number) {
+    return this.materialCalculationService.compararConsumoPorOrden(id);
   }
 
 
