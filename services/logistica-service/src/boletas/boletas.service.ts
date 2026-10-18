@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CrearBoletaDto } from './dto/crear-boleta.dto';
 import { ActualizarBoletaItemsDto } from './dto/actualizar-boleta-items.dto';
+import { ListarBoletasDto, PaginatedBoletasResultDto } from './dto/listar-boletas.dto';
 import { BoletaEnvio } from './entities/boleta-envio.entity';
 import { BoletaEnvioItem } from './entities/boleta-envio-item.entity';
 import { EstadoBoleta } from './entities/estado-boleta.enum';
@@ -64,8 +65,69 @@ export class BoletasService {
     });
   }
 
-  findAll(): Promise<BoletaEnvio[]> {
-    return this.boletas.find({ relations: { items: true }, order: { creadoEn: 'DESC', id: 'DESC' } });
+  async findAll(query: ListarBoletasDto = {}, authorization = ''): Promise<PaginatedBoletasResultDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+
+    let filtroOrdenId: string | undefined = query.ordenId;
+    const ordenParam = query.orden ?? query.ordenId;
+
+    if (ordenParam) {
+      if (/^\d+$/.test(ordenParam.trim())) {
+        filtroOrdenId = ordenParam.trim();
+      } else {
+        try {
+          const ordenDto = await this.produccion.consultarOrdenPorCodigo(ordenParam.trim(), authorization);
+          filtroOrdenId = String(ordenDto.id);
+        } catch (error) {
+          if (error instanceof NotFoundException) {
+            return {
+              items: [],
+              total: 0,
+              page,
+              limit,
+              totalPages: 0,
+            };
+          }
+          throw error;
+        }
+      }
+    }
+
+    const qb = this.boletas.createQueryBuilder('boleta')
+      .leftJoinAndSelect('boleta.items', 'item')
+      .leftJoinAndSelect('boleta.solicitudSalida', 'solicitud');
+
+    if (filtroOrdenId) {
+      qb.andWhere('solicitud.orden_id = :ordenId', { ordenId: filtroOrdenId });
+    }
+
+    if (query.estado) {
+      qb.andWhere('boleta.estado = :estado', { estado: query.estado });
+    }
+
+    if (query.fechaDesde) {
+      qb.andWhere('boleta.creado_en >= :fechaDesde', { fechaDesde: query.fechaDesde });
+    }
+
+    if (query.fechaHasta) {
+      qb.andWhere('boleta.creado_en <= :fechaHasta', { fechaHasta: query.fechaHasta });
+    }
+
+    qb.orderBy('boleta.creado_en', 'DESC')
+      .addOrderBy('boleta.id', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [items, total] = await qb.getManyAndCount();
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: string): Promise<BoletaEnvio> {

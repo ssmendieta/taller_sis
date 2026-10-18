@@ -1,4 +1,5 @@
 import { BadGatewayException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { EstadoBoleta } from './entities/estado-boleta.enum';
 import { BoletasService } from './boletas.service';
 
 describe('ABC-213/214: creación de boletas con validación documental', () => {
@@ -274,5 +275,144 @@ describe('ABC-220: edición de ítems de boleta en borrador', () => {
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     expect(del).toHaveBeenCalledWith(expect.anything(), { boletaId: '10' });
+  });
+});
+
+describe('ABC-258: listado paginado y filtros de boletas', () => {
+  const getManyAndCount = jest.fn();
+  const qb = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    skip: jest.fn().mockReturnThis(),
+    take: jest.fn().mockReturnThis(),
+    getManyAndCount,
+  };
+  const repository = {
+    createQueryBuilder: jest.fn(() => qb),
+    find: jest.fn(),
+    findOne: jest.fn(),
+  } as any;
+  const solicitudes = { findOne: jest.fn() } as any;
+  const produccion = {
+    consultarOrdenPorCodigo: jest.fn(),
+    consultarOrdenPorId: jest.fn(),
+    consultarPorOrden: jest.fn(),
+  } as any;
+  const dataSource = { transaction: jest.fn() } as any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getManyAndCount.mockResolvedValue([
+      [
+        {
+          id: '1',
+          numero: 'BOL-2026-00001',
+          estado: 'BORRADOR',
+          creadoEn: new Date('2026-10-17T15:30:00Z'),
+          items: [],
+          solicitudSalida: { id: '7', ordenId: '8' },
+        },
+      ],
+      1,
+    ]);
+  });
+
+  function service() { return new BoletasService(repository, solicitudes, dataSource, produccion); }
+
+  it('lista boletas con paginación por defecto (page=1, limit=10) y orden estable', async () => {
+    const result = await service().findAll({});
+    expect(repository.createQueryBuilder).toHaveBeenCalledWith('boleta');
+    expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('boleta.items', 'item');
+    expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('boleta.solicitudSalida', 'solicitud');
+    expect(qb.orderBy).toHaveBeenCalledWith('boleta.creado_en', 'DESC');
+    expect(qb.addOrderBy).toHaveBeenCalledWith('boleta.id', 'DESC');
+    expect(qb.skip).toHaveBeenCalledWith(0);
+    expect(qb.take).toHaveBeenCalledWith(10);
+    expect(result).toEqual({
+      items: expect.any(Array),
+      total: 1,
+      page: 1,
+      limit: 10,
+      totalPages: 1,
+    });
+  });
+
+  it('aplica paginación personalizada (skip y take según page y limit)', async () => {
+    getManyAndCount.mockResolvedValueOnce([[], 35]);
+    const result = await service().findAll({ page: 3, limit: 10 });
+    expect(qb.skip).toHaveBeenCalledWith(20);
+    expect(qb.take).toHaveBeenCalledWith(10);
+    expect(result.page).toBe(3);
+    expect(result.limit).toBe(10);
+    expect(result.total).toBe(35);
+    expect(result.totalPages).toBe(4);
+  });
+
+  it('filtra por estado de boleta', async () => {
+    await service().findAll({ estado: EstadoBoleta.EMITIDA });
+    expect(qb.andWhere).toHaveBeenCalledWith('boleta.estado = :estado', { estado: 'EMITIDA' });
+  });
+
+  it('filtra por ordenId numérico directo', async () => {
+    await service().findAll({ ordenId: '8' });
+    expect(qb.andWhere).toHaveBeenCalledWith('solicitud.orden_id = :ordenId', { ordenId: '8' });
+    expect(produccion.consultarOrdenPorCodigo).not.toHaveBeenCalled();
+  });
+
+  it('filtra por código de orden consultando a Producción', async () => {
+    produccion.consultarOrdenPorCodigo.mockResolvedValueOnce({ id: '8', codigo: 'ORD-7' });
+    await service().findAll({ orden: 'ORD-7' }, 'Bearer token-test');
+    expect(produccion.consultarOrdenPorCodigo).toHaveBeenCalledWith('ORD-7', 'Bearer token-test');
+    expect(qb.andWhere).toHaveBeenCalledWith('solicitud.orden_id = :ordenId', { ordenId: '8' });
+  });
+
+  it('retorna resultado vacío si el código de orden no existe en Producción (404)', async () => {
+    produccion.consultarOrdenPorCodigo.mockRejectedValueOnce(new NotFoundException('Orden no encontrada'));
+    const result = await service().findAll({ orden: 'ORD-INEXISTENTE' }, 'Bearer token-test');
+    expect(result).toEqual({
+      items: [],
+      total: 0,
+      page: 1,
+      limit: 10,
+      totalPages: 0,
+    });
+    expect(repository.createQueryBuilder).not.toHaveBeenCalled();
+  });
+
+  it('filtra por rango de fechas (fechaDesde y fechaHasta)', async () => {
+    await service().findAll({
+      fechaDesde: '2026-10-01T00:00:00.000Z',
+      fechaHasta: '2026-10-15T23:59:59.999Z',
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('boleta.creado_en >= :fechaDesde', {
+      fechaDesde: '2026-10-01T00:00:00.000Z',
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('boleta.creado_en <= :fechaHasta', {
+      fechaHasta: '2026-10-15T23:59:59.999Z',
+    });
+  });
+
+  it('combina filtros de orden, estado y rango de fechas simultáneamente', async () => {
+    await service().findAll({
+      ordenId: '15',
+      estado: EstadoBoleta.ANULADA,
+      fechaDesde: '2026-10-01T00:00:00.000Z',
+      fechaHasta: '2026-10-10T23:59:59.999Z',
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('solicitud.orden_id = :ordenId', { ordenId: '15' });
+    expect(qb.andWhere).toHaveBeenCalledWith('boleta.estado = :estado', { estado: 'ANULADA' });
+    expect(qb.andWhere).toHaveBeenCalledWith('boleta.creado_en >= :fechaDesde', {
+      fechaDesde: '2026-10-01T00:00:00.000Z',
+    });
+    expect(qb.andWhere).toHaveBeenCalledWith('boleta.creado_en <= :fechaHasta', {
+      fechaHasta: '2026-10-10T23:59:59.999Z',
+    });
+  });
+
+  it('es una operación de solo lectura (no llama a transacciones ni modificaciones)', async () => {
+    await service().findAll({});
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 });

@@ -39,4 +39,18 @@ describe('BoletasController', () => {
 
     expect(service.create).toHaveBeenCalledWith(dto, '42', 'Bearer token-test');
   });
+
+  it('delega findAll al servicio propagando query y autorización', async () => {
+    const query = { page: 2, limit: 15, ordenId: '8' };
+    const result = { items: [], total: 0, page: 2, limit: 15, totalPages: 0 };
+    const service = { findAll: jest.fn().mockResolvedValue(result) };
+    const controller = new BoletasController(service as any);
+
+    await expect(controller.findAll(
+      query as any,
+      { headers: { authorization: 'Bearer token-test' } },
+    )).resolves.toBe(result);
+
+    expect(service.findAll).toHaveBeenCalledWith(query, 'Bearer token-test');
+  });
 });
