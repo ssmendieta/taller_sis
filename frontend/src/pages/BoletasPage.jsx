@@ -51,6 +51,8 @@ export default function BoletasPage() {
         conteo={!cargando && !error ? `${boletas.length} ${boletas.length === 1 ? "boleta" : "boletas"}` : null}
       />
 
+      <p className="ts-notice">Para consultar boletas registradas en el servidor utiliza esta lista. El prototipo local de creación está disponible por separado: <Link to="/logistica/boletas/local/nueva">Abrir prototipo local</Link>.</p>
+
       <div className="ts-panel">
         <div className="ts-panel-title">
           <h2 id="boletas-titulo">Boletas</h2>

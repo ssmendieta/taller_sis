@@ -1,4 +1,3 @@
-
 import { Link, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import LoginPage from "../pages/LoginPage.jsx";
 import OrdenesPage from "../pages/OrdenesPage.jsx";
@@ -12,6 +11,11 @@ import SolicitudesMaterialPage from "../pages/SolicitudesMaterialPage.jsx";
 import IntegracionesPage from "../pages/IntegracionesPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import BoletasPage from "../pages/BoletasPage.jsx";
+import BoletasLocalPage from "../pages/BoletasLocalPage.jsx";
+import BoletaDetalleLocalPage from "../pages/BoletaDetalleLocalPage.jsx";
+import LogisticaPage from "../pages/LogisticaPage.jsx";
+import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
+import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
@@ -176,10 +180,32 @@ export default function AppRoutes() {
           element={privada(<BoletaDetallePage />, [PERMISO_CONSULTAR_BOLETAS])}
         />
 
+        {/* Rutas del prototipo local, aisladas de las boletas de la API. */}
+        <Route
+          path="/logistica/boletas/local/nueva"
+          element={privada(<BoletasLocalPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/boletas/local/:id"
+          element={privada(<BoletaDetalleLocalPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/boletas/consulta"
+          element={privada(<ConsultaBoletasPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/trazabilidad"
+          element={privada(<TrazabilidadPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/inicio"
+          element={privada(<LogisticaPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
-        <Route path="/logistica" element={<Navigate to="/" replace />} />
+        <Route path="/logistica" element={<Navigate to="/logistica/inicio" replace />} />
       </Route>
 
       {/* Página no encontrada */}
