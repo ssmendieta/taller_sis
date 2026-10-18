@@ -1,4 +1,4 @@
-import { BadGatewayException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CrearBoletaDto } from './dto/crear-boleta.dto';
@@ -7,6 +7,16 @@ import { BoletaEnvioItem } from './entities/boleta-envio-item.entity';
 import { EstadoBoleta } from './entities/estado-boleta.enum';
 import { SolicitudSalida } from '../solicitudes-salida/entities/solicitud-salida.entity';
 import { LotesProduccionClient } from '../disponibilidad-documental/lotes-produccion.client';
+
+const ESCALA_CANTIDAD = BigInt('10000');
+
+function cantidadEscalada(cantidad: string): bigint {
+  if (!/^\d+(?:\.\d{1,4})?$/.test(cantidad)) {
+    throw new BadGatewayException('Cantidad documental inválida');
+  }
+  const [entero, decimales = ''] = cantidad.split('.');
+  return BigInt(entero) * ESCALA_CANTIDAD + BigInt(decimales.padEnd(4, '0'));
+}
 
 @Injectable()
 export class BoletasService {
@@ -60,6 +70,80 @@ export class BoletasService {
       }));
       boleta.items = await manager.save(BoletaEnvioItem, items);
       return boleta;
+    });
+  }
+
+  async emitir(id: string, _usuarioId: string, authorization: string): Promise<BoletaEnvio> {
+    if (!/^\d+$/.test(id) || BigInt(id) < BigInt('1') || BigInt(id) > BigInt('9223372036854775807')) {
+      throw new NotFoundException('Boleta no encontrada');
+    }
+    const boleta = await this.boletas.findOne({
+      where: { id },
+      relations: { items: true, solicitudSalida: true },
+    });
+    if (!boleta) throw new NotFoundException('Boleta no encontrada');
+    if (!boleta.solicitudSalida?.ordenId) {
+      throw new BadGatewayException('La boleta no tiene una orden asociada');
+    }
+
+    const orden = await this.produccion.consultarOrdenPorId(boleta.solicitudSalida.ordenId, authorization);
+    if (String(orden.id) !== String(boleta.solicitudSalida.ordenId) || !orden.codigo?.trim() ||
+        !Number.isSafeInteger(Number(orden.producto_id)) || Number(orden.producto_id) < 1 ||
+        !orden.producto || typeof orden.producto !== 'object') {
+      throw new BadGatewayException('Producción devolvió una relación orden-producto incompleta');
+    }
+    const ordenId = String(orden.id);
+    const productoId = String(orden.producto_id);
+
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `INSERT INTO boleta_emision_bloqueos (orden_id, producto_id)
+         VALUES ($1, $2)
+         ON CONFLICT (orden_id, producto_id) DO NOTHING`,
+        [ordenId, productoId],
+      );
+      await manager.query(
+        `SELECT orden_id
+           FROM boleta_emision_bloqueos
+          WHERE orden_id = $1 AND producto_id = $2
+          FOR UPDATE`,
+        [ordenId, productoId],
+      );
+
+      const actual = await manager.findOne(BoletaEnvio, {
+        where: { id },
+        relations: { items: true, solicitudSalida: true },
+      });
+      if (!actual) throw new NotFoundException('Boleta no encontrada');
+      if (actual.estado === EstadoBoleta.EMITIDA) return actual;
+      if (actual.estado !== EstadoBoleta.BORRADOR) {
+        throw new ConflictException('Solo una boleta BORRADOR puede emitirse');
+      }
+
+      const conformes = await this.produccion.consultarConformesPorOrden(ordenId, authorization);
+      const totalConforme = conformes.reduce(
+        (total, resultado) => total + cantidadEscalada(resultado.cantidad),
+        BigInt('0'),
+      );
+      const [compromiso] = await manager.query(
+        `SELECT COALESCE(SUM(item.cantidad), 0)::text AS total
+           FROM boletas_envio boleta
+           INNER JOIN boletas_envio_items item ON item.boleta_id = boleta.id
+           INNER JOIN solicitudes_salida solicitud ON solicitud.id = boleta.solicitud_salida_id
+          WHERE solicitud.orden_id = $1 AND boleta.estado = $2`,
+        [ordenId, EstadoBoleta.EMITIDA],
+      ) as Array<{ total: string }>;
+      const totalEmitido = cantidadEscalada(compromiso?.total ?? '0');
+      const solicitado = (actual.items ?? []).reduce(
+        (total, item) => total + cantidadEscalada(item.cantidad),
+        BigInt('0'),
+      );
+      if (solicitado > totalConforme - totalEmitido) {
+        throw new ConflictException('La cantidad solicitada supera el saldo documental disponible');
+      }
+
+      actual.estado = EstadoBoleta.EMITIDA;
+      return manager.save(BoletaEnvio, actual);
     });
   }
 
