@@ -28,6 +28,7 @@ import {
   sumarCantidades,
 } from "../services/calidadService.js";
 import { MAX_CODIGO_LOTE, crearLote, listarLotesOrden } from "../services/lotesService.js";
+import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 import {
   PERMISO_PREPARAR_CIERRE,
   VERSION_CIERRE_INICIAL,
@@ -147,6 +148,7 @@ export default function OrdenDetallePage() {
   // El mismo permiso de calidad registra conformes y defectuosos.
   const permiteCalidad = tienePermiso(usuario, "calidad.registrar_conformes");
   const permiteCierre = tienePermiso(usuario, PERMISO_PREPARAR_CIERRE);
+  const permiteTrazabilidad = tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS);
 
   async function cargarCalidad() {
     try {
@@ -687,9 +689,16 @@ export default function OrdenDetallePage() {
       <PageHeader
         titulo={`Orden ${orden.codigo ?? ""}`}
         accion={
-          <Link className="ts-btn" to="/ordenes">
-            Volver
-          </Link>
+          <div className="ts-btn-group">
+            {permiteTrazabilidad && (
+              <Link className="ts-btn" to={`/ordenes/${id}/trazabilidad`}>
+                Trazabilidad documental
+              </Link>
+            )}
+            <Link className="ts-btn" to="/ordenes">
+              Volver
+            </Link>
+          </div>
         }
       />
 
