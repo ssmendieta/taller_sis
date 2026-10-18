@@ -697,7 +697,7 @@ export default function OrdenDetallePage() {
   if (!orden) return null;
 
   const enProduccion = orden.estado === "EN_PRODUCCION";
-  const reporteContable = resumenReporteContable(cierre?.reporteContable);
+  const reporteContable = resumenReporteContable(cierre);
 
   return (
     <section className="ts-page" aria-labelledby="detalle-orden-titulo">
@@ -1758,7 +1758,7 @@ export default function OrdenDetallePage() {
             )}
 
             <p className="ts-field-help" style={{ padding: "0 20px" }}>
-              Enviado: publicado y esperando respuesta. Recibido: Contabilidad recibió el
+              Pendiente: Contabilidad aún no responde. Recibido: Contabilidad recibió el
               resumen; no significa aprobación contable.
             </p>
 
