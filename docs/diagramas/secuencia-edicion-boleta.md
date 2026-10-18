@@ -42,7 +42,7 @@ sequenceDiagram
     autonumber
     actor Cliente as Cliente (Encargado de Logística)
     participant Guard as PermisoLogisticaGuard
-    participant Auth as auth-service (/auth/me)
+    participant Auth as auth-service (/me)
     participant Pipe as ValidarActualizarBoletaItemsPipe
     participant Ctrl as BoletasController (PUT /boletas/:id/items)
     participant Svc as BoletasService
@@ -51,7 +51,7 @@ sequenceDiagram
 
     %% Autenticación y Autorización
     Cliente->>Guard: PUT /boletas/:id/items (Bearer token + JSON)
-    Guard->>Auth: GET /auth/me (Bearer token)
+    Guard->>Auth: GET /me (Bearer token)
     alt Token ausente o sesión inválida
         Auth-->>Guard: 401 Unauthorized
         Guard-->>Cliente: 401 Unauthorized
