@@ -1,5 +1,5 @@
 
-import { Link, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { Link, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import LoginPage from "../pages/LoginPage.jsx";
 import OrdenesPage from "../pages/OrdenesPage.jsx";
 import OrdenDetallePage from "../pages/OrdenDetallePage.jsx";
@@ -60,6 +60,24 @@ function InicioRedirect() {
   );
 }
 
+// Consulta documental orden → lotes → boletas: la pantalla es de otra subtarea de la HU.
+// Al integrarla, reemplazar este aviso por esa página en la misma ruta y permiso.
+function TrazabilidadPendiente() {
+  const { id } = useParams();
+
+  return (
+    <section className="ts-page" aria-labelledby="trazabilidad-titulo">
+      <div className="ts-feedback ts-notice" role="status">
+        <h1 id="trazabilidad-titulo">Trazabilidad documental</h1>
+        <p>La consulta de lotes y boletas de esta orden todavía no está disponible.</p>
+        <Link className="ts-btn" to={`/ordenes/${id}`}>
+          Volver a la orden
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 function NoEncontrada() {
   const { usuario } = useSesion();
 
@@ -97,6 +115,12 @@ export default function AppRoutes() {
         <Route
           path="/ordenes/:id"
           element={privada(<OrdenDetallePage />, ["ordenes.consultar"])}
+        />
+
+        {/* Enlace desde el detalle de la orden; ve boletas, así que exige su permiso de consulta. */}
+        <Route
+          path="/ordenes/:id/trazabilidad"
+          element={privada(<TrazabilidadPendiente />, [PERMISO_CONSULTAR_BOLETAS])}
         />
 
         <Route

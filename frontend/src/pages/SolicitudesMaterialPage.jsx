@@ -6,6 +6,7 @@ import {
   listarSolicitudesMaterial,
   obtenerSolicitudMaterial,
   crearSolicitudMaterial,
+  estadoInventario,
 } from "../services/solicitudesMaterialService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 
@@ -23,6 +24,14 @@ function fechaSolicitud(fecha) {
   return Number.isNaN(valor.getTime())
     ? fecha
     : valor.toLocaleString("es-BO");
+}
+
+// Falla de nuestra API o de la red (no es una respuesta de Inventarios).
+function mensajeConsulta(error, accion) {
+  if (!error.status || error.status >= 500) {
+    return `Error operativo: no se pudo ${accion} (${error.message || "sin respuesta del servidor"}). Los estados mostrados pueden estar desactualizados; vuelve a intentar.`;
+  }
+  return error.message || `No se pudo ${accion}.`;
 }
 
 function esConflicto(error) {
@@ -68,7 +77,7 @@ export default function SolicitudesMaterialPage() {
       setSolicitudes(Array.isArray(listaSolicitudes) ? listaSolicitudes : []);
     } catch (e) {
       if (mostrarError) {
-        setError(e.message || "No se pudieron cargar los datos.");
+        setError(mensajeConsulta(e, "consultar las solicitudes"));
       }
     } finally {
       setCargando(false);
@@ -163,8 +172,9 @@ export default function SolicitudesMaterialPage() {
         })),
       });
 
+      // El registro no espera a Inventarios: su respuesta llega después por Pub/Sub.
       setAviso(
-        `Solicitud ${creada.id} registrada correctamente.`
+        `Solicitud ${creada.id} registrada. Queda pendiente de la respuesta de Inventarios; no necesitas esperar en esta pantalla.`
       );
       setOrdenId("");
       setItems([{ materialId: "", cantidad: "", unidad: "" }]);
@@ -198,7 +208,7 @@ export default function SolicitudesMaterialPage() {
       const solicitud = await obtenerSolicitudMaterial(id);
       setDetalle(solicitud);
     } catch (e) {
-      setError(e.message || "No se pudo cargar el detalle.");
+      setError(mensajeConsulta(e, "cargar el detalle"));
     }
   }
 
@@ -351,11 +361,15 @@ export default function SolicitudesMaterialPage() {
                   <th>Orden</th>
                   <th>Fecha</th>
                   <th>Estado</th>
+                  <th>Respuesta de Inventarios</th>
                   <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
-                {solicitudes.map((solicitud) => (
+                {solicitudes.map((solicitud) => {
+                  const inventario = estadoInventario(solicitud);
+
+                  return (
                   <tr key={solicitud.id}>
                     <td>{solicitud.id}</td>
                     <td>
@@ -364,7 +378,18 @@ export default function SolicitudesMaterialPage() {
                         "—"}
                     </td>
                     <td>{fechaSolicitud(solicitud.fecha)}</td>
-                    <td>{solicitud.estado ?? "PENDIENTE"}</td>
+                    <td>
+                      <span className={`ts-badge ${inventario.clase}`}>
+                        {inventario.etiqueta}
+                      </span>
+                    </td>
+                    <td>
+                      {inventario.estado === "PENDIENTE"
+                        ? "Esperando respuesta"
+                        : inventario.respondidaEn
+                          ? `${fechaSolicitud(inventario.respondidaEn)}${inventario.motivo ? ` · ${inventario.motivo}` : ""}`
+                          : "—"}
+                    </td>
                     <td>
                       <button
                         type="button"
@@ -375,7 +400,8 @@ export default function SolicitudesMaterialPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -399,9 +425,33 @@ export default function SolicitudesMaterialPage() {
             <strong>Orden:</strong>{" "}
             {detalle.orden?.codigo ?? detalle.ordenId ?? "—"}
           </p>
-          <p>
-            <strong>Estado:</strong> {detalle.estado ?? "PENDIENTE"}
-          </p>
+          {(() => {
+            const inventario = estadoInventario(detalle);
+
+            return (
+              <>
+                <p>
+                  <strong>Estado:</strong>{" "}
+                  <span className={`ts-badge ${inventario.clase}`}>
+                    {inventario.etiqueta}
+                  </span>
+                </p>
+                {inventario.estado === "PENDIENTE" && (
+                  <p className="ts-field-help" role="note">
+                    Registrada y enviada a Inventarios. Su respuesta llega después; usa
+                    «Actualizar» en el listado para consultarla.
+                  </p>
+                )}
+                {inventario.respondidaEn && (
+                  <p>
+                    <strong>Respuesta de Inventarios:</strong>{" "}
+                    {fechaSolicitud(inventario.respondidaEn)}
+                    {inventario.motivo ? ` · ${inventario.motivo}` : ""}
+                  </p>
+                )}
+              </>
+            );
+          })()}
           <p>
             <strong>Fecha:</strong> {fechaSolicitud(detalle.fecha)}
           </p>

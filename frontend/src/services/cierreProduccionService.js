@@ -41,6 +41,9 @@ export async function obtenerCierre(ordenId, cierreVersion = VERSION_CIERRE_INIC
   return response.json();
 }
 
+// El cierre trae `estadoContable` (PENDIENTE, RECIBIDO o RECHAZADO) y el resultado de Contabilidad; su presentación
+// está en `resumenReporteContable` de utils/format.js.
+
 // Solo se envían orden y versión; cantidades, consumos y fechas los toma el servidor.
 // Repetir la misma versión responde 409 sin crear un segundo snapshot.
 export async function prepararCierre(ordenId, cierreVersion = VERSION_CIERRE_INICIAL) {
