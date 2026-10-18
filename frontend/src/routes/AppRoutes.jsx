@@ -1,4 +1,3 @@
-
 import { Link, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
 import LoginPage from "../pages/LoginPage.jsx";
 import OrdenesPage from "../pages/OrdenesPage.jsx";
@@ -8,18 +7,15 @@ import RecetasPage from "../pages/RecetasPage.jsx";
 import MaterialesPage from "../pages/MaterialesPage.jsx";
 import RolesPage from "../pages/RolesPage.jsx";
 import UsuarioPage from "../pages/UsuarioPage.jsx";
-<<<<<<< HEAD
-import LogisticaPage from "../pages/LogisticaPage.jsx";
-import BoletasPage from "../pages/BoletasPage.jsx";
-import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
-import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
-import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
-=======
 import SolicitudesMaterialPage from "../pages/SolicitudesMaterialPage.jsx";
 import IntegracionesPage from "../pages/IntegracionesPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import BoletasPage from "../pages/BoletasPage.jsx";
->>>>>>> origin/develop
+import BoletasLocalPage from "../pages/BoletasLocalPage.jsx";
+import BoletaDetalleLocalPage from "../pages/BoletaDetalleLocalPage.jsx";
+import LogisticaPage from "../pages/LogisticaPage.jsx";
+import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
+import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
@@ -28,13 +24,7 @@ import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 
 const privada = (pagina, permisos) => (
-<<<<<<< HEAD
-  <ProtectedRoute permisos={permisos}>
-    {pagina}
-  </ProtectedRoute>
-=======
   <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>
->>>>>>> origin/develop
 );
 
 function InicioRedirect() {
@@ -42,17 +32,7 @@ function InicioRedirect() {
   const location = useLocation();
 
   if (!usuario) {
-<<<<<<< HEAD
-    return (
-      <Navigate
-        to="/login"
-        state={{ from: location.pathname }}
-        replace
-      />
-    );
-=======
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
->>>>>>> origin/develop
   }
 
   if (tienePermiso(usuario, "usuarios.gestionar")) {
@@ -63,14 +43,11 @@ function InicioRedirect() {
     return <Navigate to="/ordenes" replace />;
   }
 
-<<<<<<< HEAD
-=======
   // Logística y roles de solo lectura de boletas (consultar no permite crear ni emitir).
   if (tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS)) {
     return <Navigate to="/logistica/boletas" replace />;
   }
 
->>>>>>> origin/develop
   if (tienePermiso(usuario, "auditoria.consultar")) {
     return <Navigate to="/auditoria" replace />;
   }
@@ -113,10 +90,6 @@ function NoEncontrada() {
       <div className="ts-public" role="alert">
         <h1>Página no encontrada</h1>
         <p>La dirección no existe o fue movida.</p>
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/develop
         <Link
           className="ts-btn ts-btn-primary"
           to={usuario ? "/" : "/login"}
@@ -131,116 +104,20 @@ function NoEncontrada() {
 export default function AppRoutes() {
   return (
     <Routes>
-<<<<<<< HEAD
-      <Route path="/login" element={<LoginPage />} />
-
-=======
       {/* Página pública */}
       <Route path="/login" element={<LoginPage />} />
 
       {/* Páginas autenticadas */}
->>>>>>> origin/develop
       <Route element={<MainLayout><Outlet /></MainLayout>}>
-
         <Route path="/" element={<InicioRedirect />} />
 
         <Route
           path="/ordenes"
-<<<<<<< HEAD
-          element={privada(
-            <OrdenesPage />,
-            ["ordenes.consultar"]
-          )}
-=======
           element={privada(<OrdenesPage />, ["ordenes.consultar"])}
->>>>>>> origin/develop
         />
 
         <Route
           path="/ordenes/:id"
-<<<<<<< HEAD
-          element={privada(
-            <OrdenDetallePage />,
-            ["ordenes.consultar"]
-          )}
-        />
-
-        {/* =========================
-            LOGÍSTICA
-           ========================= */}
-
-        <Route
-          path="/logistica"
-          element={<LogisticaPage />}
-        />
-
-        <Route
-          path="/logistica/boletas"
-          element={
-            <ProtectedRoute
-              roles={[
-                "Administrador",
-                "Encargado de Logística"
-              ]}
-            >
-              <BoletasPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/logistica/boletas/consulta"
-          element={
-            <ProtectedRoute
-              roles={[
-                "Administrador",
-                "Encargado de Logística"
-              ]}
-            >
-                            <ConsultaBoletasPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/logistica/boletas/:id"
-          element={
-            <ProtectedRoute
-              roles={[
-                "Administrador",
-                "Encargado de Logística"
-              ]}
-            >
-              <BoletaDetallePage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/logistica/trazabilidad"
-          element={
-            <ProtectedRoute
-              roles={[
-                "Administrador",
-                "Encargado de Logística"
-              ]}
-            >
-              <TrazabilidadPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* =========================
-            RESTO DEL SISTEMA
-           ========================= */}
-
-        <Route
-          path="/recetas"
-          element={privada(
-            <RecetasPage />,
-            ["recetas.gestionar"]
-          )}
-=======
           element={privada(<OrdenDetallePage />, ["ordenes.consultar"])}
         />
 
@@ -253,19 +130,12 @@ export default function AppRoutes() {
         <Route
           path="/recetas"
           element={privada(<RecetasPage />, ["recetas.gestionar"])}
->>>>>>> origin/develop
         />
 
         <Route
           path="/materiales"
           element={privada(
             <MaterialesPage />,
-<<<<<<< HEAD
-            [
-              "materiales.consultar_disponibilidad",
-              "recetas.gestionar"
-            ]
-=======
             ["materiales.consultar_disponibilidad", "recetas.gestionar"]
           )}
         />
@@ -275,65 +145,21 @@ export default function AppRoutes() {
           element={privada(
             <SolicitudesMaterialPage />,
             ["materiales.solicitar", "materiales.consultar_disponibilidad"]
->>>>>>> origin/develop
           )}
         />
 
         <Route
           path="/usuarios"
-<<<<<<< HEAD
-          element={privada(
-            <UsuarioPage />,
-            ["usuarios.gestionar"]
-          )}
-=======
           element={privada(<UsuarioPage />, ["usuarios.gestionar"])}
->>>>>>> origin/develop
         />
 
         <Route
           path="/roles"
-<<<<<<< HEAD
-          element={privada(
-            <RolesPage />,
-            ["roles_permisos.gestionar"]
-          )}
-=======
           element={privada(<RolesPage />, ["roles_permisos.gestionar"])}
->>>>>>> origin/develop
         />
 
         <Route
           path="/auditoria"
-<<<<<<< HEAD
-          element={privada(
-            <ConsultaAuditoriaPage />,
-            ["auditoria.consultar"]
-          )}
-        />
-
-        <Route
-          path="/produccion"
-          element={<Navigate to="/ordenes" replace />}
-        />
-
-        <Route
-          path="/produccion/ordenes"
-          element={<Navigate to="/ordenes" replace />}
-        />
-
-        <Route
-          path="/produccion/avances"
-          element={<Navigate to="/ordenes" replace />}
-        />
-
-      </Route>
-
-      <Route
-        path="*"
-        element={<NoEncontrada />}
-      />
-=======
           element={privada(<ConsultaAuditoriaPage />, ["auditoria.consultar"])}
         />
 
@@ -354,17 +180,36 @@ export default function AppRoutes() {
           element={privada(<BoletaDetallePage />, [PERMISO_CONSULTAR_BOLETAS])}
         />
 
+        {/* Rutas del prototipo local, aisladas de las boletas de la API. */}
+        <Route
+          path="/logistica/boletas/local/nueva"
+          element={privada(<BoletasLocalPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/boletas/local/:id"
+          element={privada(<BoletaDetalleLocalPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/boletas/consulta"
+          element={privada(<ConsultaBoletasPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/trazabilidad"
+          element={privada(<TrazabilidadPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/inicio"
+          element={privada(<LogisticaPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
-        <Route path="/logistica" element={<Navigate to="/" replace />} />
+        <Route path="/logistica" element={<Navigate to="/logistica/inicio" replace />} />
       </Route>
 
       {/* Página no encontrada */}
       <Route path="*" element={<NoEncontrada />} />
->>>>>>> origin/develop
     </Routes>
   );
 }
-
-
