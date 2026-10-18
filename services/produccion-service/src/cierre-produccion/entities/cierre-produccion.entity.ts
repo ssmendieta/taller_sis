@@ -2,6 +2,12 @@ import { Check, Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, Primary
 import { ConsumoCierreV1, ProduccionCerradaV1Data } from '../../integraciones/contratos/contabilidad-v1';
 import { OrdenProduccion } from '../../ordenes/entities/orden-produccion.entity';
 
+export const ESTADO_CONTABLE_PENDIENTE = 'PENDIENTE' as const;
+export const ESTADO_CONTABLE_RECIBIDO = 'RECIBIDO' as const;
+export const ESTADO_CONTABLE_RECHAZADO = 'RECHAZADO' as const;
+export type EstadoContableCierre = typeof ESTADO_CONTABLE_PENDIENTE
+  | typeof ESTADO_CONTABLE_RECIBIDO | typeof ESTADO_CONTABLE_RECHAZADO;
+
 @Entity('cierres_produccion')
 @Unique('uq_cierres_produccion_orden_version', ['ordenId', 'cierreVersion'])
 @Check('ck_cierre_produccion_version', 'cierre_version > 0')
@@ -60,4 +66,19 @@ export class CierreProduccion {
 
   @CreateDateColumn({ name: 'fecha_cierre', type: 'timestamptz', default: () => 'NOW()' })
   fechaCierre: Date;
+
+  @Column({ name: 'estado_contable', type: 'varchar', length: 20, default: ESTADO_CONTABLE_PENDIENTE })
+  estadoContable: EstadoContableCierre;
+
+  @Column({ name: 'resultado_contable_event_id', type: 'uuid', nullable: true })
+  resultadoContableEventId: string | null;
+
+  @Column({ name: 'resultado_contable_en', type: 'timestamptz', nullable: true })
+  resultadoContableEn: Date | null;
+
+  @Column({ name: 'codigo_rechazo_contable', type: 'varchar', length: 100, nullable: true })
+  codigoRechazoContable: string | null;
+
+  @Column({ name: 'detalle_contable', type: 'varchar', length: 500, nullable: true })
+  detalleContable: string | null;
 }

@@ -13,6 +13,7 @@ import { ResultadosConformes1710000000014 } from '../database/migrations/1710000
 import { TipoResultadoCalidad1710000000015 } from '../database/migrations/1710000000015-TipoResultadoCalidad';
 import { CierresProduccion1710000000018 } from '../database/migrations/1710000000018-CierresProduccion';
 import { EventosOutbox1710000000017 } from '../database/migrations/1710000000017-EventosOutbox';
+import { ResultadoContableCierre1710000000021 } from '../database/migrations/1710000000021-ResultadoContableCierre';
 import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { loadOutboxConfig, OUTBOX_CONFIG } from '../integraciones/outbox/outbox.config';
 import { OutboxPublicadorService } from '../integraciones/outbox/outbox-publicador.service';
@@ -81,6 +82,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
       await new TipoResultadoCalidad1710000000015().up(runner);
       await new EventosOutbox1710000000017().up(runner);
       await new CierresProduccion1710000000018().up(runner);
+      await new ResultadoContableCierre1710000000021().up(runner);
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.query("INSERT INTO materiales (codigo,nombre,unidad_medida) VALUES ('M1','Harina','kg'),('M2','Envase','unidad')");
       await runner.commitTransaction();

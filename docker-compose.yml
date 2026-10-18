@@ -1,4 +1,19 @@
 ﻿services:
+  pubsub-emulator:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    container_name: taller_pubsub_emulator
+    command:
+      - gcloud
+      - beta
+      - emulators
+      - pubsub
+      - start
+      - --project=${TALLER_PUBSUB_PROJECT_ID:-taller-local}
+      - --host-port=0.0.0.0:8085
+    ports:
+      - "${PUBSUB_EMULATOR_PORT:-8085}:8085"
+    profiles: ["emulator"]
+
   postgres:
     image: postgres:15-alpine
     container_name: taller_postgres
@@ -81,6 +96,10 @@
       - PUBSUB_TOPIC_ID=${PUBSUB_TOPIC_ID:-}
       - PUBSUB_CONSUMER_ENABLED=${PUBSUB_CONSUMER_ENABLED:-false}
       - PUBSUB_SUBSCRIPTION_ID=${PUBSUB_SUBSCRIPTION_ID:-}
+      - PUBSUB_CONTABILIDAD_CONSUMER_ENABLED=${PUBSUB_CONTABILIDAD_CONSUMER_ENABLED:-false}
+      - PUBSUB_CONTABILIDAD_RESULTADOS_TOPIC_ID=${PUBSUB_CONTABILIDAD_RESULTADOS_TOPIC_ID:-}
+      - PUBSUB_CONTABILIDAD_RESULTADOS_SUBSCRIPTION_ID=${PUBSUB_CONTABILIDAD_RESULTADOS_SUBSCRIPTION_ID:-}
+      - PUBSUB_EMULATOR_HOST=${PUBSUB_EMULATOR_HOST:-}
       - GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/gcp/pubsub-service-account.json
       - OUTBOX_BATCH_SIZE=${OUTBOX_BATCH_SIZE:-20}
       - OUTBOX_POLL_INTERVAL_MS=${OUTBOX_POLL_INTERVAL_MS:-5000}

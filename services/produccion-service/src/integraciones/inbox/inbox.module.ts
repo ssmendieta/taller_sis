@@ -8,6 +8,9 @@ import { ProcesadorRespuestaInventarioService } from './procesador-respuesta-inv
 import { PubSubInventarioConsumerService } from './pubsub-inventario-consumer.service';
 import { ConsultaDisponibilidad } from '../disponibilidad/entities/consulta-disponibilidad.entity';
 import { ConsultaDisponibilidadItem } from '../disponibilidad/entities/consulta-disponibilidad-item.entity';
+import { CierreProduccion } from '../../cierre-produccion/entities/cierre-produccion.entity';
+import { ProcesadorResultadoContableService } from './procesador-resultado-contable.service';
+import { PubSubContabilidadConsumerService } from './pubsub-contabilidad-consumer.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([
@@ -16,8 +19,14 @@ import { ConsultaDisponibilidadItem } from '../disponibilidad/entities/consulta-
     SolicitudMaterial,
     ConsultaDisponibilidad,
     ConsultaDisponibilidadItem,
+    CierreProduccion,
   ]), PubSubModule],
-  providers: [ProcesadorRespuestaInventarioService, PubSubInventarioConsumerService],
-  exports: [ProcesadorRespuestaInventarioService, TypeOrmModule],
+  providers: [
+    ProcesadorRespuestaInventarioService,
+    PubSubInventarioConsumerService,
+    ProcesadorResultadoContableService,
+    PubSubContabilidadConsumerService,
+  ],
+  exports: [ProcesadorRespuestaInventarioService, ProcesadorResultadoContableService, TypeOrmModule],
 })
 export class InboxModule {}

@@ -1,8 +1,8 @@
 # Contrato Contabilidad v1
 
-Contrato de ABC-249 para comunicar el cierre de Producción. Durante este sprint
-Producción **solo publica** en el único topic indicado por `PUBSUB_TOPIC_ID`.
-No se crean topics ni suscripciones y no se consumen respuestas.
+Contrato de ABC-249/252/253 para comunicar el cierre de Producción y recibir el
+resultado contable. En despliegues reales la aplicación no provisiona recursos;
+la infraestructura local de ABC-253 crea recursos exclusivamente en el emulador.
 
 ## Enrutamiento
 
@@ -12,7 +12,7 @@ Los tipos de mensaje comparten el mismo sobre y se diferencian con `eventType`.
 
 ## Salida: ProduccionCerrada.v1
 
-Este es el único mensaje de este contrato que Producción publicará en el sprint.
+Este es el mensaje que Producción publica mediante el outbox.
 Solo debe construirse para una orden `FINALIZADA` con un resumen de cierre
 inmutable y validado.
 
@@ -49,10 +49,10 @@ inmutable y validado.
 }
 ```
 
-## Respuesta futura: RegistroContableResultado.v1
+## Respuesta: RegistroContableResultado.v1
 
-Se define para estabilizar el contrato, pero Producción no se suscribe, no lo
-lee y no lo persiste durante este sprint.
+Producción lo consume desde una suscripción independiente y persiste el inbox y
+el resultado sobre el cierre en una sola transacción.
 
 ```json
 {
@@ -75,6 +75,33 @@ lee y no lo persiste durante este sprint.
 Los estados permitidos son `RECIBIDO` y `RECHAZADO`. Un rechazo debe incluir
 `codigoRechazo` y puede incluir `detalle`. `RECIBIDO` solo significa recepción
 administrativa; no representa la aprobación de un asiento contable.
+
+## Estado y transiciones en Producción
+
+Todo cierre nace con `estadoContable=PENDIENTE`. Las únicas transiciones son
+`PENDIENTE -> RECIBIDO` y `PENDIENTE -> RECHAZADO`; ambos destinos son finales.
+Una respuesta posterior con otro `eventId` se conserva en `eventos_inbox` como
+`IGNORADO`, pero no pisa el primer resultado. Una redelivery con el mismo
+`eventId` y payload devuelve `DUPLICADO` y no agrega otra fila ni altera el
+estado. El mismo `eventId` con contenido distinto es un error permanente.
+
+Antes de aplicar el cambio se busca el `ProduccionCerrada.v1` original por
+`data.requestEventId` y se exige coincidencia de `correlationId`, `cierreId`,
+`cierreVersion` y `ordenId`. El snapshot productivo sigue siendo inmutable; la
+migración 21 solo habilita las columnas controladas del resultado contable.
+
+## Configuración del receptor
+
+```env
+PUBSUB_CONTABILIDAD_CONSUMER_ENABLED=false
+PUBSUB_CONTABILIDAD_RESULTADOS_TOPIC_ID=taller-contabilidad-resultados-local
+PUBSUB_CONTABILIDAD_RESULTADOS_SUBSCRIPTION_ID=taller-produccion-contabilidad-local
+```
+
+Con el flag en `false`, la falta de topic o suscripción no impide el arranque.
+El consumidor valida los atributos `eventId`, `eventType` y `correlationId`
+contra el JSON. Hace ACK después del commit; hace ACK y log para errores
+permanentes, y NACK para fallos transitorios.
 
 ## Reglas de versión e idempotencia
 

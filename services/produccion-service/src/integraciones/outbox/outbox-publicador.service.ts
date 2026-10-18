@@ -66,6 +66,13 @@ export class OutboxPublicadorService implements OnModuleInit, OnModuleDestroy {
           new Date(),
         );
         resultado.publicados += 1;
+        this.logger.log(JSON.stringify({
+          codigo: 'PUBLICACION_OUTBOX_CONFIRMADA',
+          eventId: evento.eventId,
+          eventType: evento.eventType,
+          correlationId: evento.correlationId,
+          messageId: confirmacion.messageId,
+        }));
         if (!aplicado) {
           resultado.resultadosObsoletos += 1;
           this.registrarResultadoObsoleto(evento, 'PUBLICACION_CONFIRMADA');
