@@ -30,10 +30,8 @@ import {
 import { MAX_CODIGO_LOTE, crearLote, listarLotesOrden } from "../services/lotesService.js";
 import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 import {
-  ESTADOS_REPORTE_CONTABLE,
   PERMISO_PREPARAR_CIERRE,
   VERSION_CIERRE_INICIAL,
-  estadoReporteContable,
   obtenerCierre,
   prepararCierre,
 } from "../services/cierreProduccionService.js";
@@ -52,7 +50,13 @@ import {
   responsableOrden,
   totalProducidoDe,
 } from "../utils/formato.js";
-import { filasComparacionMateriales, formatearCantidad, formatearEstadoOrden, formatearFecha } from "../utils/format.js";
+import {
+  filasComparacionMateriales,
+  formatearCantidad,
+  formatearEstadoOrden,
+  formatearFecha,
+  resumenReporteContable,
+} from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
@@ -693,7 +697,7 @@ export default function OrdenDetallePage() {
   if (!orden) return null;
 
   const enProduccion = orden.estado === "EN_PRODUCCION";
-  const reporteContable = estadoReporteContable(cierre);
+  const reporteContable = resumenReporteContable(cierre?.reporteContable);
 
   return (
     <section className="ts-page" aria-labelledby="detalle-orden-titulo">
@@ -1712,22 +1716,10 @@ export default function OrdenDetallePage() {
               style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "4px 20px 8px" }}
             >
               <span>Reporte a Contabilidad:</span>
-              <span
-                className={`ts-badge ${
-                  reporteContable?.estado === "RECIBIDO"
-                    ? "ts-badge--FINALIZADA"
-                    : reporteContable?.estado === "RECHAZADO"
-                      ? "ts-badge--CANCELADA"
-                      : reporteContable?.estado === "ENVIADO"
-                        ? "ts-badge--PENDIENTE"
-                        : "ts-badge--inactivo"
-                }`}
-              >
-                {reporteContable
-                  ? ESTADOS_REPORTE_CONTABLE[reporteContable.estado]
-                  : "Sin estado informado"}
+              <span className={`ts-badge ${reporteContable.clase}`}>
+                {reporteContable.etiqueta}
               </span>
-              {reporteContable?.actualizadoEn && (
+              {reporteContable.actualizadoEn && (
                 <small>
                   {(() => {
                     const { fecha, hora } = mostrarFechaHora(reporteContable.actualizadoEn);
@@ -1745,12 +1737,24 @@ export default function OrdenDetallePage() {
               </button>
             </div>
 
-            {reporteContable?.estado === "RECHAZADO" && (
-              <p className="ts-modal-error" role="alert" style={{ padding: "0 20px" }}>
-                Contabilidad rechazó el reporte
-                {reporteContable.codigoRechazo ? ` (${reporteContable.codigoRechazo})` : ""}
-                {reporteContable.detalle ? `: ${reporteContable.detalle}` : "."}
+            {/* Respuesta tardía: mientras no hay respuesta se mantiene pendiente, nunca RECIBIDO. */}
+            {reporteContable.pendiente && (
+              <p className="ts-field-help" role="status" style={{ padding: "0 20px" }}>
+                Contabilidad todavía no responde. El reporte sigue pendiente; usa
+                «Actualizar estado» para consultar si ya llegó la respuesta.
               </p>
+            )}
+
+            {reporteContable.estado === "RECHAZADO" && (
+              <div role="alert" style={{ padding: "0 20px 8px" }}>
+                <p className="ts-modal-error" style={{ margin: "0 0 4px" }}>
+                  Contabilidad rechazó el reporte: {reporteContable.causaResumida}
+                </p>
+                <details>
+                  <summary>Consultar causa completa</summary>
+                  <p style={{ margin: "4px 0 0" }}>{reporteContable.causaCompleta}</p>
+                </details>
+              </div>
             )}
 
             <p className="ts-field-help" style={{ padding: "0 20px" }}>
