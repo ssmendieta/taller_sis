@@ -416,3 +416,103 @@ describe('ABC-258: listado paginado y filtros de boletas', () => {
     expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 });
+
+describe('ABC-224: regla de concurrencia documental', () => {
+  const boletaBorrador = {
+    id: '10',
+    solicitudSalidaId: '7',
+    estado: 'BORRADOR',
+    solicitudSalida: { id: '7', ordenId: '8' },
+    items: [{ referencia: 'L-1', cantidad: '6.0000' }],
+  };
+  const boletas = { findOne: jest.fn() } as any;
+  const solicitudes = {} as any;
+  const manager = {
+    findOne: jest.fn(),
+    query: jest.fn(),
+    save: jest.fn(),
+  };
+  const dataSource = {
+    transaction: jest.fn(async (callback: any) => callback(manager)),
+  } as any;
+  const produccion = {
+    consultarOrdenPorId: jest.fn(),
+    consultarConformesPorOrden: jest.fn(),
+  } as any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    boletaBorrador.estado = 'BORRADOR';
+    boletas.findOne.mockResolvedValue(boletaBorrador);
+    manager.findOne.mockResolvedValue(boletaBorrador);
+    manager.query
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '8' }])
+      .mockResolvedValueOnce([{ total: '4.0000' }]);
+    manager.save.mockImplementation(async (_entity: unknown, value: unknown) => value);
+    produccion.consultarOrdenPorId.mockResolvedValue({
+      id: '8', codigo: 'ORD-7', producto_id: 3, producto: { codigo: 'P-3' },
+    });
+    produccion.consultarConformesPorOrden.mockResolvedValue([{ cantidad: '10.0000' }]);
+  });
+
+  it('emite un borrador cuando la cantidad solicitada cabe en el saldo documental', async () => {
+    const service = new BoletasService(boletas, solicitudes, dataSource, produccion);
+
+    await expect(service.emitir('10', '42', 'Bearer token')).resolves.toMatchObject({
+      id: '10',
+      estado: 'EMITIDA',
+    });
+  });
+
+  it('rechaza con conflicto cuando el saldo fue consumido por otra emisión', async () => {
+    manager.query.mockReset()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ orden_id: '8' }])
+      .mockResolvedValueOnce([{ total: '5.0000' }]);
+    const service = new BoletasService(boletas, solicitudes, dataSource, produccion);
+
+    await expect(service.emitir('10', '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rechaza un identificador de boleta inválido antes de consultar dependencias', async () => {
+    const service = new BoletasService(boletas, solicitudes, dataSource, produccion);
+
+    await expect(service.emitir('abc', '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(NotFoundException);
+    expect(produccion.consultarOrdenPorId).not.toHaveBeenCalled();
+  });
+
+  it('no abre la transacción si Producción devuelve una orden o producto inválido', async () => {
+    produccion.consultarOrdenPorId.mockResolvedValueOnce({
+      id: '8', codigo: 'ORD-7', producto_id: 0, producto: null,
+    });
+    const service = new BoletasService(boletas, solicitudes, dataSource, produccion);
+
+    await expect(service.emitir('10', '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(BadGatewayException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('no duplica el compromiso cuando la boleta ya está emitida', async () => {
+    boletaBorrador.estado = 'EMITIDA';
+    const service = new BoletasService(boletas, solicitudes, dataSource, produccion);
+
+    await expect(service.emitir('10', '42', 'Bearer token'))
+      .resolves.toMatchObject({ estado: 'EMITIDA' });
+    expect(produccion.consultarConformesPorOrden).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('revierte la emisión si no puede consultar los conformes de Producción', async () => {
+    produccion.consultarConformesPorOrden.mockRejectedValueOnce(
+      new ServiceUnavailableException('Producción no está disponible'),
+    );
+    const service = new BoletasService(boletas, solicitudes, dataSource, produccion);
+
+    await expect(service.emitir('10', '42', 'Bearer token'))
+      .rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+});

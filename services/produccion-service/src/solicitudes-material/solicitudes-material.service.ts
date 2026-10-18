@@ -6,6 +6,11 @@ import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { CreateSolicitudMaterialDto } from './dto/create-solicitud-material.dto';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { SolicitudMaterialItem } from './entities/solicitud-material-item.entity';
+import { crearEventoSolicitudMaterial } from '../integraciones/outbox/crear-evento-solicitud-material';
+import {
+  ESTADO_OUTBOX_PENDIENTE,
+  EventoOutbox,
+} from '../integraciones/outbox/entities/evento-outbox.entity';
 
 @Injectable()
 export class SolicitudesMaterialService {
@@ -32,6 +37,7 @@ export class SolicitudesMaterialService {
       if (!orden) throw new NotFoundException(`Orden con id ${dto.ordenId} no encontrada`);
 
       // Orden estable de bloqueo para solicitudes con varios materiales.
+      const materiales = new Map<number, Material>();
       for (const materialId of [...materialesIds].sort((a, b) => a - b)) {
         const material = await manager.findOne(Material, {
           where: { id: materialId }, lock: { mode: 'pessimistic_read' },
@@ -44,6 +50,7 @@ export class SolicitudesMaterialService {
         if (item.unidad !== material.unidadMedida) {
           throw new BadRequestException(`La unidad del material ${materialId} debe ser ${material.unidadMedida}`);
         }
+        materiales.set(materialId, material);
       }
 
       const duplicado = await manager.findOne(SolicitudMaterialItem, {
@@ -62,6 +69,23 @@ export class SolicitudesMaterialService {
         solicitudId: solicitud.id, materialId: String(item.materialId),
         cantidad: String(item.cantidad), unidad: item.unidad,
       })));
+      const evento = crearEventoSolicitudMaterial(
+        solicitud,
+        orden,
+        items.map((item) => ({
+          item,
+          material: materiales.get(Number(item.materialId))!,
+        })),
+      );
+      await manager.save(EventoOutbox, {
+        eventId: evento.eventId,
+        correlationId: evento.correlationId,
+        eventType: evento.eventType,
+        aggregateType: 'SolicitudMaterial',
+        aggregateId: solicitud.id,
+        payload: evento,
+        estado: ESTADO_OUTBOX_PENDIENTE,
+      });
       return { ...solicitud, items };
     });
   }

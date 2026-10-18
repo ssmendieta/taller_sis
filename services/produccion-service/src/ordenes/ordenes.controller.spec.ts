@@ -11,6 +11,7 @@ describe('OrdenesController (ABC-144)', () => {
     findByCodigo: jest.fn(),
     buscar: jest.fn(),
     obtenerHistorial: jest.fn(),
+    solicitarDisponibilidadMateriales: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -63,5 +64,13 @@ describe('OrdenesController (ABC-144)', () => {
 
     await expect(controller.obtenerHistorial(1)).resolves.toBe(historial);
     expect(ordenesServiceMock.obtenerHistorial).toHaveBeenCalledWith(1);
+  });
+
+  it('delega la creacion asincrona de una consulta de disponibilidad', async () => {
+    const consulta = { consulta_id: 'DISP-ORD-1-V1', estado_consulta: 'PENDIENTE' };
+    ordenesServiceMock.solicitarDisponibilidadMateriales.mockResolvedValue(consulta);
+
+    await expect(controller.solicitarDisponibilidadMateriales(1)).resolves.toBe(consulta);
+    expect(ordenesServiceMock.solicitarDisponibilidadMateriales).toHaveBeenCalledWith(1);
   });
 });

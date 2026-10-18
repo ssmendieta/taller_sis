@@ -2,6 +2,12 @@ Matriz de Permisos – Sprint 1 (fuente de verdad)
 
 Roles
 
+Actualización ABC-267: `integraciones.reintentar` permite `GET /integraciones/eventos`
+y `POST /integraciones/eventos/:id/reintentar` en Producción (prefijo gateway
+`/api/produccion`). La migración `1710000000012-IntegracionesReintentar` lo asigna
+solo a Administrador inicialmente. Los demás roles no lo reciben; la autorización
+se evalúa por permiso vigente obtenido de Auth, también para roles personalizados.
+
 - Administrador
 - Encargado de Producción
 - Encargado de Logística (sin funciones en Sprint 1)
@@ -45,6 +51,7 @@ Mapa ruta → permiso (produccion-service, `PermisoProduccionGuard` decide solo 
 - `POST /avances/:ordenId`, `POST /avances-produccion` → `ordenes.registrar_avance`; `GET /avances/:ordenId`, `/avances/:ordenId/total`, `GET /avances-produccion*` → `ordenes.consultar`
 - `POST /material-calculation/calcular` → `materiales.calcular` (DTO validado, 400 nunca 500)
 - `GET /inventario/material/:id`, `GET /materiales`, `GET /materiales/:id` → `materiales.consultar_disponibilidad`
+- `POST /ordenes/:id/disponibilidad-materiales/consultar` → `materiales.consultar_disponibilidad`
 - `POST/PUT/DELETE /materiales`, todo `POST/PATCH /recetas*` y `GET /recetas*` → `recetas.gestionar`
 
 Contrato Auth: `POST /login` y `GET /me` devuelven `permisos` como `[{id, codigo, nombre}]`. Producción normaliza `string | {codigo}` y no compara rol fijo, así un rol personalizado funciona sin tocar código.

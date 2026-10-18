@@ -31,3 +31,21 @@ export async function cerrarSesionServidor() {
     // El cierre local siempre se ejecuta aunque falle la red.
   }
 }
+
+export async function obtenerSesionActualServidor() {
+  const token = sessionStorage.getItem("accessToken");
+  if (!token) throw new Error("No hay una sesión activa.");
+
+  const respuesta = await fetch(`${apiConfig.gatewayUrl}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const datos = await respuesta.json().catch(() => null);
+  if (!respuesta.ok) {
+    const mensaje = datos?.message;
+    throw new Error(
+      (Array.isArray(mensaje) ? mensaje.join(". ") : mensaje) ||
+        "No se pudo actualizar la sesión.",
+    );
+  }
+  return datos;
+}

@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cerrarSesion, guardarSesion, LIMITE_INACTIVIDAD_MS, obtenerSesion, registrarActividad } from '../src/services/sesion.js';
+import {
+  actualizarUsuarioSesion,
+  cerrarSesion,
+  guardarSesion,
+  LIMITE_INACTIVIDAD_MS,
+  obtenerSesion,
+  registrarActividad,
+} from '../src/services/sesion.js';
 
 class Storage {
   #datos = new Map();
@@ -48,4 +55,22 @@ test('no acepta tokens ilegibles ni una sesión recuperada sin usuario', () => {
   sessionStorage.setItem('accessToken', respuesta(5_000_000).accessToken);
   sessionStorage.setItem('ultimaActividad', '1000000');
   assert.equal(obtenerSesion(1_000_000), null);
+});
+
+test('actualiza los permisos de una sesión vigente sin renovar su actividad', () => {
+  const ahora = 1_000_000;
+  guardarSesion(respuesta(ahora + 3_600_000), ahora);
+
+  const actualizado = actualizarUsuarioSesion(
+    {
+      id: '3',
+      rol: 'Administrador',
+      permisos: [{ codigo: 'calidad.registrar_conformes' }],
+    },
+    ahora + 1000,
+  );
+
+  assert.equal(actualizado.permisos[0].codigo, 'calidad.registrar_conformes');
+  assert.equal(obtenerSesion(ahora + 2000).permisos[0].codigo, 'calidad.registrar_conformes');
+  assert.equal(sessionStorage.getItem('ultimaActividad'), String(ahora));
 });

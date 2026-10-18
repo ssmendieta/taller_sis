@@ -3,6 +3,7 @@ import { OrdenesService } from './ordenes.service';
 import { EstadoOrden } from './estado-orden.enum';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
+import { ConsultaDisponibilidad } from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
 
 // ABC-190: calcula materiales reales y observa la persistencia, sin simular el resultado del cálculo.
 describe('ABC-190: precondiciones de inicio de orden', () => {
@@ -34,12 +35,26 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
     };
     const ordenRepo = {
       findOne: async () => ({ ...actual }),
-      query: async () => [{ material_id: 3, codigo: 'MAT-3', nombre: 'Harina',
-        unidad_medida: 'kg', cantidad_requerida: '2' }],
-      manager: { transaction: async (fn: (m: typeof manager) => Promise<unknown>) => {
-        transacciones += 1;
-        return fn(manager);
-      } },
+      manager: {
+        getRepository: (entity: unknown) => entity === ConsultaDisponibilidad
+          ? { findOne: async () => ({
+            id: '1', consultaId: 'DISP-ORD-12-V1', consultaVersion: 1,
+            requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+            estado: 'RESPONDIDA', vigenteEn: new Date('2026-10-17T12:00:00.000Z'),
+          }) }
+          : { find: async () => [{
+            materialId: '3', materialCodigo: 'MAT-3', materialNombre: 'Harina',
+            unidad: 'kg', cantidadRequerida: '20.0000',
+            cantidadDisponible: String(disponible ?? 0),
+            estado: disponible === null || disponible === 0
+              ? 'FALTANTE'
+              : disponible < 20 ? 'INSUFICIENTE' : 'SUFICIENTE',
+          }] },
+        transaction: async (fn: (m: typeof manager) => Promise<unknown>) => {
+          transacciones += 1;
+          return fn(manager);
+        },
+      },
     };
     const inventarioRepo = { findOne: async () => disponible === null ? null : {
       materialId: 3, cantidadDisponible: disponible,

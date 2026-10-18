@@ -29,6 +29,12 @@ export class BoletasController {
     return this.service.updateItems(id, dto, request.usuarioId, request.headers.authorization ?? '');
   }
 
+  @Post(':id/emitir')
+  @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.gestionar')
+  emitir(@Param('id') id: string, @Req() request: { usuarioId: string; headers: { authorization?: string } }) {
+    return this.service.emitir(id, request.usuarioId, request.headers.authorization ?? '');
+  }
+
   @Get()
   @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.consultar')
   findAll(

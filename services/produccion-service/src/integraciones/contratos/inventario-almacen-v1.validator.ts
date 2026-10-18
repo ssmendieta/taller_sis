@@ -1,9 +1,13 @@
 import { esUnidadValida } from '../../unidades/unidades.catalogo';
 import {
+  DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1,
+  DISPONIBILIDAD_MATERIAL_SOLICITADA_V1,
   SOLICITUD_MATERIAL_ALMACEN_ESTADO_ACTUALIZADO_V1,
   SOLICITUD_MATERIAL_ALMACEN_V1,
 } from './inventario-almacen-v1';
 import type {
+  DisponibilidadMaterialRespondidaV1Event,
+  DisponibilidadMaterialSolicitadaV1Event,
   SolicitudMaterialAlmacenEstadoActualizadoV1Event,
   SolicitudMaterialAlmacenV1Event,
 } from './inventario-almacen-v1';
@@ -49,11 +53,13 @@ export class EventoInventarioV1InvalidoError extends Error {
 }
 
 const ESTADOS_SOLICITUD = ['PENDIENTE', 'APROBADA', 'CANCELADA'] as const;
+const ESTADOS_DISPONIBILIDAD = ['SUFICIENTE', 'INSUFICIENTE', 'FALTANTE'] as const;
 const MAX_BIGINT_POSTGRES = 9223372036854775807n;
 const MAX_CANTIDAD = 9999999999.9999;
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DECIMAL_CANTIDAD = /^(?:0\.\d{1,4}|[1-9]\d{0,9}(?:\.\d{1,4})?)$/;
+const DECIMAL_CANTIDAD_NO_NEGATIVA = /^(?:0(?:\.\d{1,4})?|[1-9]\d{0,9}(?:\.\d{1,4})?)$/;
 const FECHA = /^(\d{4})-(\d{2})-(\d{2})$/;
 const FECHA_HORA_CON_ZONA =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -212,12 +218,166 @@ function esEstadoSolicitud(value: unknown): boolean {
     && (ESTADOS_SOLICITUD as readonly string[]).includes(value);
 }
 
+function esEstadoDisponibilidad(value: unknown): boolean {
+  return typeof value === 'string'
+    && (ESTADOS_DISPONIBILIDAD as readonly string[]).includes(value);
+}
+
+function validarCantidadPositiva(
+  value: unknown,
+  campo: string,
+  errores: ErrorValidacionInventarioV1[],
+): value is string {
+  if (!validarTexto(value, campo, errores)) return false;
+  if (!DECIMAL_CANTIDAD.test(value)
+    || Number(value) < 0.0001
+    || Number(value) > MAX_CANTIDAD) {
+    agregarError(errores, campo, 'debe ser un decimal positivo con hasta cuatro decimales');
+    return false;
+  }
+  return true;
+}
+
+function validarCantidadNoNegativa(
+  value: unknown,
+  campo: string,
+  errores: ErrorValidacionInventarioV1[],
+): value is string {
+  if (!validarTexto(value, campo, errores)) return false;
+  if (!DECIMAL_CANTIDAD_NO_NEGATIVA.test(value) || Number(value) > MAX_CANTIDAD) {
+    agregarError(errores, campo, 'debe ser un decimal no negativo con hasta cuatro decimales');
+    return false;
+  }
+  return true;
+}
+
+function validarMaterialRequerido(
+  item: unknown,
+  campo: string,
+  materiales: Set<string>,
+  errores: ErrorValidacionInventarioV1[],
+): item is JsonObject {
+  if (!esObjeto(item)) {
+    agregarError(errores, campo, 'debe ser un objeto');
+    return false;
+  }
+  if (validarBigintPositivoComoTexto(item.materialId, `${campo}.materialId`, errores)) {
+    if (materiales.has(item.materialId)) {
+      agregarError(errores, `${campo}.materialId`, 'no debe repetirse');
+    }
+    materiales.add(item.materialId);
+  }
+  validarTexto(item.materialCodigo, `${campo}.materialCodigo`, errores);
+  validarTexto(item.materialNombre, `${campo}.materialNombre`, errores);
+  validarCantidadPositiva(item.cantidadRequerida, `${campo}.cantidadRequerida`, errores);
+  if (!esUnidadValida(item.unidad)) {
+    agregarError(errores, `${campo}.unidad`, 'debe pertenecer al catalogo de unidades');
+  }
+  return true;
+}
+
+export function esTipoEventoInventarioV1(eventType: unknown): boolean {
+  if (typeof eventType !== 'string') return false;
+  return eventType.startsWith('DisponibilidadMaterialSolicitada.v')
+    || eventType.startsWith('DisponibilidadMaterialRespondida.v')
+    || eventType.startsWith('SolicitudMaterialAlmacen.v')
+    || eventType.startsWith('SolicitudMaterialAlmacenEstadoActualizado.v');
+}
+
 export function esTipoEventoSolicitudMaterialInventarioV1(
   eventType: unknown,
 ): boolean {
   if (typeof eventType !== 'string') return false;
   return eventType.startsWith('SolicitudMaterialAlmacen.v')
     || eventType.startsWith('SolicitudMaterialAlmacenEstadoActualizado.v');
+}
+
+export function validarDisponibilidadMaterialSolicitadaV1(
+  value: unknown,
+): DisponibilidadMaterialSolicitadaV1Event {
+  const errores: ErrorValidacionInventarioV1[] = [];
+  const tieneSobre = validarSobre(
+    value,
+    DISPONIBILIDAD_MATERIAL_SOLICITADA_V1,
+    'produccion-service',
+    errores,
+  );
+
+  if (tieneSobre && esObjeto(value.data)) {
+    const data = value.data;
+    validarTexto(data.consultaId, 'data.consultaId', errores);
+    validarEnteroSeguroPositivo(data.consultaVersion, 'data.consultaVersion', errores);
+    validarEnteroSeguroPositivo(data.ordenId, 'data.ordenId', errores);
+    validarTexto(data.ordenCodigo, 'data.ordenCodigo', errores);
+    validarFecha(data.fechaNecesaria, 'data.fechaNecesaria', errores);
+    if (!Array.isArray(data.materiales) || data.materiales.length === 0) {
+      agregarError(errores, 'data.materiales', 'debe contener al menos un material');
+    } else {
+      const materiales = new Set<string>();
+      data.materiales.forEach((item, index) => validarMaterialRequerido(
+        item,
+        `data.materiales[${index}]`,
+        materiales,
+        errores,
+      ));
+    }
+  }
+
+  if (errores.length > 0) throw crearError(value, errores);
+  return value as DisponibilidadMaterialSolicitadaV1Event;
+}
+
+export function validarDisponibilidadMaterialRespondidaV1(
+  value: unknown,
+): DisponibilidadMaterialRespondidaV1Event {
+  const errores: ErrorValidacionInventarioV1[] = [];
+  const tieneSobre = validarSobre(
+    value,
+    DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1,
+    'inventario-service',
+    errores,
+  );
+
+  if (tieneSobre && esObjeto(value.data)) {
+    const data = value.data;
+    validarTexto(data.consultaId, 'data.consultaId', errores);
+    validarEnteroSeguroPositivo(data.consultaVersion, 'data.consultaVersion', errores);
+    validarUuid(data.requestEventId, 'data.requestEventId', errores);
+    validarEnteroSeguroPositivo(data.ordenId, 'data.ordenId', errores);
+    validarFechaHora(data.vigenteAt, 'data.vigenteAt', errores);
+    if (!Array.isArray(data.materiales) || data.materiales.length === 0) {
+      agregarError(errores, 'data.materiales', 'debe contener al menos un material');
+    } else {
+      const materiales = new Set<string>();
+      data.materiales.forEach((item, index) => {
+        const campo = `data.materiales[${index}]`;
+        if (!validarMaterialRequerido(item, campo, materiales, errores)) return;
+        const cantidadValida = validarCantidadNoNegativa(
+          item.cantidadDisponible,
+          `${campo}.cantidadDisponible`,
+          errores,
+        );
+        if (!esEstadoDisponibilidad(item.estado)) {
+          agregarError(errores, `${campo}.estado`, 'debe ser SUFICIENTE, INSUFICIENTE o FALTANTE');
+          return;
+        }
+        if (!cantidadValida || typeof item.cantidadRequerida !== 'string') return;
+        const disponible = Number(item.cantidadDisponible);
+        const requerida = Number(item.cantidadRequerida);
+        const consistente = item.estado === 'FALTANTE'
+          ? disponible === 0
+          : item.estado === 'INSUFICIENTE'
+            ? disponible > 0 && disponible < requerida
+            : disponible >= requerida;
+        if (!consistente) {
+          agregarError(errores, `${campo}.estado`, 'no coincide con las cantidades informadas');
+        }
+      });
+    }
+  }
+
+  if (errores.length > 0) throw crearError(value, errores);
+  return value as DisponibilidadMaterialRespondidaV1Event;
 }
 
 export function validarSolicitudMaterialAlmacenV1(
@@ -262,18 +422,7 @@ export function validarSolicitudMaterialAlmacenV1(
         }
         validarTexto(item.materialCodigo, `${campo}.materialCodigo`, errores);
         validarTexto(item.materialNombre, `${campo}.materialNombre`, errores);
-        if (!validarTexto(item.cantidad, `${campo}.cantidad`, errores)
-          || !DECIMAL_CANTIDAD.test(item.cantidad)
-          || Number(item.cantidad) < 0.0001
-          || Number(item.cantidad) > MAX_CANTIDAD) {
-          if (typeof item.cantidad === 'string' && item.cantidad.trim()) {
-            agregarError(
-              errores,
-              `${campo}.cantidad`,
-              'debe ser un decimal positivo con hasta cuatro decimales',
-            );
-          }
-        }
+        validarCantidadPositiva(item.cantidad, `${campo}.cantidad`, errores);
         if (!esUnidadValida(item.unidad)) {
           agregarError(errores, `${campo}.unidad`, 'debe pertenecer al catalogo de unidades');
         }
@@ -334,6 +483,78 @@ export function validarEventoSolicitudMaterialInventarioV1(
     campo: 'eventType',
     motivo: `debe ser ${SOLICITUD_MATERIAL_ALMACEN_V1} o ${SOLICITUD_MATERIAL_ALMACEN_ESTADO_ACTUALIZADO_V1}`,
   }]);
+}
+
+export function validarEventoInventarioV1(
+  value: unknown,
+): DisponibilidadMaterialSolicitadaV1Event
+  | DisponibilidadMaterialRespondidaV1Event
+  | SolicitudMaterialAlmacenV1Event
+  | SolicitudMaterialAlmacenEstadoActualizadoV1Event {
+  if (!esObjeto(value)) {
+    throw crearError(value, [{ campo: '$', motivo: 'debe ser un objeto' }]);
+  }
+  if (value.eventType === DISPONIBILIDAD_MATERIAL_SOLICITADA_V1) {
+    return validarDisponibilidadMaterialSolicitadaV1(value);
+  }
+  if (value.eventType === DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1) {
+    return validarDisponibilidadMaterialRespondidaV1(value);
+  }
+  if (value.eventType === SOLICITUD_MATERIAL_ALMACEN_V1) {
+    return validarSolicitudMaterialAlmacenV1(value);
+  }
+  if (value.eventType === SOLICITUD_MATERIAL_ALMACEN_ESTADO_ACTUALIZADO_V1) {
+    return validarSolicitudMaterialAlmacenEstadoActualizadoV1(value);
+  }
+  throw crearError(value, [{
+    campo: 'eventType',
+    motivo: `debe ser ${DISPONIBILIDAD_MATERIAL_SOLICITADA_V1}, ${DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1}, ${SOLICITUD_MATERIAL_ALMACEN_V1} o ${SOLICITUD_MATERIAL_ALMACEN_ESTADO_ACTUALIZADO_V1}`,
+  }]);
+}
+
+export function validarCorrelacionDisponibilidadMaterialV1(
+  solicitudValue: unknown,
+  respuestaValue: unknown,
+): void {
+  const solicitud = validarDisponibilidadMaterialSolicitadaV1(solicitudValue);
+  const respuesta = validarDisponibilidadMaterialRespondidaV1(respuestaValue);
+  const errores: ErrorValidacionInventarioV1[] = [];
+
+  if (respuesta.correlationId !== solicitud.correlationId) {
+    agregarError(errores, 'correlationId', 'no coincide con la consulta original');
+  }
+  if (respuesta.data.requestEventId !== solicitud.eventId) {
+    agregarError(errores, 'data.requestEventId', 'no coincide con el eventId solicitado');
+  }
+  if (respuesta.data.consultaId !== solicitud.data.consultaId) {
+    agregarError(errores, 'data.consultaId', 'no coincide con la consulta original');
+  }
+  if (respuesta.data.consultaVersion !== solicitud.data.consultaVersion) {
+    agregarError(errores, 'data.consultaVersion', 'no coincide con la version consultada');
+  }
+  if (respuesta.data.ordenId !== solicitud.data.ordenId) {
+    agregarError(errores, 'data.ordenId', 'no coincide con la orden original');
+  }
+
+  const solicitados = new Map(solicitud.data.materiales.map((item) => [item.materialId, item]));
+  if (respuesta.data.materiales.length !== solicitados.size) {
+    agregarError(errores, 'data.materiales', 'debe responder todos los materiales solicitados');
+  }
+  for (const material of respuesta.data.materiales) {
+    const solicitado = solicitados.get(material.materialId);
+    if (!solicitado) {
+      agregarError(errores, 'data.materiales', `incluye el material no solicitado ${material.materialId}`);
+      continue;
+    }
+    if (material.materialCodigo !== solicitado.materialCodigo
+      || material.materialNombre !== solicitado.materialNombre
+      || material.cantidadRequerida !== solicitado.cantidadRequerida
+      || material.unidad !== solicitado.unidad) {
+      agregarError(errores, `data.materiales.${material.materialId}`, 'no coincide con el material solicitado');
+    }
+  }
+
+  if (errores.length > 0) throw crearError(respuesta, errores);
 }
 
 export function validarCorrelacionSolicitudMaterialInventarioV1(

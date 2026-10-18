@@ -14,10 +14,13 @@ import { SolicitudesMaterialModule } from './solicitudes-material/solicitudes-ma
 import { ConsumosMaterialModule } from './consumos-material/consumos-material.module';
 import { CalidadModule } from './calidad/calidad.module';
 import { LotesModule } from './lotes/lotes.module';
+import { IntegracionesModule } from './integraciones/integraciones.module';
+import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.module';
 
 @Module({
   imports: [
     DatabaseModule,
+    IntegracionesModule,
     HealthModule,
     AvancesProduccionModule,
     OrdenesModule,
@@ -29,6 +32,7 @@ import { LotesModule } from './lotes/lotes.module';
     ConsumosMaterialModule,
     MaterialCalculationModule,
     LotesModule,
+    CierreProduccionModule,
     CalidadModule,
     PubSubModule,
     CalidadModule,

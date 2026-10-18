@@ -22,7 +22,9 @@ API Gateway (NestJS :3000)  -> ConfigModule + http-proxy-middleware
 └──────────────┴─────────────────────┴──────────────────┘
          ↓ 1 instancia PostgreSQL 15 taller_postgres:5432 (pgdata)
 ```
-Todo HTTP/REST. Cada MS solo ve su DB, sin FK entre DBs.
+La comunicación síncrona usa HTTP/REST. Producción también publica eventos
+asíncronos a Inventarios mediante Google Cloud Pub/Sub y una outbox PostgreSQL.
+Cada MS solo ve su DB, sin FK entre DBs.
 
 ## 3. Estructura de Carpetas
 ```
@@ -83,7 +85,7 @@ cd services/produccion-service; npm run migration:run; cd ../..
 # Ejecutar migration:run una segunda vez debe decir "No migrations are pending" (idempotente).
 # Verificar:
 docker exec taller_postgres psql -U postgres_user -d auth_db -c "\dt"              # debe mostrar roles, permisos, usuarios, sesiones, auditoria
-docker exec taller_postgres psql -U postgres_user -d produccion_db -c "\dt; \dv"  # debe mostrar 7 tablas + 2 vistas + secuencia_codigo_orden
+docker exec taller_postgres psql -U postgres_user -d produccion_db -c "\dt; \dv"  # debe incluir eventos_outbox y los objetos de Producción
 docker exec taller_postgres psql -U postgres_user -d logistica_db -c "\dt"         # debe estar vacío (correcto)
 ```
 
@@ -167,7 +169,8 @@ Automática al primer `up` via `database/init/01-create-dbs.sql` (`/docker-entry
 ## 8. Migraciones
 TypeORM `synchronize:false` en `services/*/src/database/data-source.ts`.
 - `auth-service`: `1710000000000-AuthSchema` + `1710000000001-AuthSeed`
-- `produccion-service`: `1710000000002-ProduccionSchema`
+- `produccion-service`: migraciones secuenciales bajo `src/database/migrations/`;
+  `1710000000017-EventosOutbox` agrega la publicación durable de ABC-242.
 - `logistica-service`: sin migraciones.
 ```powershell
 cd services/auth-service; npm run migration:run

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { randomUUID } from 'crypto';
 
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
@@ -17,6 +18,17 @@ import { CreateOrdenDto } from './dto/create-orden.dto';
 import { Inventario } from '../inventario/entities/inventario.entity';
 import { RecetasService } from '../recetas/recetas.service';
 import { multiplicarMateriales } from '../material-calculation/material-calculation.service';
+import {
+  ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
+  ESTADO_CONSULTA_DISPONIBILIDAD_RESPONDIDA,
+  ConsultaDisponibilidad,
+} from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
+import { ConsultaDisponibilidadItem } from '../integraciones/disponibilidad/entities/consulta-disponibilidad-item.entity';
+import { crearEventoDisponibilidadMaterial } from '../integraciones/outbox/crear-evento-disponibilidad-material';
+import {
+  ESTADO_OUTBOX_PENDIENTE,
+  EventoOutbox,
+} from '../integraciones/outbox/entities/evento-outbox.entity';
 
 // Identidad verificada por PermisoProduccionGuard (decide solo por permiso).
 export interface UsuarioAutenticadoProduccion {
@@ -290,67 +302,140 @@ export class OrdenesService {
       throw new NotFoundException(`Orden ${id} no encontrada`);
     }
 
-    const materiales = await this.ordenRepository.query(
-      `
-      SELECT
-        m.id AS material_id,
-        m.codigo,
-        m.nombre,
-        m.unidad_medida,
-        rm.cantidad_requerida
-      FROM ordenes_produccion o
-      INNER JOIN receta_material rm
-        ON rm.receta_id = o.receta_id
-      INNER JOIN materiales m
-        ON m.id = rm.material_id
-      WHERE o.id = $1
-      `,
-      [id],
-    );
+    const consulta = await this.ordenRepository.manager.getRepository(ConsultaDisponibilidad)
+      .findOne({ where: { ordenId: String(id) }, order: { consultaVersion: 'DESC' } });
+    if (!consulta) return this.respuestaDisponibilidad(orden, null, []);
 
-    const resultado = [];
-
-    for (const material of materiales) {
-      const cantidadRequerida =
-        Number(material.cantidad_requerida) * Number(orden.cantidad);
-
-      const inventario = await this.inventarioRepository.findOne({
-        where: {
-          materialId: Number(material.material_id),
-        },
+    const items = await this.ordenRepository.manager.getRepository(ConsultaDisponibilidadItem)
+      .find({
+        where: { consultaDisponibilidadId: consulta.id },
+        order: { materialId: 'ASC' },
       });
+    return this.respuestaDisponibilidad(orden, consulta, items);
+  }
 
-      const cantidadDisponible = inventario
-        ? Number(inventario.cantidadDisponible)
-        : 0;
+  async solicitarDisponibilidadMateriales(id: number) {
+    return this.ordenRepository.manager.transaction(async (manager) => {
+      const orden = await manager.findOne(OrdenProduccion, {
+        where: { id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!orden) throw new NotFoundException(`Orden ${id} no encontrada`);
 
-      let estado: string;
-
-      if (!inventario || cantidadDisponible === 0) {
-        estado = 'FALTANTE';
-      } else if (cantidadDisponible < cantidadRequerida) {
-        estado = 'INSUFICIENTE';
-      } else {
-        estado = 'DISPONIBLE';
+      const pendiente = await manager.findOne(ConsultaDisponibilidad, {
+        where: {
+          ordenId: String(id),
+          estado: ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
+        },
+        order: { consultaVersion: 'DESC' },
+      });
+      if (pendiente) {
+        const itemsPendientes = await manager.find(ConsultaDisponibilidadItem, {
+          where: { consultaDisponibilidadId: pendiente.id },
+          order: { materialId: 'ASC' },
+        });
+        return this.respuestaDisponibilidad(orden, pendiente, itemsPendientes);
       }
 
-      resultado.push({
-        material_id: Number(material.material_id),
-        codigo: material.codigo,
-        nombre: material.nombre,
-        unidad_medida: material.unidad_medida,
-        cantidad_requerida: cantidadRequerida,
-        cantidad_disponible: cantidadDisponible,
-        estado,
-      });
-    }
+      const materiales = await manager.query(`
+        SELECT
+          m.id::text AS material_id,
+          m.codigo,
+          m.nombre,
+          m.unidad_medida,
+          ROUND((rm.cantidad_requerida * o.cantidad_solicitada)::numeric, 4)::text AS cantidad_requerida
+        FROM ordenes_produccion o
+        INNER JOIN receta_material rm ON rm.receta_id = o.receta_id
+        INNER JOIN materiales m ON m.id = rm.material_id
+        WHERE o.id = $1
+        ORDER BY m.id ASC
+      `, [id]) as Array<{
+        material_id: string;
+        codigo: string;
+        nombre: string;
+        unidad_medida: string;
+        cantidad_requerida: string;
+      }>;
+      if (materiales.length === 0) {
+        throw new ConflictException('La orden no tiene materiales configurados para consultar');
+      }
 
+      const ultima = await manager.findOne(ConsultaDisponibilidad, {
+        where: { ordenId: String(id) },
+        order: { consultaVersion: 'DESC' },
+      });
+      const consultaVersion = (ultima?.consultaVersion ?? 0) + 1;
+      const requestEventId = randomUUID();
+      const correlationId = randomUUID();
+      const consulta = await manager.save(ConsultaDisponibilidad, {
+        consultaId: `DISP-ORD-${id}-V${consultaVersion}`,
+        consultaVersion,
+        ordenId: String(id),
+        requestEventId,
+        correlationId,
+        estado: ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
+      });
+      const items = await manager.save(ConsultaDisponibilidadItem, materiales.map((material) => ({
+        consultaDisponibilidadId: consulta.id,
+        materialId: material.material_id,
+        materialCodigo: material.codigo,
+        materialNombre: material.nombre,
+        cantidadRequerida: material.cantidad_requerida,
+        cantidadDisponible: null,
+        unidad: material.unidad_medida,
+        estado: null,
+      })));
+      const evento = crearEventoDisponibilidadMaterial(
+        consulta,
+        orden,
+        items.map((item) => ({
+          materialId: item.materialId,
+          materialCodigo: item.materialCodigo,
+          materialNombre: item.materialNombre,
+          cantidadRequerida: item.cantidadRequerida,
+          unidad: item.unidad,
+        })),
+        { eventId: requestEventId, correlationId },
+      );
+      await manager.save(EventoOutbox, {
+        eventId: evento.eventId,
+        correlationId: evento.correlationId,
+        eventType: evento.eventType,
+        aggregateType: 'ConsultaDisponibilidad',
+        aggregateId: consulta.id,
+        payload: evento,
+        estado: ESTADO_OUTBOX_PENDIENTE,
+      });
+      return this.respuestaDisponibilidad(orden, consulta, items);
+    });
+  }
+
+  private async respuestaDisponibilidad(
+    orden: OrdenProduccion,
+    consulta: ConsultaDisponibilidad | null,
+    items: ConsultaDisponibilidadItem[],
+  ) {
     return {
       orden_id: orden.id,
       orden_codigo: orden.codigo,
       cantidad_producir: Number(orden.cantidad),
       unidad_producto: await this.unidadDeReceta(orden.producto_id),
-      materiales: resultado,
+      estado_consulta: consulta?.estado ?? 'SIN_CONSULTA',
+      consulta_id: consulta?.consultaId ?? null,
+      consulta_version: consulta?.consultaVersion ?? null,
+      request_event_id: consulta?.requestEventId ?? null,
+      vigente_en: consulta?.vigenteEn?.toISOString() ?? null,
+      materiales: items.map((item) => ({
+        material_id: Number(item.materialId),
+        codigo: item.materialCodigo,
+        nombre: item.materialNombre,
+        unidad_medida: item.unidad,
+        cantidad_requerida: Number(item.cantidadRequerida),
+        cantidad_disponible: item.cantidadDisponible === null
+          ? null
+          : Number(item.cantidadDisponible),
+        estado: item.estado ?? ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
+      })),
     };
   }
 
@@ -429,6 +514,14 @@ export class OrdenesService {
       }
 
       const disponibilidad = await this.compararDisponibilidadMateriales(id);
+      if (disponibilidad.estado_consulta !== ESTADO_CONSULTA_DISPONIBILIDAD_RESPONDIDA) {
+        throw new ConflictException({
+          message: 'No se puede iniciar la orden sin una disponibilidad externa respondida.',
+          orden_id: id,
+          estado_consulta: disponibilidad.estado_consulta,
+          consulta_id: disponibilidad.consulta_id,
+        });
+      }
       const materialesFaltantes = disponibilidad.materiales.filter(
         (material) => material.estado === 'INSUFICIENTE' || material.estado === 'FALTANTE',
       );

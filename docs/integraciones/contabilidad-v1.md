@@ -1,18 +1,18 @@
 # Contrato Contabilidad v1
 
-Contrato de ABC-249 para comunicar el cierre de Producción. Durante este sprint
-Producción **solo publica** en el único topic indicado por `PUBSUB_TOPIC_ID`.
-No se crean topics ni suscripciones y no se consumen respuestas.
+Contrato de ABC-249/252/253 para comunicar el cierre de Producción y recibir el
+resultado contable. En despliegues reales la aplicación no provisiona recursos;
+la infraestructura local de ABC-253 crea recursos exclusivamente en el emulador.
 
 ## Enrutamiento
 
 Los tipos de mensaje comparten el mismo sobre y se diferencian con `eventType`.
-`eventId` identifica una entrega, `correlationId` identifica el flujo completo y
+`eventId` identifica un evento lógico, `correlationId` identifica el flujo completo y
 `requestEventId` enlaza una eventual respuesta con el mensaje que la originó.
 
 ## Salida: ProduccionCerrada.v1
 
-Este es el único mensaje de este contrato que Producción publicará en el sprint.
+Este es el mensaje que Producción publica mediante el outbox.
 Solo debe construirse para una orden `FINALIZADA` con un resumen de cierre
 inmutable y validado.
 
@@ -49,10 +49,10 @@ inmutable y validado.
 }
 ```
 
-## Respuesta futura: RegistroContableResultado.v1
+## Respuesta: RegistroContableResultado.v1
 
-Se define para estabilizar el contrato, pero Producción no se suscribe, no lo
-lee y no lo persiste durante este sprint.
+Producción lo consume desde una suscripción independiente y persiste el inbox y
+el resultado sobre el cierre en una sola transacción.
 
 ```json
 {
@@ -76,6 +76,33 @@ Los estados permitidos son `RECIBIDO` y `RECHAZADO`. Un rechazo debe incluir
 `codigoRechazo` y puede incluir `detalle`. `RECIBIDO` solo significa recepción
 administrativa; no representa la aprobación de un asiento contable.
 
+## Estado y transiciones en Producción
+
+Todo cierre nace con `estadoContable=PENDIENTE`. Las únicas transiciones son
+`PENDIENTE -> RECIBIDO` y `PENDIENTE -> RECHAZADO`; ambos destinos son finales.
+Una respuesta posterior con otro `eventId` se conserva en `eventos_inbox` como
+`IGNORADO`, pero no pisa el primer resultado. Una redelivery con el mismo
+`eventId` y payload devuelve `DUPLICADO` y no agrega otra fila ni altera el
+estado. El mismo `eventId` con contenido distinto es un error permanente.
+
+Antes de aplicar el cambio se busca el `ProduccionCerrada.v1` original por
+`data.requestEventId` y se exige coincidencia de `correlationId`, `cierreId`,
+`cierreVersion` y `ordenId`. El snapshot productivo sigue siendo inmutable; la
+migración 21 solo habilita las columnas controladas del resultado contable.
+
+## Configuración del receptor
+
+```env
+PUBSUB_CONTABILIDAD_CONSUMER_ENABLED=false
+PUBSUB_CONTABILIDAD_RESULTADOS_TOPIC_ID=taller-contabilidad-resultados-local
+PUBSUB_CONTABILIDAD_RESULTADOS_SUBSCRIPTION_ID=taller-produccion-contabilidad-local
+```
+
+Con el flag en `false`, la falta de topic o suscripción no impide el arranque.
+El consumidor valida los atributos `eventId`, `eventType` y `correlationId`
+contra el JSON. Hace ACK después del commit; hace ACK y log para errores
+permanentes, y NACK para fallos transitorios.
+
 ## Reglas de versión e idempotencia
 
 - `eventType` termina en `.v1`; un cambio incompatible requiere `.v2`.
@@ -85,6 +112,51 @@ administrativa; no representa la aprobación de un asiento contable.
 - Los consumidores futuros deben ignorar campos opcionales desconocidos.
 
 ## Evidencia local de publicación
+
+### Conexión de negocio y outbox (ABC-121, subtarea 2)
+
+`POST /cierres-produccion` conserva el permiso `ordenes.finalizar_cancelar`.
+Prepara el snapshot validado de ABC-299 y su `ProduccionCerrada.v1` en la misma
+transacción `REPEATABLE READ`, dentro de `produccion_db`. Si falla la inserción
+del evento, se revierte también el snapshot; no se llama a Google desde esa
+transacción. La respuesta 201 confirma la persistencia local de ambos registros,
+sin esperar la disponibilidad del broker. El GET existente sigue consultando
+el snapshot guardado.
+
+El mensaje se construye exclusivamente desde la fila inmutable recién leída.
+`cierreId` y `resumenId` contienen ambos el `id` persistido de `CierreProduccion`,
+como texto: el modelo actual guarda cierre y resumen en una sola entidad.
+`cierreVersion` conserva la versión explícita del snapshot y `occurredAt` su
+`fechaCierre`. Los identificadores ilustrativos del ejemplo no imponen un formato.
+El contrato v1 conserva sus campos actuales: solicitada y conforme; producida y
+defectuosa permanecen en el snapshot sin agregar campos al contrato de ABC-249.
+Los consumos mantienen cantidades decimales y unidades separadas.
+
+El evento usa `aggregateType=CierreProduccion` y `aggregateId=snapshot.id`.
+La restricción existente del outbox permite un único evento de este tipo por
+snapshot; la restricción orden/versión y el bloqueo de orden impiden duplicar
+el negocio. Repetir el POST devuelve 409; no reenvía ni crea otra versión.
+Una versión nueva solicitada explícitamente genera su propio snapshot y evento.
+Los snapshots anteriores a esta integración no se encolan automáticamente.
+
+Después del commit, el publicador existente reclama pendientes con lease y
+envía el payload persistido al único `PUBSUB_TOPIC_ID`. Un fallo devuelve el
+evento a `PENDIENTE` con espera exponencial. Cada reintento conserva `eventId`,
+`correlationId`, fechas y contenido, aunque se hayan corregido los datos fuente.
+Los pendientes sobreviven al reinicio y se procesan al recuperar la conexión
+con `PUBSUB_ENABLED=true` y las credenciales externas ya configuradas.
+
+La confirmación de Google guarda `PUBLICADO`, `messageId` y `publicadoEn` en el
+outbox. No modifica el snapshot ni declara `RECIBIDO` por Contabilidad. Si Google
+acepta el mensaje pero falla el guardado local de la confirmación, puede haber
+otra entrega con el mismo `eventId`: el consumidor futuro debe deduplicarlo.
+Se garantiza un solo efecto de negocio local, no una sola entrega al broker.
+
+Las pruebas `cierre-produccion.persistencia.spec.ts`, con `CIERRE_DB_REAL=1`,
+usan PostgreSQL real en un esquema aislado y simulan únicamente Auth y el cliente
+de Google. Comprueban rollback si falla el outbox, invisibilidad antes del commit,
+broker caído y recuperación tras reiniciar Nest, payload congelado, confirmación
+local perdida y POST concurrentes. No envían mensajes a Google real.
 
 La prueba `contratos-salida.spec.ts` publica el ejemplo mediante un cliente
 simulado y comprueba que usa exactamente el único `topicId` configurado. Una

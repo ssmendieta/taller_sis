@@ -7,9 +7,13 @@ import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { SolicitudesMaterialController } from './solicitudes-material.controller';
 import { SolicitudesMaterialService } from './solicitudes-material.service';
+import { OutboxModule } from '../integraciones/outbox/outbox.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SolicitudMaterial, SolicitudMaterialItem, OrdenProduccion, Material])],
+  imports: [
+    TypeOrmModule.forFeature([SolicitudMaterial, SolicitudMaterialItem, OrdenProduccion, Material]),
+    OutboxModule,
+  ],
   controllers: [SolicitudesMaterialController],
   providers: [SolicitudesMaterialService, PermisoProduccionGuard],
   exports: [TypeOrmModule, SolicitudesMaterialService],

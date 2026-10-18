@@ -16,7 +16,11 @@
     "pubsub:smoke": "ts-node --transpile-only src/integraciones/pubsub/pubsub-smoke.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "seed:demo": "ts-node --transpile-only src/seeds/seed-demo.ts"
+    "seed:demo": "ts-node --transpile-only src/seeds/seed-demo.ts",
+    "seed:contabilidad-demo": "ts-node --transpile-only src/seeds/seed-contabilidad-demo.ts",
+    "verify:contabilidad-demo": "ts-node --transpile-only src/seeds/verificar-contabilidad-demo.ts",
+    "publish:contabilidad-duplicate": "ts-node --transpile-only src/seeds/publicar-duplicado-contabilidad-demo.ts",
+    "publish:contabilidad-response-duplicate": "ts-node --transpile-only src/seeds/publicar-respuesta-duplicada-contabilidad-demo.ts"
   },
   "jest": {
     "preset": "ts-jest",

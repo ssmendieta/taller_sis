@@ -1,10 +1,15 @@
 import {
+  DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1_EJEMPLO,
+  DISPONIBILIDAD_MATERIAL_SOLICITADA_V1_EJEMPLO,
   SOLICITUD_MATERIAL_ALMACEN_ESTADO_ACTUALIZADO_V1_EJEMPLO,
   SOLICITUD_MATERIAL_ALMACEN_V1_EJEMPLO,
 } from './inventario-almacen-v1';
 import {
   EventoInventarioV1InvalidoError,
+  validarCorrelacionDisponibilidadMaterialV1,
   validarCorrelacionSolicitudMaterialInventarioV1,
+  validarDisponibilidadMaterialRespondidaV1,
+  validarDisponibilidadMaterialSolicitadaV1,
   validarEventoSolicitudMaterialInventarioV1,
   validarSolicitudMaterialAlmacenEstadoActualizadoV1,
   validarSolicitudMaterialAlmacenV1,
@@ -141,6 +146,52 @@ describe('ABC-241: contrato de solicitudes de material con Inventarios', () => {
       'data.solicitudId',
       'data.ordenId',
       'data.solicitudVersion',
+    ]));
+  });
+});
+
+describe('ABC-278: contrato de disponibilidad asincrona', () => {
+  it('acepta y correlaciona los ejemplos acordados', () => {
+    expect(validarDisponibilidadMaterialSolicitadaV1(
+      DISPONIBILIDAD_MATERIAL_SOLICITADA_V1_EJEMPLO,
+    )).toBe(DISPONIBILIDAD_MATERIAL_SOLICITADA_V1_EJEMPLO);
+    expect(validarDisponibilidadMaterialRespondidaV1(
+      DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1_EJEMPLO,
+    )).toBe(DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1_EJEMPLO);
+    expect(() => validarCorrelacionDisponibilidadMaterialV1(
+      DISPONIBILIDAD_MATERIAL_SOLICITADA_V1_EJEMPLO,
+      DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1_EJEMPLO,
+    )).not.toThrow();
+  });
+
+  it('rechaza un estado que contradice las cantidades', () => {
+    const respuesta = copia(DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1_EJEMPLO);
+    respuesta.data.materiales[0].estado = 'FALTANTE';
+
+    const error = capturarError(() => validarDisponibilidadMaterialRespondidaV1(respuesta));
+
+    expect(error.errores).toContainEqual(expect.objectContaining({
+      campo: 'data.materiales[0].estado',
+    }));
+  });
+
+  it('rechaza una respuesta incompleta o de otra consulta', () => {
+    const solicitud = copia(DISPONIBILIDAD_MATERIAL_SOLICITADA_V1_EJEMPLO);
+    solicitud.data.materiales.push({
+      materialId: '9', materialCodigo: 'AZU-001', materialNombre: 'Azucar',
+      cantidadRequerida: '2.0000', unidad: 'kg',
+    });
+    const respuesta = copia(DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1_EJEMPLO);
+    respuesta.data.consultaId = 'OTRA-CONSULTA';
+
+    const error = capturarError(() => validarCorrelacionDisponibilidadMaterialV1(
+      solicitud,
+      respuesta,
+    ));
+
+    expect(error.errores).toEqual(expect.arrayContaining([
+      expect.objectContaining({ campo: 'data.consultaId' }),
+      expect.objectContaining({ campo: 'data.materiales' }),
     ]));
   });
 });

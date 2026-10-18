@@ -164,7 +164,7 @@ SolicitudMaterialAlmacenV1Event = {
   },
 };
 
-// Contrato de interoperabilidad futura. Este sprint no lo consume.
+// Evento de respuesta consumido de forma idempotente por el inbox de Produccion.
 export const SOLICITUD_MATERIAL_ALMACEN_ESTADO_ACTUALIZADO_V1_EJEMPLO:
 SolicitudMaterialAlmacenEstadoActualizadoV1Event = {
   eventId: '9d08a84e-1f44-40b0-87be-e161d399371d',

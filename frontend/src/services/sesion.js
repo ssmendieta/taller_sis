@@ -54,3 +54,14 @@ export function guardarSesion(respuesta, ahora = Date.now()) {
   sessionStorage.setItem("ultimaActividad", String(ahora));
   return usuario;
 }
+
+export function actualizarUsuarioSesion(usuario, ahora = Date.now()) {
+  const actual = obtenerSesion(ahora);
+  if (!actual) return null;
+  if (!usuario?.id || String(usuario.id) !== String(actual.id) ||
+      !Array.isArray(usuario.permisos)) {
+    throw new Error("Auth devolvió un usuario de sesión inválido.");
+  }
+  sessionStorage.setItem("usuario", JSON.stringify(usuario));
+  return usuario;
+}
