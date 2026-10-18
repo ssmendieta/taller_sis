@@ -41,6 +41,26 @@ export async function obtenerCierre(ordenId, cierreVersion = VERSION_CIERRE_INIC
   return response.json();
 }
 
+// Estado del reporte del cierre a Contabilidad que devuelve nuestra API en
+// `reporteContable`: ENVIADO (publicado, sin respuesta todavía), RECIBIDO o RECHAZADO
+// (respuesta RegistroContableResultado.v1). RECIBIDO es recepción, no aprobación contable.
+export const ESTADOS_REPORTE_CONTABLE = {
+  ENVIADO: "Enviado",
+  RECIBIDO: "Recibido",
+  RECHAZADO: "Rechazado",
+};
+
+export function estadoReporteContable(cierre) {
+  const reporte = cierre?.reporteContable;
+  if (!reporte || !Object.hasOwn(ESTADOS_REPORTE_CONTABLE, reporte.estado)) return null;
+  return {
+    estado: reporte.estado,
+    codigoRechazo: reporte.codigoRechazo ?? null,
+    detalle: reporte.detalle ?? null,
+    actualizadoEn: reporte.actualizadoEn ?? null,
+  };
+}
+
 // Solo se envían orden y versión; cantidades, consumos y fechas los toma el servidor.
 // Repetir la misma versión responde 409 sin crear un segundo snapshot.
 export async function prepararCierre(ordenId, cierreVersion = VERSION_CIERRE_INICIAL) {

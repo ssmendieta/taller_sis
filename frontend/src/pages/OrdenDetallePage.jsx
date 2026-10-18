@@ -30,8 +30,10 @@ import {
 import { MAX_CODIGO_LOTE, crearLote, listarLotesOrden } from "../services/lotesService.js";
 import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 import {
+  ESTADOS_REPORTE_CONTABLE,
   PERMISO_PREPARAR_CIERRE,
   VERSION_CIERRE_INICIAL,
+  estadoReporteContable,
   obtenerCierre,
   prepararCierre,
 } from "../services/cierreProduccionService.js";
@@ -141,6 +143,7 @@ export default function OrdenDetallePage() {
   const [preparandoCierre, setPreparandoCierre] = useState(false);
   const [errorCierre, setErrorCierre] = useState("");
   const [avisoCierre, setAvisoCierre] = useState("");
+  const [actualizandoReporte, setActualizandoReporte] = useState(false);
 
   const muestraAcciones = puedeVerAcciones(usuario);
   const permiteAvance = puedeRegistrarAvance(usuario);
@@ -530,6 +533,13 @@ export default function OrdenDetallePage() {
     }
   }
 
+  // La respuesta de Contabilidad llega después por Pub/Sub: se vuelve a leer el cierre.
+  async function actualizarReporteContable() {
+    setActualizandoReporte(true);
+    await cargarCierre();
+    setActualizandoReporte(false);
+  }
+
   async function prepararResumenCierre() {
     if (preparandoCierre) return;
 
@@ -683,6 +693,7 @@ export default function OrdenDetallePage() {
   if (!orden) return null;
 
   const enProduccion = orden.estado === "EN_PRODUCCION";
+  const reporteContable = estadoReporteContable(cierre);
 
   return (
     <section className="ts-page" aria-labelledby="detalle-orden-titulo">
@@ -1696,6 +1707,57 @@ export default function OrdenDetallePage() {
 
         {estadoCierre === "preparado" && cierre ? (
           <>
+            {/* Se lee junto con el cierre al abrir la orden, sin esperar a la operación de preparar. */}
+            <div
+              style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "4px 20px 8px" }}
+            >
+              <span>Reporte a Contabilidad:</span>
+              <span
+                className={`ts-badge ${
+                  reporteContable?.estado === "RECIBIDO"
+                    ? "ts-badge--FINALIZADA"
+                    : reporteContable?.estado === "RECHAZADO"
+                      ? "ts-badge--CANCELADA"
+                      : reporteContable?.estado === "ENVIADO"
+                        ? "ts-badge--PENDIENTE"
+                        : "ts-badge--inactivo"
+                }`}
+              >
+                {reporteContable
+                  ? ESTADOS_REPORTE_CONTABLE[reporteContable.estado]
+                  : "Sin estado informado"}
+              </span>
+              {reporteContable?.actualizadoEn && (
+                <small>
+                  {(() => {
+                    const { fecha, hora } = mostrarFechaHora(reporteContable.actualizadoEn);
+                    return `${fecha} ${hora}`;
+                  })()}
+                </small>
+              )}
+              <button
+                type="button"
+                className="ts-btn ts-btn--sm"
+                onClick={actualizarReporteContable}
+                disabled={actualizandoReporte}
+              >
+                {actualizandoReporte ? "Actualizando…" : "Actualizar estado"}
+              </button>
+            </div>
+
+            {reporteContable?.estado === "RECHAZADO" && (
+              <p className="ts-modal-error" role="alert" style={{ padding: "0 20px" }}>
+                Contabilidad rechazó el reporte
+                {reporteContable.codigoRechazo ? ` (${reporteContable.codigoRechazo})` : ""}
+                {reporteContable.detalle ? `: ${reporteContable.detalle}` : "."}
+              </p>
+            )}
+
+            <p className="ts-field-help" style={{ padding: "0 20px" }}>
+              Enviado: publicado y esperando respuesta. Recibido: Contabilidad recibió el
+              resumen; no significa aprobación contable.
+            </p>
+
             <div className="ts-table-wrap">
               <table className="ts-table">
                 <caption>Datos congelados del cierre</caption>
