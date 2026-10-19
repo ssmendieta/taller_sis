@@ -6,6 +6,8 @@ import { ActualizarBoletaItemsDto } from './dto/actualizar-boleta-items.dto';
 import { ValidarActualizarBoletaItemsPipe } from './dto/validar-actualizar-boleta-items.pipe';
 import { ListarBoletasDto } from './dto/listar-boletas.dto';
 import { ValidarListarBoletasPipe } from './dto/validar-listar-boletas.pipe';
+import { AnularBoletaDto } from './dto/anular-boleta.dto';
+import { ValidarAnularBoletaPipe } from './dto/validar-anular-boleta.pipe';
 import { BoletasService } from './boletas.service';
 
 @Controller('boletas')
@@ -33,6 +35,16 @@ export class BoletasController {
   @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.gestionar')
   emitir(@Param('id') id: string, @Req() request: { usuarioId: string; headers: { authorization?: string } }) {
     return this.service.emitir(id, request.usuarioId, request.headers.authorization ?? '');
+  }
+
+  @Post(':id/anular')
+  @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.gestionar')
+  anular(
+    @Param('id') id: string,
+    @Body(new ValidarAnularBoletaPipe()) dto: AnularBoletaDto,
+    @Req() request: { usuarioId: string; headers: { authorization?: string } },
+  ) {
+    return this.service.anular(id, dto, request.usuarioId);
   }
 
   @Get()

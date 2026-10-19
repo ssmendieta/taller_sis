@@ -14,6 +14,7 @@ import {
 import { SolicitudSalida } from '../../solicitudes-salida/entities/solicitud-salida.entity';
 import { EstadoBoleta } from './estado-boleta.enum';
 import { BoletaEnvioItem } from './boleta-envio-item.entity';
+import { BoletaEnvioHistorial } from './boleta-envio-historial.entity';
 
 @Entity('boletas_envio')
 @Unique('uq_boleta_envio_numero', ['numero'])
@@ -38,6 +39,9 @@ export class BoletaEnvio {
 
   @OneToMany(() => BoletaEnvioItem, (item) => item.boleta, { cascade: false })
   items!: BoletaEnvioItem[];
+
+  @OneToMany(() => BoletaEnvioHistorial, (historial) => historial.boleta, { cascade: false })
+  historial!: BoletaEnvioHistorial[];
 
   @CreateDateColumn({ name: 'creado_en', type: 'timestamptz' })
   creadoEn!: Date;

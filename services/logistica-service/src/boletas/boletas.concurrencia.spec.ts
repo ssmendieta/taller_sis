@@ -12,6 +12,8 @@ import { SolicitudSalidaItem } from '../solicitudes-salida/entities/solicitud-sa
 import { CrearSolicitudesSalida1710000000001 } from '../database/migrations/1710000000001-CrearSolicitudesSalida';
 import { CrearBoletasEnvio1710000000002 } from '../database/migrations/1710000000002-CrearBoletasEnvio';
 import { ReglaConcurrenciaDocumental1710000000003 } from '../database/migrations/1710000000003-ReglaConcurrenciaDocumental';
+import { BoletaEnvioHistorial } from './entities/boleta-envio-historial.entity';
+import { HistorialBoletasEnvio1710000000004 } from '../database/migrations/1710000000004-HistorialBoletasEnvio';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 
@@ -38,11 +40,18 @@ describeConPostgres('ABC-224: concurrencia documental con PostgreSQL', () => {
     dataSource = new DataSource({
       ...connection,
       schema,
-      entities: [SolicitudSalida, SolicitudSalidaItem, BoletaEnvio, BoletaEnvioItem],
+      entities: [
+        SolicitudSalida,
+        SolicitudSalidaItem,
+        BoletaEnvio,
+        BoletaEnvioItem,
+        BoletaEnvioHistorial,
+      ],
       migrations: [
         CrearSolicitudesSalida1710000000001,
         CrearBoletasEnvio1710000000002,
         ReglaConcurrenciaDocumental1710000000003,
+        HistorialBoletasEnvio1710000000004,
       ],
       migrationsTableName: 'migrations_abc224',
       extra: { options: `-c search_path=${schema}` },

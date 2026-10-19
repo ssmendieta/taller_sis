@@ -1,5 +1,7 @@
-import { BadGatewayException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { EstadoBoleta } from './entities/estado-boleta.enum';
+import { BoletaEnvio } from './entities/boleta-envio.entity';
+import { BoletaEnvioHistorial } from './entities/boleta-envio-historial.entity';
 import { BoletasService } from './boletas.service';
 
 describe('ABC-213/214: creación de boletas con validación documental', () => {
@@ -861,5 +863,189 @@ describe('ABC-232 / ABC-235: transición a EMITIDA, responsable emisor y precond
     expect(resultado.estado).toBe(EstadoBoleta.EMITIDA);
     expect(resultado.responsableUsuarioId).toBe('42');
     expect(manager.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('ABC-246: anulación de boletas de envío en el servicio', () => {
+  let boletaMock: any;
+  let boletas: any;
+  let solicitudes: any;
+  let manager: any;
+  let dataSource: any;
+  let produccion: any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    boletaMock = {
+      id: '30',
+      numero: 'BOL-2026-00030',
+      solicitudSalidaId: '18',
+      estado: EstadoBoleta.EMITIDA,
+      responsableUsuarioId: '10',
+      items: [
+        { id: '1', boletaId: '30', referencia: 'LOT-A', cantidad: '4.0000' },
+        { id: '2', boletaId: '30', referencia: 'LOT-B', cantidad: '6.0000' },
+      ],
+      historial: [],
+    };
+    boletas = {
+      findOne: jest.fn().mockResolvedValue(boletaMock),
+    };
+    solicitudes = { findOne: jest.fn() };
+    manager = {
+      findOne: jest.fn().mockResolvedValue(boletaMock),
+      query: jest.fn().mockResolvedValue([{ id: '30' }]),
+      create: jest.fn((_type: any, val: any) => val),
+      save: jest.fn().mockImplementation(async (_entity: unknown, value: unknown) => value),
+    };
+    dataSource = {
+      transaction: jest.fn(async (callback: any) => callback(manager)),
+    };
+    produccion = {
+      consultarOrdenPorId: jest.fn(),
+      consultarPorOrden: jest.fn(),
+      consultarConformesPorOrden: jest.fn(),
+    };
+  });
+
+  function crearServicio() {
+    return new BoletasService(boletas, solicitudes, dataSource, produccion);
+  }
+
+  it('anula exitosamente una boleta EMITIDA, actualiza estado a ANULADA y persiste historial en la misma transacción', async () => {
+    const service = crearServicio();
+    const dto = { motivo: 'Cliente solicitó cambio de lote' };
+
+    const resultado = await service.anular('30', dto, '42');
+
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(manager.query).toHaveBeenCalledWith(
+      expect.stringContaining('SELECT id FROM boletas_envio WHERE id = $1 FOR UPDATE'),
+      ['30'],
+    );
+    expect(resultado.id).toBe('30');
+    expect(resultado.numero).toBe('BOL-2026-00030');
+    expect(resultado.estado).toBe(EstadoBoleta.ANULADA);
+    expect(resultado.responsableUsuarioId).toBe('10');
+    expect(resultado.items).toHaveLength(2);
+
+    expect(manager.save).toHaveBeenCalledTimes(2);
+    expect(manager.save).toHaveBeenCalledWith(
+      BoletaEnvioHistorial,
+      expect.objectContaining({
+        boletaId: '30',
+        estadoAnterior: EstadoBoleta.EMITIDA,
+        estadoNuevo: EstadoBoleta.ANULADA,
+        usuarioActorId: '42',
+        motivo: 'Cliente solicitó cambio de lote',
+      }),
+    );
+    expect(manager.save).toHaveBeenCalledWith(
+      BoletaEnvio,
+      expect.objectContaining({
+        id: '30',
+        estado: EstadoBoleta.ANULADA,
+      }),
+    );
+  });
+
+  it('conserva el número, ítems y responsable original del documento tras anular', async () => {
+    const service = crearServicio();
+    const itemsOriginales = JSON.parse(JSON.stringify(boletaMock.items));
+
+    const resultado = await service.anular('30', { motivo: 'Anulación por error de tipeo' }, '42');
+
+    expect(resultado.numero).toBe('BOL-2026-00030');
+    expect(resultado.items).toEqual(itemsOriginales);
+    expect(resultado.responsableUsuarioId).toBe('10');
+  });
+
+  it('rechaza con 409 Conflict si la boleta está en estado BORRADOR y no guarda cambios ni historial', async () => {
+    boletaMock.estado = EstadoBoleta.BORRADOR;
+    const service = crearServicio();
+
+    await expect(service.anular('30', { motivo: 'No deseado' }, '42'))
+      .rejects.toThrow(new ConflictException('Solo se pueden anular boletas en estado EMITIDA (estado actual: BORRADOR)'));
+
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(boletaMock.estado).toBe(EstadoBoleta.BORRADOR);
+  });
+
+  it('rechaza con 409 Conflict si la boleta ya se encuentra en estado ANULADA', async () => {
+    boletaMock.estado = EstadoBoleta.ANULADA;
+    const service = crearServicio();
+
+    await expect(service.anular('30', { motivo: 'Intento de doble anulación' }, '42'))
+      .rejects.toThrow(new ConflictException('La boleta ya se encuentra en estado ANULADA'));
+
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 404 NotFound si la boleta no existe', async () => {
+    manager.findOne.mockResolvedValueOnce(null);
+    const service = crearServicio();
+
+    await expect(service.anular('99', { motivo: 'Boleta inexistente' }, '42'))
+      .rejects.toThrow(new NotFoundException('Boleta no encontrada'));
+
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 404 NotFound si el identificador no es un número válido', async () => {
+    const service = crearServicio();
+
+    await expect(service.anular('abc', { motivo: 'Id inválido' }, '42'))
+      .rejects.toThrow(new NotFoundException('Boleta no encontrada'));
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 400 BadRequest si el motivo es vacío o solo contiene espacios', async () => {
+    const service = crearServicio();
+
+    await expect(service.anular('30', { motivo: '   ' }, '42'))
+      .rejects.toThrow(BadRequestException);
+
+    await expect(service.anular('30', { motivo: '' }, '42'))
+      .rejects.toThrow(BadRequestException);
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza con 400 BadRequest si el identificador de usuario es inválido', async () => {
+    const service = crearServicio();
+
+    await expect(service.anular('30', { motivo: 'Motivo correcto' }, '0'))
+      .rejects.toThrow(BadRequestException);
+
+    await expect(service.anular('30', { motivo: 'Motivo correcto' }, ''))
+      .rejects.toThrow(BadRequestException);
+
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('aborta la transacción (rollback) si falla el guardado del historial de auditoría', async () => {
+    const errorBd = new Error('Violación de restricción en historial');
+    manager.save.mockRejectedValueOnce(errorBd);
+
+    const service = crearServicio();
+    await expect(service.anular('30', { motivo: 'Error auditoría' }, '42'))
+      .rejects.toThrow(errorBd);
+
+    expect(manager.save).toHaveBeenCalledTimes(1);
+    expect(manager.save).toHaveBeenCalledWith(BoletaEnvioHistorial, expect.anything());
+  });
+
+  it('aborta la transacción (rollback) si falla el guardado de la boleta de envío', async () => {
+    const errorBd = new Error('Error al actualizar estado de boleta');
+    manager.save
+      .mockResolvedValueOnce({ id: '1', boletaId: '30' })
+      .mockRejectedValueOnce(errorBd);
+
+    const service = crearServicio();
+    await expect(service.anular('30', { motivo: 'Error boleta' }, '42'))
+      .rejects.toThrow(errorBd);
+
+    expect(manager.save).toHaveBeenCalledTimes(2);
   });
 });
