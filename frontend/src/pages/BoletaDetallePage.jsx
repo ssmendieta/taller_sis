@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
+import { tienePermiso } from "../services/permisos.js";
 import {
   ESTADO_BOLETA_EMITIDA,
+  emitirBoleta,
   obtenerBoleta,
   obtenerSolicitudSalida,
 } from "../services/boletasService.js";
@@ -49,6 +51,41 @@ export default function BoletaDetallePage() {
   const [ordenCodigo, setOrdenCodigo] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [emitiendo, setEmitiendo] = useState(false);
+  const [mensajeEmision, setMensajeEmision] = useState("");
+  const [errorEmision, setErrorEmision] = useState("");
+
+  const puedeEmitir = tienePermiso(usuario, "logistica.boletas.gestionar");
+
+  async function handleEmitir() {
+    if (emitiendo) return;
+    setMensajeEmision("");
+    setErrorEmision("");
+
+    if (boleta?.estado !== "BORRADOR") {
+      setErrorEmision("Solo una boleta en BORRADOR puede ser emitida.");
+      return;
+    }
+
+    const confirmar = window.confirm(
+      "¿Está seguro de emitir esta boleta? Una vez emitida, la cabecera no podrá modificarse."
+    );
+
+    if (!confirmar) {
+      return;
+    }
+
+    setEmitiendo(true);
+    try {
+      await emitirBoleta(id);
+      setMensajeEmision("Boleta emitida correctamente.");
+      await cargar();
+    } catch (fallo) {
+      setErrorEmision(fallo?.message || "No se pudo emitir la boleta.");
+    } finally {
+      setEmitiendo(false);
+    }
+  }
 
   async function cargar() {
     setCargando(true);
@@ -77,6 +114,8 @@ export default function BoletaDetallePage() {
   }
 
   useEffect(() => {
+    setMensajeEmision("");
+    setErrorEmision("");
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -123,6 +162,17 @@ export default function BoletaDetallePage() {
           descripcion={`Estado: ${ETIQUETAS_ESTADO[boleta.estado] ?? boleta.estado}`}
           accion={
             <div className="ts-btn-group">
+              {puedeEmitir && !emitida && boleta.estado === "BORRADOR" && (
+                <button
+                  type="button"
+                  className="ts-btn ts-btn-primary"
+                  onClick={handleEmitir}
+                  disabled={emitiendo}
+                  data-feature="ABC-234"
+                >
+                  {emitiendo ? "Emitiendo…" : "Emitir boleta"}
+                </button>
+              )}
               {emitida && (
                 <button type="button" className="ts-btn ts-btn-primary" onClick={() => window.print()}>
                   Imprimir
@@ -132,6 +182,18 @@ export default function BoletaDetallePage() {
             </div>
           }
         />
+
+        {mensajeEmision && (
+          <div className="ts-feedback ts-notice" role="status" style={{ marginBottom: "1rem" }}>
+            <p>{mensajeEmision}</p>
+          </div>
+        )}
+
+        {errorEmision && (
+          <div className="ts-feedback ts-error" role="alert" style={{ marginBottom: "1rem" }}>
+            <p>{errorEmision}</p>
+          </div>
+        )}
 
         {!emitida && (
           <p className="ts-notice" role="note">
