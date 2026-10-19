@@ -1,12 +1,15 @@
-import { BadGatewayException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { CrearBoletaDto } from './dto/crear-boleta.dto';
 import { ActualizarBoletaItemsDto } from './dto/actualizar-boleta-items.dto';
 import { ListarBoletasDto, PaginatedBoletasResultDto } from './dto/listar-boletas.dto';
+import { AnularBoletaDto } from './dto/anular-boleta.dto';
 import { BoletaEnvio } from './entities/boleta-envio.entity';
 import { BoletaEnvioItem } from './entities/boleta-envio-item.entity';
+import { BoletaEnvioHistorial } from './entities/boleta-envio-historial.entity';
 import { EstadoBoleta } from './entities/estado-boleta.enum';
+import { esTransicionBoletaValida } from './entities/estado-boleta.transiciones';
 import { SolicitudSalida } from '../solicitudes-salida/entities/solicitud-salida.entity';
 import { LotesProduccionClient } from '../disponibilidad-documental/lotes-produccion.client';
 
@@ -202,6 +205,69 @@ export class BoletasService {
       actual.estado = EstadoBoleta.EMITIDA;
       actual.responsableUsuarioId = usuarioId;
       return manager.save(BoletaEnvio, actual);
+    });
+  }
+
+  async anular(id: string, dto: AnularBoletaDto, usuarioId: string): Promise<BoletaEnvio> {
+    if (!/^\d+$/.test(id) || BigInt(id) < BigInt('1') || BigInt(id) > BigInt('9223372036854775807')) {
+      throw new NotFoundException('Boleta no encontrada');
+    }
+    if (!usuarioId || !/^\d+$/.test(usuarioId) || BigInt(usuarioId) < BigInt('1') || BigInt(usuarioId) > BigInt('9223372036854775807')) {
+      throw new BadRequestException('Identificador de usuario inválido');
+    }
+    const motivoLimpio = dto?.motivo?.trim();
+    if (!motivoLimpio) {
+      throw new BadRequestException('El motivo de anulación es obligatorio y no puede estar vacío');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      if (typeof manager.query === 'function') {
+        await manager.query(
+          `SELECT id FROM boletas_envio WHERE id = $1 FOR UPDATE`,
+          [id],
+        );
+      }
+
+      const boleta = await manager.findOne(BoletaEnvio, {
+        where: { id },
+        relations: { items: true },
+      });
+
+      if (!boleta) {
+        throw new NotFoundException('Boleta no encontrada');
+      }
+
+      if (!esTransicionBoletaValida(boleta.estado, EstadoBoleta.ANULADA)) {
+        if (boleta.estado === EstadoBoleta.ANULADA) {
+          throw new ConflictException('La boleta ya se encuentra en estado ANULADA');
+        }
+        if (boleta.estado === EstadoBoleta.BORRADOR) {
+          throw new ConflictException(`Solo se pueden anular boletas en estado EMITIDA (estado actual: ${boleta.estado})`);
+        }
+        throw new ConflictException(`No se permite anular una boleta en estado ${boleta.estado}`);
+      }
+
+      const estadoAnterior = boleta.estado;
+      boleta.estado = EstadoBoleta.ANULADA;
+
+      const historial = manager.create
+        ? manager.create(BoletaEnvioHistorial, {
+            boletaId: boleta.id,
+            estadoAnterior,
+            estadoNuevo: EstadoBoleta.ANULADA,
+            usuarioActorId: usuarioId,
+            motivo: motivoLimpio,
+          })
+        : Object.assign(new BoletaEnvioHistorial(), {
+            boletaId: boleta.id,
+            estadoAnterior,
+            estadoNuevo: EstadoBoleta.ANULADA,
+            usuarioActorId: usuarioId,
+            motivo: motivoLimpio,
+          });
+
+      await manager.save(BoletaEnvioHistorial, historial);
+      return manager.save(BoletaEnvio, boleta);
     });
   }
 

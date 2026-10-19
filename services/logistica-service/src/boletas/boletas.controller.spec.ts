@@ -9,6 +9,7 @@ describe('BoletasController', () => {
     expect(Reflect.getMetadata(PERMISO_LOGISTICA, BoletasController.prototype.create)).toBe('logistica.boletas.gestionar');
     expect(Reflect.getMetadata(PERMISO_LOGISTICA, BoletasController.prototype.updateItems)).toBe('logistica.boletas.gestionar');
     expect(Reflect.getMetadata(PERMISO_LOGISTICA, BoletasController.prototype.emitir)).toBe('logistica.boletas.gestionar');
+    expect(Reflect.getMetadata(PERMISO_LOGISTICA, BoletasController.prototype.anular)).toBe('logistica.boletas.gestionar');
     expect(Reflect.getMetadata(PERMISO_LOGISTICA, BoletasController.prototype.findAll)).toBe('logistica.boletas.consultar');
     expect(Reflect.getMetadata(PERMISO_LOGISTICA, BoletasController.prototype.findOne)).toBe('logistica.boletas.consultar');
   });
@@ -67,5 +68,20 @@ describe('ABC-224: emisión protegida de boletas', () => {
       headers: { authorization: 'Bearer token' },
     })).resolves.toMatchObject({ estado: 'EMITIDA' });
     expect(emitir).toHaveBeenCalledWith('10', '42', 'Bearer token');
+  });
+});
+
+describe('ABC-246: anulación protegida de boletas', () => {
+  it('expone anular con permiso de gestión y toma el actor exclusivamente de la autenticación', async () => {
+    const anular = jest.fn().mockResolvedValue({ id: '10', estado: 'ANULADA' });
+    const controller = new BoletasController({ anular } as any);
+
+    const dto = { motivo: 'Error en la orden de despacho' };
+    await expect(controller.anular('10', dto, {
+      usuarioId: '99',
+      headers: { authorization: 'Bearer token-anular' },
+    })).resolves.toMatchObject({ estado: 'ANULADA' });
+
+    expect(anular).toHaveBeenCalledWith('10', dto, '99');
   });
 });

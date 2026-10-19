@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
+import { ConflictException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { BoletasService } from './boletas.service';
 import { EstadoBoleta } from './entities/estado-boleta.enum';
 import { esTransicionBoletaValida, TRANSICIONES_BOLETA_PERMITIDAS } from './entities/estado-boleta.transiciones';
 import { BoletaEnvio } from './entities/boleta-envio.entity';
@@ -166,13 +168,15 @@ describeConPostgres('ABC-245: Persistencia de auditoría y restricciones en Post
     }
   });
 
-  async function crearSolicitudYBoleta(): Promise<{ solicitudId: string; boletaId: string }> {
+  async function crearSolicitudYBoleta(estado: EstadoBoleta = EstadoBoleta.EMITIDA): Promise<{ solicitudId: string; boletaId: string; ordenId: string }> {
     const solRepo = dataSource.getRepository(SolicitudSalida);
     const boletaRepo = dataSource.getRepository(BoletaEnvio);
+    const itemRepo = dataSource.getRepository(BoletaEnvioItem);
 
+    const ordenId = String(Date.now().toString().slice(-6));
     const solicitud = await solRepo.save(
       solRepo.create({
-        ordenId: '10',
+        ordenId,
         destinoDocumental: 'Almacén central',
         motivo: 'Traslado de auditoría',
         responsableUsuarioId: '10',
@@ -180,17 +184,24 @@ describeConPostgres('ABC-245: Persistencia de auditoría y restricciones en Post
       }),
     );
 
-    let boletaCounter = 1;
     const boleta = await boletaRepo.save(
       boletaRepo.create({
         solicitudSalidaId: solicitud.id,
-        estado: EstadoBoleta.EMITIDA,
+        estado,
         numero: `B${Date.now().toString().slice(-8)}-${Math.floor(Math.random() * 1000)}`,
         responsableUsuarioId: '10',
       }),
     );
 
-    return { solicitudId: solicitud.id, boletaId: boleta.id };
+    await itemRepo.save(
+      itemRepo.create({
+        boletaId: boleta.id,
+        referencia: 'LOT-PRUEBA',
+        cantidad: '10.0000',
+      }),
+    );
+
+    return { solicitudId: solicitud.id, boletaId: boleta.id, ordenId };
   }
 
   it('persiste un evento de auditoría y permite consultarlo vinculado a la boleta', async () => {
@@ -288,5 +299,101 @@ describeConPostgres('ABC-245: Persistencia de auditoría y restricciones en Post
         }),
       ),
     ).rejects.toThrow();
+  });
+
+  it('ABC-246: anula a través de BoletasService persistiendo estado ANULADA y registro de auditoría en PostgreSQL', async () => {
+    const { boletaId } = await crearSolicitudYBoleta(EstadoBoleta.EMITIDA);
+    const boletaRepo = dataSource.getRepository(BoletaEnvio);
+    const solRepo = dataSource.getRepository(SolicitudSalida);
+    const historialRepo = dataSource.getRepository(BoletaEnvioHistorial);
+
+    const service = new BoletasService(boletaRepo, solRepo, dataSource, {} as any);
+    const resultado = await service.anular(boletaId, { motivo: 'Anulación aprobada en control de calidad' }, '55');
+
+    expect(resultado.estado).toBe(EstadoBoleta.ANULADA);
+    expect(resultado.items).toHaveLength(1);
+    expect(resultado.items[0].cantidad).toBe('10.0000');
+
+    // Confirmación directa en PostgreSQL
+    const boletaEnBd = await boletaRepo.findOne({ where: { id: boletaId }, relations: { items: true } });
+    expect(boletaEnBd!.estado).toBe(EstadoBoleta.ANULADA);
+    expect(boletaEnBd!.items).toHaveLength(1);
+
+    const historialEnBd = await historialRepo.find({ where: { boletaId } });
+    expect(historialEnBd).toHaveLength(1);
+    expect(historialEnBd[0].estadoAnterior).toBe(EstadoBoleta.EMITIDA);
+    expect(historialEnBd[0].estadoNuevo).toBe(EstadoBoleta.ANULADA);
+    expect(historialEnBd[0].usuarioActorId).toBe('55');
+    expect(historialEnBd[0].motivo).toBe('Anulación aprobada en control de calidad');
+  });
+
+  it('ABC-246: dos llamadas concurrentes a service.anular en la misma boleta resultan en una exitosa y una rechazada con 409 Conflict', async () => {
+    const { boletaId } = await crearSolicitudYBoleta(EstadoBoleta.EMITIDA);
+    const boletaRepo = dataSource.getRepository(BoletaEnvio);
+    const solRepo = dataSource.getRepository(SolicitudSalida);
+    const historialRepo = dataSource.getRepository(BoletaEnvioHistorial);
+
+    const service = new BoletasService(boletaRepo, solRepo, dataSource, {} as any);
+
+    const [r1, r2] = await Promise.allSettled([
+      service.anular(boletaId, { motivo: 'Anulación solicitante A' }, '11'),
+      service.anular(boletaId, { motivo: 'Anulación solicitante B' }, '12'),
+    ]);
+
+    const exitosos = [r1, r2].filter((r) => r.status === 'fulfilled');
+    const rechazados = [r1, r2].filter((r) => r.status === 'rejected');
+
+    expect(exitosos).toHaveLength(1);
+    expect(rechazados).toHaveLength(1);
+    expect((rechazados[0] as PromiseRejectedResult).reason).toBeInstanceOf(ConflictException);
+
+    // En PostgreSQL solo debe haber exactamente un registro de auditoría
+    const historialEnBd = await historialRepo.find({ where: { boletaId } });
+    expect(historialEnBd).toHaveLength(1);
+
+    const boletaEnBd = await boletaRepo.findOne({ where: { id: boletaId } });
+    expect(boletaEnBd!.estado).toBe(EstadoBoleta.ANULADA);
+  });
+
+  it('ABC-246: rechaza anular una boleta en BORRADOR con 409 Conflict', async () => {
+    const { boletaId } = await crearSolicitudYBoleta(EstadoBoleta.BORRADOR);
+    const boletaRepo = dataSource.getRepository(BoletaEnvio);
+    const solRepo = dataSource.getRepository(SolicitudSalida);
+
+    const service = new BoletasService(boletaRepo, solRepo, dataSource, {} as any);
+    await expect(service.anular(boletaId, { motivo: 'Intento en borrador' }, '11'))
+      .rejects.toThrow(ConflictException);
+  });
+
+  it('ABC-246: una boleta anulada deja de descontar saldo documental para la orden', async () => {
+    const { boletaId, ordenId } = await crearSolicitudYBoleta(EstadoBoleta.EMITIDA);
+    const boletaRepo = dataSource.getRepository(BoletaEnvio);
+    const solRepo = dataSource.getRepository(SolicitudSalida);
+
+    // Saldo emitido antes de anular (debe ser 10.0000)
+    const [antes] = await dataSource.query(
+      `SELECT COALESCE(SUM(item.cantidad), 0)::text AS total
+         FROM boletas_envio boleta
+         INNER JOIN boletas_envio_items item ON item.boleta_id = boleta.id
+         INNER JOIN solicitudes_salida solicitud ON solicitud.id = boleta.solicitud_salida_id
+        WHERE solicitud.orden_id = $1 AND boleta.estado = $2`,
+      [ordenId, EstadoBoleta.EMITIDA],
+    );
+    expect(antes.total).toBe('10.0000');
+
+    // Anulamos la boleta
+    const service = new BoletasService(boletaRepo, solRepo, dataSource, {} as any);
+    await service.anular(boletaId, { motivo: 'Liberación de saldo para reasignación' }, '42');
+
+    // Saldo emitido después de anular (debe ser 0)
+    const [despues] = await dataSource.query(
+      `SELECT COALESCE(SUM(item.cantidad), 0)::text AS total
+         FROM boletas_envio boleta
+         INNER JOIN boletas_envio_items item ON item.boleta_id = boleta.id
+         INNER JOIN solicitudes_salida solicitud ON solicitud.id = boleta.solicitud_salida_id
+        WHERE solicitud.orden_id = $1 AND boleta.estado = $2`,
+      [ordenId, EstadoBoleta.EMITIDA],
+    );
+    expect(despues.total).toBe('0');
   });
 });
