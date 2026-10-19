@@ -68,3 +68,20 @@ export async function obtenerSolicitudSalida(id) {
   await exigirOk(response, "No se pudo cargar la solicitud de salida de la boleta.");
   return response.json();
 }
+
+// Consulta documental de trazabilidad (ABC-306)
+export async function consultarTrazabilidad(filtros = {}) {
+  const params = new URLSearchParams();
+  if (filtros.ordenId) params.set("ordenId", String(filtros.ordenId).trim());
+  if (filtros.loteId) params.set("loteId", String(filtros.loteId).trim());
+  if (filtros.boletaId) params.set("boletaId", String(filtros.boletaId).trim());
+  if (filtros.q) params.set("q", String(filtros.q).trim());
+
+  const queryStr = params.toString() ? `?${params.toString()}` : "";
+  const response = await fetch(`${LOGISTICA}/trazabilidad${queryStr}`, {
+    headers: encabezados(),
+  });
+
+  await exigirOk(response, "No se pudo consultar la trazabilidad documental.");
+  return response.json();
+}
