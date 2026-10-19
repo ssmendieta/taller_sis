@@ -42,11 +42,12 @@ El control de disponibilidad acumulada se realiza en el servicio transaccional;
 no es un CHECK de fila. Los futuros puntos de escritura deben usar este servicio
 para conservar esa regla.
 
-`LotesModule` registra las entidades y exporta el servicio; `AppModule` importa
-ese módulo. Estas subtareas no añaden controlador, rutas, permisos, pantalla ni
-consulta de Logística. Los códigos indicados son excepciones del servicio que
-la futura API podrá devolver con el manejo estándar de NestJS; aquí no se prueba
-un endpoint de lotes, porque todavía no existe.
+`LotesModule` registra las entidades, el servicio y el controlador; `AppModule`
+importa ese módulo. La API actual expone `POST /lotes`, protegido con
+`calidad.registrar_conformes`, y `GET /lotes/orden/:ordenCodigo`, protegido con
+`ordenes.consultar`. El gateway antepone `/api/produccion`. El permiso de creación
+ya se define en Auth mediante `CalidadRegistrarConformes1710000000013`.
+La subtarea 4 prueba esa API existente; no añade endpoints, permisos ni pantalla.
 
 ## Migración y pruebas
 
@@ -86,3 +87,16 @@ de ABC-82 y defectos mediante ABC-83. Verifican 10 + 13 conformes asignables com
 defectos excluidos, órdenes sin conformes, concurrencia, restricciones de BD y
 reversión/reaplicación. Los rechazos conservan los lotes anteriores sin datos
 parciales.
+
+Las pruebas HTTP de `lotes.persistencia.spec.ts` arrancan `LotesModule` con
+TypeORM y PostgreSQL reales en el mismo esquema aislado. Solo simulan la respuesta
+de identidad/permisos de Auth; no reemplazan el guard, controlador, DTO, servicio
+ni la transacción. Verifican 201/200 para creación y consulta, duplicados globales
+y saldo insuficiente con 409, orden inexistente con 404, datos inválidos con 400,
+permiso ausente con 403 y falta de sesión con 401. Comparan las filas antes y
+después de cada rechazo y comprueban rollback ante un fallo simulado después del
+INSERT real. La creación tampoco altera los resultados de calidad ni avances.
+Estas pruebas no acreditan un login contra el servicio Auth real ni la asignación
+efectiva de permisos de una cuenta del entorno.
+
+Resumen para Jira: [ABC-294, subtarea 4](../../../../docs/evidencias/lotes/ABC-294-subtarea-4.md).
