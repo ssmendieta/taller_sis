@@ -48,6 +48,17 @@ export async function obtenerBoleta(id) {
   return response.json();
 }
 
+// Emite una boleta en borrador; pasa a EMITIDA y registra el autor emisor en el backend.
+export async function emitirBoleta(id) {
+  const response = await fetch(`${LOGISTICA}/boletas/${encodeURIComponent(id)}/emitir`, {
+    method: "POST",
+    headers: encabezados(),
+  });
+
+  await exigirOk(response, "No se pudo emitir la boleta.");
+  return response.json();
+}
+
 // La boleta solo guarda la solicitud; orden y destino vienen de la solicitud de salida.
 export async function obtenerSolicitudSalida(id) {
   const response = await fetch(`${LOGISTICA}/solicitudes-salida/${encodeURIComponent(id)}`, {
