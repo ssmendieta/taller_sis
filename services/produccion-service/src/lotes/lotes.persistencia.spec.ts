@@ -1,4 +1,7 @@
 import 'reflect-metadata';
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 import { AppDataSource } from '../database/data-source';
@@ -14,6 +17,7 @@ import { CalidadService } from '../calidad/calidad.service';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { Lote } from './entities/lote.entity';
 import { LotesService } from './lotes.service';
+import { LotesModule } from './lotes.module';
 
 describe('ABC-294: modelo de lote', () => {
   it('registra orden, cantidad conforme, codigo unico, responsable y fecha automatica', async () => {
@@ -36,10 +40,16 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
   let service: LotesService;
   let schemaCreado = false;
   let secuencia = 0;
+  let app: INestApplication;
+  let base: string;
+  const httpFetch = global.fetch;
+  const options = (): PostgresConnectionOptions => ({
+    ...(AppDataSource.options as PostgresConnectionOptions), schema,
+    entities: [Lote, OrdenProduccion, ResultadoConforme, AvancesProduccion], migrations: [],
+  });
 
   beforeAll(async () => {
-    source = new DataSource({ ...(AppDataSource.options as PostgresConnectionOptions), schema,
-      entities: [Lote, OrdenProduccion, ResultadoConforme, AvancesProduccion], migrations: [] });
+    source = new DataSource(options());
     await source.initialize();
     const runner = source.createQueryRunner();
     await runner.startTransaction();
@@ -61,9 +71,16 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
       await runner.release();
     }
     service = new LotesService(source);
+    const module = await Test.createTestingModule({
+      imports: [TypeOrmModule.forRoot(options()), LotesModule],
+    }).compile();
+    app = module.createNestApplication();
+    await app.listen(0, '127.0.0.1');
+    base = await app.getUrl();
   }, 30000);
 
   afterAll(async () => {
+    await app?.close();
     if (schemaCreado && !source.isInitialized) await source.initialize();
     if (source?.isInitialized) {
       try {
@@ -204,5 +221,156 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
       await runner.rollbackTransaction();
       await runner.release();
     }
+  });
+
+  describe('subtarea 4: respuestas HTTP y estado persistido', () => {
+    let permisos: string[];
+
+    beforeEach(() => {
+      permisos = ['calidad.registrar_conformes', 'ordenes.consultar'];
+      jest.spyOn(global, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
+        id: '42', rol: 'Encargado de Producción', permisos: permisos.map((codigo) => ({ codigo })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } }));
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    async function crear(body: unknown, conSesion = true) {
+      const response = await httpFetch(`${base}/lotes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(conSesion ? { Authorization: 'Bearer prueba' } : {}) },
+        body: JSON.stringify(body),
+      });
+      return { status: response.status, body: await response.json() };
+    }
+
+    async function consultar(ordenId: number) {
+      const orden = await source.getRepository(OrdenProduccion).findOneByOrFail({ id: ordenId });
+      const response = await httpFetch(`${base}/lotes/orden/${orden.codigo}`, {
+        headers: { Authorization: 'Bearer prueba' },
+      });
+      return { status: response.status, body: await response.json() };
+    }
+
+    const lotesGuardados = () => source.getRepository(Lote).find({ order: { id: 'ASC' } });
+
+    it('201/200: asigna 23 conformes de 10+13, persiste y consulta los mismos datos sin alterar calidad', async () => {
+      const ordenId = await prepararOrden();
+      const calidad = await source.getRepository(ResultadoConforme).find({ order: { id: 'ASC' } });
+      const avances = await source.getRepository(AvancesProduccion).find({ order: { id: 'ASC' } });
+      const respuesta = await crear({ ordenId, codigo: 'L-HTTP-VALIDO', cantidad: 23 });
+      expect(respuesta.status).toBe(201);
+      expect(respuesta.body).toMatchObject({
+        ordenId: String(ordenId), codigo: 'L-HTTP-VALIDO', cantidad: '23.0000', responsableUsuarioId: '42',
+      });
+      const guardado = await source.getRepository(Lote).findOneByOrFail({ id: respuesta.body.id });
+      expect(JSON.parse(JSON.stringify(guardado))).toEqual(respuesta.body);
+      expect(guardado.fechaHora).toBeInstanceOf(Date);
+      const consulta = await consultar(ordenId);
+      expect(consulta.status).toBe(200);
+      expect(consulta.body).toEqual([expect.objectContaining(respuesta.body)]);
+      expect(await source.getRepository(ResultadoConforme).find({ order: { id: 'ASC' } })).toEqual(calidad);
+      expect(await source.getRepository(AvancesProduccion).find({ order: { id: 'ASC' } })).toEqual(avances);
+    });
+
+    it.each(['misma orden', 'otra orden'])('409: codigo duplicado global en %s no cambia ningun lote', async (alcance) => {
+      const ordenId = await prepararOrden();
+      const destino = alcance === 'misma orden' ? ordenId : await prepararOrden();
+      const codigo = `L-HTTP-DUP-${destino}`;
+      expect((await crear({ ordenId, codigo, cantidad: 5 })).status).toBe(201);
+      const anteriores = await lotesGuardados();
+      const respuesta = await crear({ ordenId: destino, codigo: ` ${codigo} `, cantidad: 1 });
+      expect(respuesta).toMatchObject({ status: 409, body: {
+        statusCode: 409, message: 'Ya existe un lote con este código',
+      } });
+      expect(await lotesGuardados()).toEqual(anteriores);
+      expect(await source.getRepository(Lote).countBy({ codigo })).toBe(1);
+    });
+
+    it('409: asignados 10 de 23, rechaza 14, conserva el saldo y despues permite asignar los 13 restantes', async () => {
+      const ordenId = await prepararOrden();
+      expect((await crear({ ordenId, codigo: 'L-HTTP-PARCIAL', cantidad: 10 })).status).toBe(201);
+      const anteriores = await lotesGuardados();
+      const respuesta = await crear({ ordenId, codigo: 'L-HTTP-EXCESO', cantidad: 14 });
+      expect(respuesta).toMatchObject({ status: 409, body: {
+        statusCode: 409, message: 'La cantidad supera los conformes disponibles sin asignar de la orden',
+      } });
+      expect(await lotesGuardados()).toEqual(anteriores);
+      expect(await source.getRepository(Lote).countBy({ codigo: 'L-HTTP-EXCESO' })).toBe(0);
+      expect((await crear({ ordenId, codigo: 'L-HTTP-RESTO', cantidad: 13 })).status).toBe(201);
+      const lotes = await source.getRepository(Lote).findBy({ ordenId: String(ordenId) });
+      expect(lotes.map((lote) => lote.cantidad).sort()).toEqual(['10.0000', '13.0000']);
+    });
+
+    it('404: una orden inexistente no deja registros parciales', async () => {
+      const anteriores = await lotesGuardados();
+      const respuesta = await crear({ ordenId: 999999, codigo: 'L-HTTP-SIN-ORDEN', cantidad: 1 });
+      expect(respuesta).toMatchObject({ status: 404, body: { statusCode: 404, message: 'Orden con id 999999 no encontrada' } });
+      expect(await lotesGuardados()).toEqual(anteriores);
+    });
+
+    it.each([0, -1, 1.5])('400: referencia de orden invalida %s no guarda datos', async (ordenId) => {
+      const anteriores = await lotesGuardados();
+      expect((await crear({ ordenId, codigo: 'L-HTTP-ORDEN-INVALIDA', cantidad: 1 })).status).toBe(400);
+      expect(await lotesGuardados()).toEqual(anteriores);
+    });
+
+    it.each([0, -1])('400: cantidad no positiva %s no guarda datos', async (cantidad) => {
+      const ordenId = await prepararOrden();
+      const anteriores = await lotesGuardados();
+      expect((await crear({ ordenId, codigo: 'L-HTTP-CANTIDAD-INVALIDA', cantidad })).status).toBe(400);
+      expect(await lotesGuardados()).toEqual(anteriores);
+    });
+
+    it('403: un usuario autenticado sin el permiso de creacion solo puede consultar y no altera la BD', async () => {
+      const ordenId = await prepararOrden();
+      expect((await crear({ ordenId, codigo: 'L-HTTP-ANTES-PERMISO', cantidad: 5 })).status).toBe(201);
+      const anteriores = await lotesGuardados();
+      permisos = ['ordenes.consultar', 'ordenes.registrar_avance'];
+      expect(await crear({ ordenId, codigo: 'L-HTTP-SIN-PERMISO', cantidad: 1 }))
+        .toMatchObject({ status: 403, body: { statusCode: 403, message: 'No tiene permisos para esta operación' } });
+      expect(await lotesGuardados()).toEqual(anteriores);
+      expect((await consultar(ordenId)).status).toBe(200);
+    });
+
+    it('403: permiso de creacion no habilita la consulta sin ordenes.consultar', async () => {
+      const ordenId = await prepararOrden();
+      expect((await crear({ ordenId, codigo: 'L-HTTP-LECTURA-PROTEGIDA', cantidad: 5 })).status).toBe(201);
+      const anteriores = await lotesGuardados();
+      permisos = ['calidad.registrar_conformes'];
+      expect((await consultar(ordenId)).status).toBe(403);
+      expect(await lotesGuardados()).toEqual(anteriores);
+    });
+
+    it('401: sin sesion no se registra ningun lote', async () => {
+      const ordenId = await prepararOrden();
+      const anteriores = await lotesGuardados();
+      expect((await crear({ ordenId, codigo: 'L-HTTP-SIN-SESION', cantidad: 1 }, false)).status).toBe(401);
+      expect(await lotesGuardados()).toEqual(anteriores);
+    });
+
+    it('500: un fallo despues del INSERT revierte el lote completo', async () => {
+      const ordenId = await prepararOrden();
+      const anteriores = await lotesGuardados();
+      const appSource = app.get(DataSource);
+      const originalRunner = appSource.createQueryRunner.bind(appSource);
+      let insertEjecutado = false;
+      jest.spyOn(appSource, 'createQueryRunner').mockImplementation((mode) => {
+        const runner = originalRunner(mode);
+        const query = runner.query.bind(runner);
+        jest.spyOn(runner, 'query').mockImplementation(async (sql, parameters, structured) => {
+          const result = await query(sql, parameters, structured);
+          if (typeof sql === 'string' && sql.startsWith('INSERT INTO') && sql.includes('"lotes"')) {
+            insertEjecutado = true;
+            throw new Error('Fallo simulado despues de insertar el lote');
+          }
+          return result;
+        });
+        return runner;
+      });
+      expect((await crear({ ordenId, codigo: 'L-HTTP-ROLLBACK', cantidad: 1 })).status).toBe(500);
+      expect(insertEjecutado).toBe(true);
+      expect(await lotesGuardados()).toEqual(anteriores);
+    });
   });
 });
