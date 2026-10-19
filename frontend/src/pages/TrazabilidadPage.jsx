@@ -1,6 +1,7 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import { consultarTrazabilidad } from "../services/boletasService.js";
 
 function obtenerBoletas() {
   const registros = [];
@@ -68,27 +69,66 @@ export default function TrazabilidadPage() {
   const [boletas, setBoletas] = useState([]);
   const [seleccionadaId, setSeleccionadaId] = useState("");
   const [busqueda, setBusqueda] = useState(filtroUrl);
+  const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(false);
 
-  function cargar() {
-    const registros = obtenerBoletas();
+  function mensajeError(fallo) {
+    if (fallo?.status === 403) return "No tienes permiso para consultar la trazabilidad documental.";
+    if (fallo?.status === 401) return "Tu sesión expiró. Vuelve a ingresar.";
+    return fallo?.message || "No se pudo consultar la trazabilidad documental.";
+  }
 
-    setBoletas(registros);
+  async function cargar() {
+    setCargando(true);
+    setError("");
 
     const boletaUrl = searchParams.get("boletaId");
     const loteUrl = searchParams.get("loteId");
     const ordenUrl = searchParams.get("ordenId");
+    const qUrl = searchParams.get("q");
+
+    const tieneSesion = Boolean(
+      sessionStorage.getItem("accessToken") || localStorage.getItem("accessToken")
+    );
+
+    let registros = [];
+    if (tieneSesion) {
+      const criterioBusqueda = busqueda.trim() || qUrl;
+      const hayCriterio = Boolean(boletaUrl || loteUrl || ordenUrl || criterioBusqueda);
+
+      if (hayCriterio) {
+        try {
+          const datosApi = await consultarTrazabilidad({
+            boletaId: boletaUrl,
+            loteId: loteUrl,
+            ordenId: ordenUrl,
+            q: criterioBusqueda,
+          });
+          registros = Array.isArray(datosApi) ? datosApi : [];
+        } catch (fallo) {
+          setBoletas([]);
+          setSeleccionadaId("");
+          setError(mensajeError(fallo));
+          setCargando(false);
+          return;
+        }
+      } else {
+        registros = [];
+      }
+    } else {
+      registros = obtenerBoletas();
+    }
+
+    setBoletas(registros);
+    setCargando(false);
 
     const encontrada = registros.find((item) => {
-
       if (boletaUrl) {
         return String(item.id) === String(boletaUrl);
       }
 
       if (loteUrl) {
-        return (
-          String(obtenerLote(item)) ===
-          String(loteUrl)
-        );
+        return String(obtenerLote(item)) === String(loteUrl);
       }
 
       if (ordenUrl) {
@@ -98,17 +138,13 @@ export default function TrazabilidadPage() {
           item.orden ??
           "";
 
-        return (
-          String(ordenAsociada) ===
-          String(ordenUrl)
-        );
+        return String(ordenAsociada) === String(ordenUrl);
       }
 
       return false;
     });
 
     setSeleccionadaId((actual) => {
-
       if (encontrada) {
         return encontrada.id;
       }
@@ -128,7 +164,7 @@ export default function TrazabilidadPage() {
 
   useEffect(() => {
     cargar();
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     setBusqueda(filtroUrl);
@@ -217,6 +253,12 @@ export default function TrazabilidadPage() {
               onChange={(evento) =>
                 setBusqueda(evento.target.value)
               }
+              onKeyDown={(evento) => {
+                if (evento.key === "Enter") {
+                  evento.preventDefault();
+                  cargar();
+                }
+              }}
               placeholder="Boleta, solicitud, orden o lote"
             />
           </label>
@@ -257,12 +299,25 @@ export default function TrazabilidadPage() {
               type="button"
               className="ts-btn"
               onClick={cargar}
+              disabled={cargando}
             >
-              Actualizar
+              {cargando ? "Cargando..." : "Actualizar"}
             </button>
           </div>
         </div>
       </div>
+
+      {error && (
+        <div
+          className="ts-panel"
+          style={{ marginTop: "1rem" }}
+          role="alert"
+        >
+          <p className="ts-error" style={{ color: "var(--color-error, #b00020)", margin: 0 }}>
+            {error}
+          </p>
+        </div>
+      )}
 
       {!boleta ? (
         <div
