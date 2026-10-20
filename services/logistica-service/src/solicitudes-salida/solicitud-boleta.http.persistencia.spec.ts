@@ -11,6 +11,7 @@ import { ReglaConcurrenciaDocumental1710000000003 } from '../database/migrations
 import { HistorialBoletasEnvio1710000000004 } from '../database/migrations/1710000000004-HistorialBoletasEnvio';
 import { BoletasModule } from '../boletas/boletas.module';
 import { BoletaEnvio } from '../boletas/entities/boleta-envio.entity';
+import { BoletaEnvioHistorial } from '../boletas/entities/boleta-envio-historial.entity';
 import { LotesProduccionClient } from '../disponibilidad-documental/lotes-produccion.client';
 import { SolicitudesSalidaModule } from './solicitudes-salida.module';
 import { SolicitudSalida } from './entities/solicitud-salida.entity';
@@ -22,17 +23,20 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
   const httpFetch = global.fetch;
   const options = (): PostgresConnectionOptions => ({
     ...(AppDataSource.options as PostgresConnectionOptions), schema, migrations: [],
+    extra: { options: `-c search_path=${schema}` },
   });
   let source: DataSource;
   let app: INestApplication;
   let base: string;
   let creado = false;
   let permisos: string[];
+  let usuarioId: string;
   const produccion = {
     consultarOrdenPorId: jest.fn(async (id: string) => ({ id, codigo: 'ORD-PRUEBA', producto_id: 3, producto: { codigo: 'P-PRUEBA' } })),
     consultarPorOrden: jest.fn(async () => ['LOTE-A', 'LOTE-B'].map((codigo, indice) => ({
       id: String(indice + 1), codigo, ordenId: '8', productoId: '3', cantidad: '20.0000',
     }))),
+    consultarConformesPorOrden: jest.fn(async () => [{ cantidad: '1000.0000' }]),
   };
   const body = { ordenId: '8', destinoDocumental: 'Destino de prueba', motivo: 'Verificación de persistencia',
     items: [{ referencia: 'LOTE-A', cantidad: '10.0000' }, { referencia: 'LOTE-B', cantidad: '2.0000' }] };
@@ -66,9 +70,10 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
   }, 30000);
 
   beforeEach(() => {
+    usuarioId = '42';
     permisos = ['logistica.solicitudes.consultar', 'logistica.solicitudes.gestionar', 'logistica.boletas.consultar', 'logistica.boletas.gestionar'];
     jest.spyOn(global, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
-      id: '42', permisos: permisos.map((codigo) => ({ codigo })),
+      id: usuarioId, rol: 'Encargado de Logística', permisos: permisos.map((codigo) => ({ codigo })),
     }), { status: 200, headers: { 'content-type': 'application/json' } }));
   });
   afterEach(() => jest.restoreAllMocks());
@@ -107,7 +112,9 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
     expect(detalle.body.numero).toMatch(/^BOL-\d{4}-\d{5}$/);
     const pagina = await request('/boletas?page=1&limit=1');
     expect(pagina.status).toBe(200);
-    expect(pagina.body).toMatchObject({ total: 1, items: [expect.objectContaining(detalle.body)] });
+    const { historial, ...sinHistorial } = detalle.body;
+    expect(historial).toEqual([]);
+    expect(pagina.body).toMatchObject({ total: 1, items: [expect.objectContaining(sinHistorial)] });
     await app.close();
     await arrancar();
     expect((await request(`/solicitudes-salida/${solicitud.body.id}`)).status).toBe(200);
@@ -165,5 +172,62 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
       expect((await request('/solicitudes-salida', 'POST', { ...body, items: [{ referencia: 'LOTE-FALLO', cantidad: '1.0000' }] })).status).toBe(500);
       expect(await source.getRepository(SolicitudSalida).count()).toBe(anteriores);
     } finally { await source.query(`ALTER TABLE "${schema}".solicitudes_salida_items DROP CONSTRAINT fallo_item_prueba`); }
+  });
+
+  async function crearBoleta(emitida = false) {
+    const solicitud = await request('/solicitudes-salida', 'POST', body);
+    expect(solicitud.status).toBe(201);
+    const creada = await request('/boletas', 'POST', { solicitudSalidaId: solicitud.body.id, items: body.items });
+    expect(creada.status).toBe(201);
+    if (emitida) expect((await request(`/boletas/${creada.body.id}/emitir`, 'POST')).status).toBe(201);
+    return (await request(`/boletas/${creada.body.id}`)).body;
+  }
+
+  it('ABC-124: anula EMITIDA con permiso, persiste auditoría de otro actor y conserva responsable e ítems tras reiniciar', async () => {
+    const original = await crearBoleta(true);
+    usuarioId = '55';
+    const anulada = await request(`/boletas/${original.id}/anular`, 'POST', { motivo: '  Destino incorrecto  ' });
+    expect(anulada.status).toBe(201);
+    const detalle = await request(`/boletas/${original.id}`);
+    expect(detalle.status).toBe(200);
+    expect(detalle.body).toMatchObject({ ...original, actualizadoEn: expect.any(String), estado: 'ANULADA', historial: [expect.objectContaining({
+      boletaId: original.id, estadoAnterior: 'EMITIDA', estadoNuevo: 'ANULADA',
+      usuarioActorId: '55', motivo: 'Destino incorrecto', fechaHora: expect.any(String),
+    })] });
+    expect(detalle.body.responsableUsuarioId).toBe('42');
+    expect(Number.isNaN(Date.parse(detalle.body.historial[0].fechaHora))).toBe(false);
+    const guardada = await source.getRepository(BoletaEnvio).findOneOrFail({ where: { id: original.id },
+      relations: { items: true, historial: true } });
+    expect(JSON.parse(JSON.stringify(guardada))).toEqual(detalle.body);
+    await app.close(); await arrancar();
+    expect(await request(`/boletas/${original.id}`)).toEqual(detalle);
+  });
+
+  it.each(['', '   '])('ABC-124: motivo %j devuelve 400 sin cambiar la boleta ni insertar auditoría', async (motivo) => {
+    const original = await crearBoleta(true);
+    const anteriores = await source.getRepository(BoletaEnvioHistorial).count();
+    expect((await request(`/boletas/${original.id}/anular`, 'POST', { motivo })).status).toBe(400);
+    expect((await request(`/boletas/${original.id}`)).body).toEqual(original);
+    expect(await source.getRepository(BoletaEnvioHistorial).count()).toBe(anteriores);
+  });
+
+  it('ABC-124: sin permiso gestionar devuelve 403, sin sesión 401, sin cambiar estado ni historial', async () => {
+    const original = await crearBoleta(true);
+    permisos = ['logistica.boletas.consultar'];
+    expect((await request(`/boletas/${original.id}/anular`, 'POST', { motivo: 'Motivo' })).status).toBe(403);
+    expect((await request(`/boletas/${original.id}/anular`, 'POST', { motivo: 'Motivo' }, false)).status).toBe(401);
+    expect((await request(`/boletas/${original.id}`)).body).toEqual(original);
+  });
+
+  it('ABC-124: BORRADOR y ANULADA devuelven 409 sin datos parciales ni historial duplicado', async () => {
+    const borrador = await crearBoleta();
+    expect((await request(`/boletas/${borrador.id}/anular`, 'POST', { motivo: 'Motivo' })).status).toBe(409);
+    expect((await request(`/boletas/${borrador.id}`)).body).toEqual(borrador);
+    const emitida = await crearBoleta(true);
+    expect((await request(`/boletas/${emitida.id}/anular`, 'POST', { motivo: 'Primera anulación' })).status).toBe(201);
+    const primera = await request(`/boletas/${emitida.id}`);
+    expect((await request(`/boletas/${emitida.id}/anular`, 'POST', { motivo: 'Repetida' })).status).toBe(409);
+    expect(await request(`/boletas/${emitida.id}`)).toEqual(primera);
+    expect(await source.getRepository(BoletaEnvioHistorial).countBy({ boletaId: emitida.id })).toBe(1);
   });
 });

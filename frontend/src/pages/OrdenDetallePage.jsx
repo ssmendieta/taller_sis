@@ -10,6 +10,7 @@ import {
   obtenerMaterialesOrden,
   obtenerOrden,
   obtenerTotalProducido,
+  solicitarDisponibilidadOrden,
   registrarAvance,
 } from "../services/ordenesService.js";
 import {
@@ -91,6 +92,10 @@ export default function OrdenDetallePage() {
   const [orden, setOrden] = useState(null);
   const [materiales, setMateriales] = useState([]);
   const [disponibilidad, setDisponibilidad] = useState([]);
+  const [estadoConsultaDisponibilidad, setEstadoConsultaDisponibilidad] = useState("SIN_CONSULTA");
+  const [solicitandoDisponibilidad, setSolicitandoDisponibilidad] = useState(false);
+  const [errorDisponibilidad, setErrorDisponibilidad] = useState("");
+  const [avisoDisponibilidad, setAvisoDisponibilidad] = useState("");
   const [historial, setHistorial] = useState([]);
   const [avances, setAvances] = useState([]);
   const [total, setTotal] = useState(0);
@@ -151,6 +156,7 @@ export default function OrdenDetallePage() {
 
   const muestraAcciones = puedeVerAcciones(usuario);
   const permiteAvance = puedeRegistrarAvance(usuario);
+  const permiteConsultarDisponibilidad = tienePermiso(usuario, "materiales.consultar_disponibilidad");
   const permiteConsumo = tienePermiso(usuario, "materiales.registrar_consumo");
   // El mismo permiso de calidad registra conformes y defectuosos.
   const permiteCalidad = tienePermiso(usuario, "calidad.registrar_conformes");
@@ -220,6 +226,13 @@ export default function OrdenDetallePage() {
     }
   }
 
+  async function actualizarDisponibilidad() {
+    const respuesta = await obtenerDisponibilidadOrden(id);
+    setDisponibilidad(materialesNormalizados(respuesta));
+    setEstadoConsultaDisponibilidad(respuesta?.estado_consulta ?? "SIN_CONSULTA");
+    return respuesta;
+  }
+
   async function cargar() {
     setCargando(true);
     setError("");
@@ -237,10 +250,10 @@ export default function OrdenDetallePage() {
 
       // Disponibilidad y avance no bloquean el detalle si fallan.
       try {
-        const disp = await obtenerDisponibilidadOrden(id);
-        setDisponibilidad(materialesNormalizados(disp));
+        await actualizarDisponibilidad();
       } catch {
         setDisponibilidad([]);
+        setEstadoConsultaDisponibilidad("SIN_CONSULTA");
       }
 
       try {
@@ -326,6 +339,11 @@ export default function OrdenDetallePage() {
   const motivoBloqueoInicio = useMemo(() => {
     if (orden?.estado !== "PLANIFICADA") return "";
     if (recetaActiva === false) return "La receta de esta orden está inactiva.";
+    if (estadoConsultaDisponibilidad !== "RESPONDIDA") {
+      return estadoConsultaDisponibilidad === "PENDIENTE"
+        ? "La consulta de disponibilidad está pendiente. Espera la respuesta de Inventario."
+        : "Primero solicita la disponibilidad de materiales y espera la respuesta de Inventario.";
+    }
 
     if (faltantes.length > 0) {
       const nombres = faltantes
@@ -339,7 +357,7 @@ export default function OrdenDetallePage() {
     }
 
     return "";
-  }, [orden, recetaActiva, faltantes]);
+  }, [orden, recetaActiva, faltantes, estadoConsultaDisponibilidad]);
 
   const acciones = useMemo(
     () => (orden ? accionesPara(usuario, orden.estado) : []),
@@ -389,6 +407,35 @@ export default function OrdenDetallePage() {
       );
     } finally {
       setGuardando(false);
+    }
+  }
+
+  async function consultarDisponibilidad() {
+    if (solicitandoDisponibilidad) return;
+    setSolicitandoDisponibilidad(true);
+    setErrorDisponibilidad("");
+    setAvisoDisponibilidad("");
+    try {
+      const inicial = await solicitarDisponibilidadOrden(id);
+      setDisponibilidad(materialesNormalizados(inicial));
+      setEstadoConsultaDisponibilidad(inicial?.estado_consulta ?? "PENDIENTE");
+      setAvisoDisponibilidad("Solicitud enviada a Inventario. Esperando respuesta…");
+
+      // La respuesta llega por Pub/Sub y se persiste de forma asíncrona.
+      for (let intento = 0; intento < 20; intento += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const actual = await actualizarDisponibilidad();
+        if (actual?.estado_consulta === "RESPONDIDA") {
+          setAvisoDisponibilidad("Inventario respondió. Revisa las cantidades y estados de los materiales.");
+          return;
+        }
+      }
+      setAvisoDisponibilidad("La solicitud sigue pendiente. Puedes volver a consultar en unos segundos; no se duplicará la consulta pendiente.");
+    } catch (fallo) {
+      setErrorDisponibilidad(fallo.message || "No se pudo solicitar la disponibilidad.");
+      try { await actualizarDisponibilidad(); } catch { /* el detalle sigue disponible aunque falle la consulta */ }
+    } finally {
+      setSolicitandoDisponibilidad(false);
     }
   }
 
@@ -813,8 +860,28 @@ export default function OrdenDetallePage() {
       <div className="ts-panel" style={{ marginBottom: 16 }}>
         <div className="ts-panel-title">
           <h2>Materiales requeridos</h2>
-          <span>{materiales.length} líneas</span>
+          <div className="ts-btn-group">
+            <span>{materiales.length} líneas · Disponibilidad: {estadoConsultaDisponibilidad.replaceAll("_", " ").toLowerCase()}</span>
+            {permiteConsultarDisponibilidad && orden.estado === "PLANIFICADA" && materiales.length > 0 && (
+              <button
+                type="button"
+                className="ts-btn ts-btn-primary"
+                onClick={consultarDisponibilidad}
+                disabled={solicitandoDisponibilidad}
+              >
+                {solicitandoDisponibilidad ? "Consultando…" : "Solicitar disponibilidad"}
+              </button>
+            )}
+          </div>
         </div>
+
+        {errorDisponibilidad && <p className="ts-error" role="alert">{errorDisponibilidad}</p>}
+        {avisoDisponibilidad && <p className="ts-success" role="status">{avisoDisponibilidad}</p>}
+        {estadoConsultaDisponibilidad !== "RESPONDIDA" && orden.estado === "PLANIFICADA" && permiteConsultarDisponibilidad && (
+          <p className="ts-field-help" role="note">
+            Solicita la consulta y espera la respuesta de Inventario. La respuesta llega de forma asíncrona por Pub/Sub.
+          </p>
+        )}
 
         {materiales.length === 0 ? (
           <p className="ts-empty">Sin materiales.</p>

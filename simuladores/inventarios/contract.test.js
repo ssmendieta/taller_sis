@@ -5,10 +5,65 @@ const assert = require('node:assert/strict');
 const {
   SOLICITUD_MATERIAL_ALMACEN_V1,
   SOLICITUD_MATERIAL_ALMACEN_ESTADO_ACTUALIZADO_V1,
+  DISPONIBILIDAD_MATERIAL_SOLICITADA_V1,
+  DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1,
   MensajePermanenteError,
   crearRespuesta,
+  crearRespuestaDisponibilidad,
   validarEntrada,
+  validarSolicitudDisponibilidad,
 } = require('./contract');
+
+function disponibilidadValida() {
+  return {
+    eventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+    eventType: DISPONIBILIDAD_MATERIAL_SOLICITADA_V1,
+    occurredAt: '2026-10-19T10:00:00.000Z',
+    source: 'produccion-service',
+    correlationId: '67bfbe4d-9a02-4cb9-b707-d68434ba2c4a',
+    data: {
+      consultaId: 'DISP-ORD-6-V1',
+      consultaVersion: 1,
+      ordenId: 6,
+      ordenCodigo: 'ORD-0006',
+      fechaNecesaria: '2026-10-20',
+      materiales: [{
+        materialId: '8', materialCodigo: 'HAR-001', materialNombre: 'Harina',
+        cantidadRequerida: '100.0000', unidad: 'kg',
+      }],
+    },
+  };
+}
+
+test('simulador valida y responde una consulta de disponibilidad correlacionada', () => {
+  const solicitud = disponibilidadValida();
+  validarSolicitudDisponibilidad(solicitud, {
+    eventId: solicitud.eventId,
+    eventType: solicitud.eventType,
+    source: solicitud.source,
+    correlationId: solicitud.correlationId,
+  });
+
+  const respuesta = crearRespuestaDisponibilidad(solicitud, {
+    now: new Date('2026-10-19T10:00:02.000Z'),
+  });
+  assert.equal(respuesta.eventType, DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1);
+  assert.equal(respuesta.source, 'inventario-service');
+  assert.equal(respuesta.correlationId, solicitud.correlationId);
+  assert.equal(respuesta.data.requestEventId, solicitud.eventId);
+  assert.equal(respuesta.data.consultaId, solicitud.data.consultaId);
+  assert.equal(respuesta.data.materiales[0].cantidadDisponible, '100.0000');
+  assert.equal(respuesta.data.materiales[0].estado, 'SUFICIENTE');
+});
+
+test('simulador representa stock insuficiente y faltante con estados coherentes', () => {
+  const solicitud = disponibilidadValida();
+  const insuficiente = crearRespuestaDisponibilidad(solicitud, { stock: { 'HAR-001': 50 } });
+  const faltante = crearRespuestaDisponibilidad(solicitud, { stock: { 'HAR-001': 0 } });
+  assert.equal(insuficiente.data.materiales[0].estado, 'INSUFICIENTE');
+  assert.equal(insuficiente.data.materiales[0].cantidadDisponible, '50.0000');
+  assert.equal(faltante.data.materiales[0].estado, 'FALTANTE');
+});
 
 function muestraValida() {
   return {
