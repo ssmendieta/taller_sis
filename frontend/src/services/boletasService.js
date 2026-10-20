@@ -14,8 +14,9 @@ function encabezados(extra = {}) {
 // Conserva el código HTTP para distinguir 403 y 404 en la pantalla.
 async function exigirOk(response, mensaje) {
   if (!response.ok) {
-    const datos = await response.json().catch(() => null);
-    const detalle = datos?.message;
+    const texto = await response.text().catch(() => "");
+    let detalle = texto;
+    try { detalle = JSON.parse(texto)?.message || texto; } catch { /* Respuesta sin JSON. */ }
     const error = new Error(
       (Array.isArray(detalle) ? detalle.join(". ") : detalle) || mensaje
     );
@@ -26,6 +27,8 @@ async function exigirOk(response, mensaje) {
 }
 
 export const PERMISO_CONSULTAR_BOLETAS = "logistica.boletas.consultar";
+export const PERMISO_CONSULTAR_SOLICITUDES = "logistica.solicitudes.consultar";
+export const PERMISO_GESTIONAR_SOLICITUDES = "logistica.solicitudes.gestionar";
 export const ESTADO_BOLETA_EMITIDA = "EMITIDA";
 
 const LOGISTICA = `${apiConfig.gatewayUrl}/api/logistica`;
@@ -38,6 +41,42 @@ export async function listarBoletas() {
   return response.json();
 }
 
+// Crea una boleta persistida a partir de una solicitud de salida y sus lotes.
+export async function crearBoleta(solicitudSalidaId, items) {
+  const response = await fetch(`${LOGISTICA}/boletas`, {
+    method: "POST",
+    headers: encabezados({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ solicitudSalidaId: String(solicitudSalidaId), items }),
+  });
+
+  await exigirOk(response, "No se pudo crear la boleta.");
+  const boleta = await response.json();
+  if (!boleta?.id || !boleta.estado) throw new Error("El servidor no confirmó el registro de la boleta.");
+  return boleta;
+}
+
+export async function crearSolicitudSalida({ ordenId, destinoDocumental, motivo, items }) {
+  const response = await fetch(`${LOGISTICA}/solicitudes-salida`, {
+    method: "POST",
+    headers: encabezados({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ ordenId, destinoDocumental, motivo,
+      items: items.map(({ referencia, cantidad }) => ({ referencia, cantidad })) }),
+  });
+  await exigirOk(response, "No se pudo registrar la solicitud de salida.");
+  const solicitud = await response.json();
+  if (!solicitud?.id || !solicitud.estado || !Array.isArray(solicitud.items) || !solicitud.items.length) {
+    throw new Error("El servidor no confirmó el registro de la solicitud. Revisa el listado antes de volver a enviarla.");
+  }
+  return solicitud;
+}
+
+export async function listarSolicitudesSalida() {
+  const response = await fetch(`${LOGISTICA}/solicitudes-salida`, { headers: encabezados() });
+
+  await exigirOk(response, "No se pudieron cargar las solicitudes de salida.");
+  return response.json();
+}
+
 // Solo lecturas: imprimir una boleta nunca cambia su estado ni sus cantidades.
 export async function obtenerBoleta(id) {
   const response = await fetch(`${LOGISTICA}/boletas/${encodeURIComponent(id)}`, {
@@ -45,6 +84,18 @@ export async function obtenerBoleta(id) {
   });
 
   await exigirOk(response, "No se pudo cargar la boleta.");
+  return response.json();
+}
+
+// ABC-78: reemplaza los ítems de una boleta BORRADOR en una sola operación.
+export async function actualizarItemsBoleta(id, items) {
+  const response = await fetch(`${LOGISTICA}/boletas/${encodeURIComponent(id)}/items`, {
+    method: "PUT",
+    headers: encabezados({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ items }),
+  });
+
+  await exigirOk(response, "No se pudieron actualizar los ítems de la boleta.");
   return response.json();
 }
 

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { listarBoletas } from "../services/boletasService.js";
+import { useSesion } from "../context/SesionContext.jsx";
+import { tienePermiso } from "../services/permisos.js";
+import { listarBoletas, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
 import { formatearFechaHora } from "../utils/format.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
@@ -19,6 +21,7 @@ function mensajeError(fallo) {
 }
 
 export default function BoletasPage() {
+  const { usuario } = useSesion();
   const [boletas, setBoletas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -29,7 +32,7 @@ export default function BoletasPage() {
 
     try {
       const respuesta = await listarBoletas();
-      setBoletas(Array.isArray(respuesta) ? respuesta : []);
+      setBoletas(Array.isArray(respuesta) ? respuesta : Array.isArray(respuesta?.items) ? respuesta.items : []);
     } catch (fallo) {
       setBoletas([]);
       setError(mensajeError(fallo));
@@ -49,9 +52,11 @@ export default function BoletasPage() {
         titulo="Boletas de envío"
         descripcion="Documentos de salida generados desde solicitudes de salida."
         conteo={!cargando && !error ? `${boletas.length} ${boletas.length === 1 ? "boleta" : "boletas"}` : null}
+        accion={<div className="ts-btn-group">
+          {(tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES)) && <Link className="ts-btn" to="/logistica/inicio">Solicitudes de salida</Link>}
+          {tienePermiso(usuario, "logistica.boletas.gestionar") && <Link className="ts-btn ts-btn-primary" to="/logistica/boletas/nueva">Crear boleta</Link>}
+        </div>}
       />
-
-      <p className="ts-notice">Para consultar boletas registradas en el servidor utiliza esta lista. El prototipo local de creación está disponible por separado: <Link to="/logistica/boletas/local/nueva">Abrir prototipo local</Link>.</p>
 
       <div className="ts-panel">
         <div className="ts-panel-title">

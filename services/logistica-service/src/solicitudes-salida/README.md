@@ -14,27 +14,34 @@ El `POST` recibe `ordenId`, `destinoDocumental`, `motivo` e `items`, donde cada
 
 ## Límite de verificación de Producción
 
-Producción expone consultas protegidas de órdenes y resultados conformes, pero
-Logística no tiene un permiso de Producción para invocarlas y la API de lotes
-no tiene endpoint de consulta. Por ello esta implementación conserva la orden
-y referencia declaradas, pero no demuestra la existencia/estado de la orden,
-la identidad del producto ni que una referencia de lote corresponda a unidades
-conformes disponibles. El registro en `BORRADOR` no afirma que esa verificación
-haya ocurrido. Para completar la comprobación se necesita un contrato de
-servicio autorizado que incluya lectura de lotes y su cantidad conforme.
+La pantalla `/logistica/inicio` obtiene las órdenes desde Producción y consulta
+`GET /lotes/orden/:ordenCodigo` para seleccionar referencias existentes. Estas
+lecturas requieren `ordenes.consultar`. La migración de Auth
+`LogisticaConsultaProduccion1710000000018`, autorizada por Andrea, asigna ese
+permiso existente al Encargado de Logística sin conceder escritura en Producción.
+
+La API de solicitudes conserva la orden y referencias declaradas; no consulta
+Producción al registrar el borrador. Al convertir la solicitud en boleta,
+`BoletasService` sí consulta la orden, su producto y los lotes de esa orden antes
+de guardar. No se modifican existencias ni se considera una solicitud BORRADOR
+como una salida emitida.
 
 La referencia de orden no tiene FK: Producción y Logística mantienen bases
 independientes. La única FK local une los ítems con su solicitud.
 
 ## Migración
 
-`1710000000001-CrearSolicitudesSalida.ts` es el identificador propuesto y no
-colisiona con los archivos de migración actualmente presentes en Logística.
-Jira requiere acordar la numeración con el equipo; ese acuerdo no se verificó.
-La migración no se ejecutó porque no se identificó una base autorizada.
+La tabla de solicitudes usa `1710000000001-CrearSolicitudesSalida.ts`. El esquema
+actual de Logística tiene cuatro migraciones, verificadas como aplicadas en
+`logistica_db`. Este cambio no requiere otra migración de Logística.
 
 ## Pruebas
 
-Los archivos `*.spec.ts` de este módulo son unitarios y usan mocks para
-repositorios/transacciones. No demuestran persistencia real, rollback en
-PostgreSQL ni conformidad de una orden/lote consultada en Producción.
+Además de las pruebas unitarias, `solicitud-boleta.http.persistencia.spec.ts`
+levanta Nest con los módulos reales de solicitudes y boletas y PostgreSQL en un
+esquema aislado de `logistica_db`. Verifica creación, listado, conversión en
+boleta, paginación con relaciones, persistencia tras reiniciar y rollback ante
+fallo de un ítem. Auth y las consultas externas a Producción se simulan solo en
+estas pruebas. El frontend se prueba con `npm run test:logistica`.
+
+Evidencia y comandos: [solicitud a boleta](../../../../docs/evidencias/boletas/solicitud-salida-a-boleta.md).

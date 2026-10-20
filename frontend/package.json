@@ -8,6 +8,7 @@
     "build": "vite build",
     "test:session": "node --test scripts/sesion.test.mjs",
     "test:audit": "node --test scripts/auditoria.test.mjs",
+    "test:logistica": "node --test scripts/logistica.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "react-test-renderer": "18.3.1",
     "vite": "^5.4.0"
   }
 }

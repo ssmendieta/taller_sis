@@ -320,7 +320,7 @@ export class BoletasService {
       qb.andWhere('boleta.creado_en <= :fechaHasta', { fechaHasta: query.fechaHasta });
     }
 
-    qb.orderBy('boleta.creado_en', 'DESC')
+    qb.orderBy('boleta.creadoEn', 'DESC')
       .addOrderBy('boleta.id', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);

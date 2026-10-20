@@ -6,7 +6,7 @@ import { NOMBRE_SISTEMA } from "../constants/marca.js";
 import { cerrarSesionServidor } from "../services/auth.js";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
-import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
+import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
 import "../styles/layout.css";
 
 const iconos = {
@@ -38,6 +38,7 @@ export default function MainLayout({ children }) {
   const puedeAuditoria = tienePermiso(usuario, "auditoria.consultar");
   const puedeIntegraciones = tienePermiso(usuario, PERMISO_INTEGRACIONES);
   const puedeBoletas = tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS);
+  const puedeSalidas = tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES);
   const activo = (path) => {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
     if (path === "/logistica/boletas") return location.pathname.startsWith("/logistica/boletas") ? "active" : "";
@@ -59,6 +60,7 @@ export default function MainLayout({ children }) {
           {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios" onClick={() => setAbierto(false)}><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
           {puedeRoles && <Link className={activo("/roles")} to="/roles" onClick={() => setAbierto(false)}><IconoNavegacion nombre="roles" />Roles y permisos</Link>}
           {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria" onClick={() => setAbierto(false)}><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
+          {puedeSalidas && <Link className={activo("/logistica/inicio")} to="/logistica/inicio" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de salida</Link>}
           {puedeBoletas && <Link className={activo("/logistica/boletas")} to="/logistica/boletas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="boletas" />Boletas</Link>}
           {puedeIntegraciones && <Link className={activo("/integraciones")} to="/integraciones" onClick={() => setAbierto(false)}><IconoNavegacion nombre="integraciones" />Integraciones</Link>}
         </nav>
