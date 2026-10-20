@@ -49,6 +49,22 @@ export async function listarBoletas(filtros = {}) {
   return response.json();
 }
 
+export async function obtenerDisponibilidadDocumental(ordenCodigo, { signal } = {}) {
+  const codigo = ordenCodigo.trim();
+  const response = await fetch(`${LOGISTICA}/disponibilidad/${encodeURIComponent(codigo)}`, {
+    headers: encabezados(),
+    signal,
+  });
+  await exigirOk(response, "No se pudo consultar la disponibilidad documental.");
+  const disponibilidad = await response.json();
+  if (disponibilidad?.ordenCodigo !== codigo ||
+      ["totalConforme", "totalEmitido", "saldoDocumental"].some((campo) =>
+        typeof disponibilidad[campo] !== "string" || !/^-?\d+(?:\.\d{1,4})?$/.test(disponibilidad[campo]))) {
+    throw new Error("El servidor devolvió una disponibilidad documental incompleta o inválida.");
+  }
+  return disponibilidad;
+}
+
 // Crea una boleta persistida a partir de una solicitud de salida y sus lotes.
 export async function crearBoleta(solicitudSalidaId, items) {
   const datos = typeof solicitudSalidaId === "object" && solicitudSalidaId !== null

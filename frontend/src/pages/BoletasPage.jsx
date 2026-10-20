@@ -8,6 +8,7 @@ import { formatearFechaHora } from "../utils/format.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import DocumentosSalidaFormularios from "../components/logistica/DocumentosSalidaFormularios.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
+import "../styles/boletas.css";
 
 // Cada estado documental con su propio color: las anuladas no se confunden con las emitidas.
 const ESTADOS = {
@@ -99,7 +100,7 @@ export default function BoletasPage() {
   const boletas = resultado.items;
 
   return (
-    <section className="ts-page" aria-labelledby="boletas-titulo">
+    <section className="ts-page boletas-page" aria-labelledby="boletas-titulo">
       <PageHeader
         titulo="Boletas de envío"
         descripcion="Documentos de salida generados desde solicitudes de salida."
@@ -112,13 +113,13 @@ export default function BoletasPage() {
 
       <DocumentosSalidaFormularios />
 
-      <div className="ts-panel">
+      <div className="ts-panel boletas-listado">
         <div className="ts-panel-title">
           <h2 id="boletas-titulo">Boletas</h2>
           {!cargando && !error && <span>{`${resultado.total} ${resultado.total === 1 ? "boleta" : "boletas"}`}</span>}
         </div>
 
-        <form onSubmit={aplicarFiltros} aria-label="Filtros de boletas">
+        <form className="boletas-filtros" onSubmit={aplicarFiltros} aria-label="Filtros de boletas">
           <div className="ts-filters">
             <label htmlFor="boletas-orden">Código de orden
               <input id="boletas-orden" type="text" value={orden} maxLength={100}
@@ -142,7 +143,7 @@ export default function BoletasPage() {
               <input id="boletas-hasta" type="date" value={fechaHasta} onChange={(evento) => setFechaHasta(evento.target.value)} />
             </label>
           </div>
-          <div className="ts-btn-group" style={{ marginTop: "1rem" }}>
+          <div className="ts-btn-group boletas-filtros__acciones">
             <button type="submit" className="ts-btn ts-btn-primary" disabled={cargando}>Aplicar / actualizar</button>
             <button type="button" className="ts-btn" onClick={limpiarFiltros} disabled={cargando}>Limpiar filtros</button>
           </div>
@@ -202,7 +203,7 @@ export default function BoletasPage() {
           </div>
         )}
         {!cargando && !error && (
-          <nav className="ts-btn-group" aria-label="Paginación de boletas" style={{ marginTop: "1rem" }}>
+          <nav className="ts-btn-group boletas-paginacion" aria-label="Paginación de boletas">
             <span>Página {resultado.totalPages === 0 ? 0 : resultado.page} de {resultado.totalPages} · {resultado.total} resultado(s)</span>
             <button type="button" className="ts-btn" disabled={resultado.page <= 1 || resultado.totalPages === 0}
               onClick={() => cargar(filtrosAplicados, resultado.page - 1)}>Anterior</button>

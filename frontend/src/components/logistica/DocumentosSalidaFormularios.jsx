@@ -89,43 +89,45 @@ export default function DocumentosSalidaFormularios() {
 
   return (<>
       {(puedeCrearSolicitud || puedeCrearBoleta) && (
-        <div className="ts-panel">
+        <div className="ts-panel documentos-salida">
           <h2>Crear documentos de salida</h2>
           {errorFormulario && <p className="ts-feedback ts-error" role="alert">{errorFormulario}</p>}
           {mensajeFormulario && <p className="ts-feedback ts-notice" role="status">{mensajeFormulario}</p>}
           {puedeCrearSolicitud && (
-            <form onSubmit={guardarSolicitud} aria-label="Crear solicitud de salida">
+            <form className="documentos-salida__seccion" onSubmit={guardarSolicitud} aria-label="Crear solicitud de salida">
               <h3>1. Nueva solicitud de salida</h3>
-              <div className="ts-filters">
-                <label>Orden *
+              <div className="documentos-salida__campos">
+                <label className="ts-field">Orden *
                   <select required value={nuevaSolicitud.ordenId} onChange={(evento) => setNuevaSolicitud({ ...nuevaSolicitud, ordenId: evento.target.value, items: [{ referencia: "", cantidad: "" }] })}>
                     <option value="">Seleccionar orden</option>
                     {ordenes.map((orden) => <option key={orden.id} value={orden.id}>{orden.codigo}</option>)}
                   </select>
                 </label>
-                <label>Destino documental *
+                <label className="ts-field">Destino documental *
                   <input required maxLength={250} value={nuevaSolicitud.destinoDocumental} onChange={(evento) => setNuevaSolicitud({ ...nuevaSolicitud, destinoDocumental: evento.target.value })} />
                 </label>
-                <label>Motivo *
+                <label className="ts-field">Motivo *
                   <input required maxLength={500} value={nuevaSolicitud.motivo} onChange={(evento) => setNuevaSolicitud({ ...nuevaSolicitud, motivo: evento.target.value })} />
                 </label>
               </div>
+              <div className="documentos-salida__items">
               <h4>Ítems de la solicitud</h4>
               {nuevaSolicitud.items.map((item, indice) => (
-                <div className="ts-filters" key={indice}>
-                  <label>Lote *
+                <div className="documentos-salida__fila-item" key={indice}>
+                  <label className="ts-field">Lote *
                     <select required value={item.referencia} onChange={(evento) => cambiarItemSolicitud(indice, "referencia", evento.target.value)}>
                       <option value="">Seleccionar lote</option>
                       {lotes.map((lote) => <option key={lote.id} value={lote.codigo}>{lote.codigo}</option>)}
                     </select>
                   </label>
-                  <label>Cantidad *
+                  <label className="ts-field">Cantidad *
                     <input required type="number" min="0.0001" max="9999999999.9999" step="0.0001" value={item.cantidad} onChange={(evento) => cambiarItemSolicitud(indice, "cantidad", evento.target.value)} />
                   </label>
                   {nuevaSolicitud.items.length > 1 && <button type="button" className="ts-btn" onClick={() => setNuevaSolicitud((actual) => ({ ...actual, items: actual.items.filter((_, posicion) => posicion !== indice) }))}>Quitar ítem</button>}
                 </div>
               ))}
-              <div className="ts-btn-group">
+              </div>
+              <div className="ts-btn-group documentos-salida__acciones">
                 <button type="button" className="ts-btn" onClick={() => setNuevaSolicitud((actual) => ({ ...actual, items: [...actual.items, { referencia: "", cantidad: "" }] }))}>Agregar ítem</button>
                 <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando || lotes.length === 0}>Crear solicitud</button>
               </div>
@@ -133,30 +135,36 @@ export default function DocumentosSalidaFormularios() {
             </form>
           )}
           {puedeCrearBoleta && (
-            <form onSubmit={guardarBoleta} aria-label="Crear boleta de salida">
+            <form className="documentos-salida__seccion" onSubmit={guardarBoleta} aria-label="Crear boleta de salida">
               <h3>2. Crear boleta en BORRADOR</h3>
-              <label>Solicitud de salida *
+              <div className="documentos-salida__seleccion">
+              <label className="ts-field">Solicitud de salida *
                 <select required value={solicitudId} onChange={(evento) => seleccionarSolicitud(evento.target.value)}>
                   <option value="">Seleccionar solicitud</option>
                   {solicitudes.map((solicitud) => <option key={solicitud.id} value={solicitud.id}>#{solicitud.id} · orden #{solicitud.ordenId} · {solicitud.destinoDocumental}</option>)}
                 </select>
               </label>
+              <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando || !solicitudId || itemsBoleta.length === 0}>Crear boleta</button>
+              </div>
+              <div className="documentos-salida__items">
               {itemsBoleta.map((item, indice) => (
-                <div className="ts-filters" key={indice}>
-                  <label>Referencia *
+                <div className="documentos-salida__fila-item" key={indice}>
+                  <label className="ts-field">Referencia *
                     <select required value={item.referencia} onChange={(evento) => setItemsBoleta((actual) => actual.map((valor, posicion) => posicion === indice ? { ...valor, referencia: evento.target.value } : valor))}>
                       <option value="">Seleccionar referencia</option>
                       {(solicitudes.find((solicitud) => String(solicitud.id) === solicitudId)?.items ?? []).map((solicitudItem) => <option key={solicitudItem.id} value={solicitudItem.referencia}>{solicitudItem.referencia}</option>)}
                     </select>
                   </label>
-                  <label>Cantidad *
+                  <label className="ts-field">Cantidad *
                     <input required type="number" min="0.0001" max="9999999999.9999" step="0.0001" value={item.cantidad} onChange={(evento) => setItemsBoleta((actual) => actual.map((valor, posicion) => posicion === indice ? { ...valor, cantidad: evento.target.value } : valor))} />
                   </label>
                   {itemsBoleta.length > 1 && <button type="button" className="ts-btn" onClick={() => setItemsBoleta((actual) => actual.filter((_, posicion) => posicion !== indice))}>Quitar ítem</button>}
                 </div>
               ))}
-              {solicitudId && <button type="button" className="ts-btn" onClick={() => setItemsBoleta((actual) => [...actual, { referencia: "", cantidad: "" }])}>Agregar ítem</button>}
-              <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando || !solicitudId || itemsBoleta.length === 0}>Crear boleta</button>
+              </div>
+              {solicitudId && <div className="ts-btn-group documentos-salida__acciones">
+                <button type="button" className="ts-btn" onClick={() => setItemsBoleta((actual) => [...actual, { referencia: "", cantidad: "" }])}>Agregar ítem</button>
+              </div>}
             </form>
           )}
         </div>
