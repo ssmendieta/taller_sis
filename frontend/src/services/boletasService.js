@@ -110,6 +110,17 @@ export async function emitirBoleta(id) {
   return response.json();
 }
 
+export async function anularBoleta(id, motivo) {
+  const response = await fetch(`${LOGISTICA}/boletas/${encodeURIComponent(id)}/anular`, {
+    method: "POST",
+    headers: encabezados({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ motivo }),
+  });
+
+  await exigirOk(response, "No se pudo anular la boleta.");
+  return response.json();
+}
+
 // La boleta solo guarda la solicitud; orden y destino vienen de la solicitud de salida.
 export async function obtenerSolicitudSalida(id) {
   const response = await fetch(`${LOGISTICA}/solicitudes-salida/${encodeURIComponent(id)}`, {

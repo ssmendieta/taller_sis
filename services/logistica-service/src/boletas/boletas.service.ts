@@ -340,7 +340,11 @@ export class BoletasService {
     if (!/^\d+$/.test(id) || BigInt(id) < BigInt('1') || BigInt(id) > BigInt('9223372036854775807')) {
       throw new NotFoundException('Boleta no encontrada');
     }
-    const boleta = await this.boletas.findOne({ where: { id }, relations: { items: true } });
+    const boleta = await this.boletas.findOne({
+      where: { id },
+      relations: { items: true, historial: true },
+      order: { historial: { fechaHora: 'ASC', id: 'ASC' } },
+    });
     if (!boleta) throw new NotFoundException('Boleta no encontrada');
     return boleta;
   }
