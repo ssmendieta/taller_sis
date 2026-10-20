@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { OrdenesService } from './ordenes.service';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
 import { EstadoOrden } from './estado-orden.enum';
@@ -49,7 +50,7 @@ describe('ABC-170: flujo completo de estados de una orden', () => {
     } as unknown as Repository<HistorialEstadoOrden>;
 
     service = new OrdenesService(ordenRepository, historialRepository, {} as any,
-      { findOne: async () => ({ activa: true }) } as any);
+      { findOne: async () => ({ activa: true }) } as any, new DisponibilidadSimuladaService());
     jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
       orden_id: 42, orden_codigo: 'ORD-42', cantidad_producir: 1, unidad_producto: 'unidad',
       estado_consulta: 'RESPONDIDA', consulta_id: 'DISP-ORD-42-V1', consulta_version: 1,

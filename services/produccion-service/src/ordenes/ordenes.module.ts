@@ -7,6 +7,7 @@ import { Inventario } from '../inventario/entities/inventario.entity';
 
 import { OrdenesService } from './ordenes.service';
 import { OrdenesController } from './ordenes.controller';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 import { RecetasModule } from '../recetas/recetas.module';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { MaterialCalculationModule } from '../material-calculation/material-calculation.module';
@@ -28,6 +29,6 @@ import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.ent
     MaterialCalculationModule,
   ],
   controllers: [OrdenesController],
-  providers: [OrdenesService, PermisoProduccionGuard],
+  providers: [OrdenesService, PermisoProduccionGuard, DisponibilidadSimuladaService],
 })
 export class OrdenesModule {}

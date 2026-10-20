@@ -38,3 +38,14 @@ La migración no se ejecutó porque no se identificó una base autorizada.
 Los archivos `*.spec.ts` de este módulo son unitarios y usan mocks para
 repositorios/transacciones. No demuestran persistencia real, rollback en
 PostgreSQL ni conformidad de una orden/lote consultada en Producción.
+
+## Saldo documental por lote
+
+Logística ya consulta los lotes de una orden a Producción (`GET /lotes/orden/:codigo`)
+y calcula el saldo documental de cada lote en
+`GET /disponibilidad/:ordenCodigo/lotes` (permiso `logistica.boletas.consultar`).
+El saldo de un lote es su cantidad original menos lo comprometido en boletas
+`EMITIDAS`; los borradores no descuentan y las boletas `ANULADA` devuelven su
+cantidad. La emisión de una boleta valida ese saldo por lote además del saldo
+general de la orden, y ninguna boleta puede superar la cantidad autorizada por
+su solicitud de salida.

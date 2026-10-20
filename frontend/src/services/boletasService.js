@@ -61,6 +61,17 @@ export async function crearSolicitudSalida(datos) {
   return response.json();
 }
 
+// Saldo documental de cada lote de la orden: cantidad original, cantidad comprometida
+// en boletas EMITIDAS y cantidad disponible.
+export async function consultarDisponibilidadLotes(ordenCodigo) {
+  const response = await fetch(
+    `${LOGISTICA}/disponibilidad/${encodeURIComponent(ordenCodigo)}/lotes`,
+    { headers: encabezados() }
+  );
+  await exigirOk(response, "No se pudo consultar la disponibilidad por lote.");
+  return response.json();
+}
+
 export async function crearBoleta(datos) {
   const response = await fetch(`${LOGISTICA}/boletas`, {
     method: "POST",

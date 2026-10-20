@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity';
 import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad.enum';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
@@ -7,7 +7,7 @@ import { Lote } from './entities/lote.entity';
 
 export interface CrearLoteInput {
   ordenId: number;
-  codigo: string;
+  codigo?: string;
   cantidad: number;
 }
 
@@ -43,6 +43,18 @@ export class LotesService {
     }));
   }
 
+  // El código del lote lo genera el servidor a partir del código de la orden
+  // y un consecutivo por orden: LOT-ORD-2026-00010-001. Así es único y no
+  // depende de que el usuario escriba un código.
+  private async generarCodigo(lotes: Repository<Lote>, orden: OrdenProduccion): Promise<string> {
+    const existentes = await lotes.count({ where: { ordenId: String(orden.id) } });
+    for (let consecutivo = existentes + 1; consecutivo <= existentes + 1000; consecutivo++) {
+      const codigo = `LOT-${orden.codigo}-${String(consecutivo).padStart(3, '0')}`;
+      if (!(await lotes.existsBy({ codigo }))) return codigo;
+    }
+    throw new ConflictException('No se pudo asignar un código de lote disponible para la orden');
+  }
+
   async create(dto: CrearLoteInput, usuarioId: number): Promise<Lote> {
     if (!Number.isSafeInteger(usuarioId) || usuarioId < 1) {
       throw new UnauthorizedException('Debe iniciar sesión');
@@ -52,10 +64,6 @@ export class LotesService {
         Number(dto.cantidad.toFixed(4)) !== dto.cantidad) {
       throw new BadRequestException('Orden y cantidad deben ser positivas; cantidad admite hasta cuatro decimales');
     }
-    if (typeof dto.codigo !== 'string' || !dto.codigo.trim() || dto.codigo.trim().length > 80) {
-      throw new BadRequestException('El código de lote es obligatorio y admite hasta 80 caracteres');
-    }
-    const codigo = dto.codigo.trim();
 
     try {
       return await this.dataSource.transaction(async (manager) => {
@@ -65,9 +73,8 @@ export class LotesService {
         if (!orden) throw new NotFoundException(`Orden con id ${dto.ordenId} no encontrada`);
 
         const lotes = manager.getRepository(Lote);
-        if (await lotes.existsBy({ codigo })) {
-          throw new ConflictException('Ya existe un lote con este código');
-        }
+        // El código lo genera el servidor: el usuario no lo elige.
+        const codigo = await this.generarCodigo(lotes, orden);
         const conformes = await manager.getRepository(ResultadoConforme).createQueryBuilder('resultado')
           .select('COALESCE(SUM(resultado.cantidad), 0)::text', 'total')
           .where('resultado.ordenId = :ordenId', { ordenId: String(dto.ordenId) })
@@ -88,7 +95,7 @@ export class LotesService {
     } catch (error) {
       const dbError = error?.driverError ?? error;
       if (dbError?.code === '23505' && dbError.constraint === 'uq_lotes_codigo') {
-        throw new ConflictException('Ya existe un lote con este código');
+        throw new ConflictException('El código de lote generado ya existe. Intenta de nuevo.');
       }
       throw error;
     }

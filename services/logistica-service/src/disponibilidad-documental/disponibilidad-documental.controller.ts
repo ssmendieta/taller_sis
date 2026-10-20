@@ -7,6 +7,13 @@ import { DisponibilidadDocumentalService } from './disponibilidad-documental.ser
 export class DisponibilidadDocumentalController {
   constructor(private readonly service: DisponibilidadDocumentalService) {}
 
+  // Saldo documental individual de cada lote de la orden.
+  @Get(':ordenCodigo/lotes')
+  @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.consultar')
+  consultarLotes(@Param('ordenCodigo') ordenCodigo: string, @Req() request: { headers: { authorization?: string } }) {
+    return this.service.consultarLotes(ordenCodigo, request.headers.authorization ?? '');
+  }
+
   @Get(':ordenCodigo')
   @SetMetadata(PERMISO_LOGISTICA, 'logistica.boletas.consultar')
   consultar(@Param('ordenCodigo') ordenCodigo: string, @Req() request: { headers: { authorization?: string } }) {

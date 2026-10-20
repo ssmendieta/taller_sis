@@ -101,6 +101,9 @@ describeConPostgres('ABC-224: concurrencia documental con PostgreSQL', () => {
       consultarOrdenPorId: jest.fn().mockResolvedValue({
         id: '8', codigo: 'ORD-7', producto_id: 3, producto: { codigo: 'P-3' },
       }),
+      consultarPorOrden: jest.fn().mockResolvedValue([
+        { id: '1', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' },
+      ]),
       consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
     } as any;
     const service = new BoletasService(boletas, solicitudes, dataSource, produccion);
@@ -140,6 +143,7 @@ describeConPostgres('ABC-224: concurrencia documental con PostgreSQL', () => {
   it('permite dos emisiones concurrentes que completan exactamente el saldo', async () => {
     const solicitudes = dataSource.getRepository(SolicitudSalida);
     const boletas = dataSource.getRepository(BoletaEnvio);
+    const solicitudItems = dataSource.getRepository(SolicitudSalidaItem);
     const boletaItems = dataSource.getRepository(BoletaEnvioItem);
     const solicitudBase = {
       ordenId: '9', destinoDocumental: 'Almacén de despacho', motivo: 'Límite ABC-224',
@@ -147,6 +151,10 @@ describeConPostgres('ABC-224: concurrencia documental con PostgreSQL', () => {
     };
     const solicitud1 = await solicitudes.save(solicitudes.create(solicitudBase));
     const solicitud2 = await solicitudes.save(solicitudes.create(solicitudBase));
+    await solicitudItems.save([
+      solicitudItems.create({ solicitudId: solicitud1.id, referencia: 'L-2', cantidad: '5.0000' }),
+      solicitudItems.create({ solicitudId: solicitud2.id, referencia: 'L-2', cantidad: '5.0000' }),
+    ]);
     const boleta1 = await boletas.save(boletas.create({
       solicitudSalidaId: solicitud1.id, responsableUsuarioId: '42', estado: EstadoBoleta.BORRADOR,
     }));
@@ -161,6 +169,9 @@ describeConPostgres('ABC-224: concurrencia documental con PostgreSQL', () => {
       consultarOrdenPorId: jest.fn().mockResolvedValue({
         id: '9', codigo: 'ORD-9', producto_id: 4, producto: { codigo: 'P-4' },
       }),
+      consultarPorOrden: jest.fn().mockResolvedValue([
+        { id: '2', codigo: 'L-2', ordenId: '9', productoId: '4', cantidad: '10.0000' },
+      ]),
       consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
     } as any;
     const service = new BoletasService(boletas, solicitudes, dataSource, produccion);

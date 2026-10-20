@@ -17,7 +17,7 @@ describe('ABC-213/214: creación de boletas con validación documental', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    solicitudes.findOne.mockResolvedValue({ id: '7', ordenId: '8', items: [{ referencia: 'L-1' }] });
+    solicitudes.findOne.mockResolvedValue({ id: '7', ordenId: '8', items: [{ referencia: 'L-1', cantidad: '10.0000' }] });
     produccion.consultarOrdenPorId.mockResolvedValue({ id: '8', codigo: 'ORD-7', producto_id: 3, producto: { codigo: 'P-3' } });
     produccion.consultarPorOrden.mockResolvedValue([{ id: '4', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' }]);
   });
@@ -74,7 +74,7 @@ describe('ABC-213/214: creación de boletas con validación documental', () => {
   it('rechaza ítems presentes en la solicitud pero que no existen en los lotes de la orden en Producción', async () => {
     solicitudes.findOne.mockResolvedValueOnce({
       id: '7', ordenId: '8',
-      items: [{ referencia: 'L-1' }, { referencia: 'L-2' }],
+      items: [{ referencia: 'L-1', cantidad: '10.0000' }, { referencia: 'L-2', cantidad: '5.0000' }],
     });
     produccion.consultarPorOrden.mockResolvedValueOnce([
       { id: '4', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' },
@@ -120,7 +120,7 @@ describe('ABC-220: edición de ítems de boleta en borrador', () => {
       solicitudSalidaId: '7',
       items: [{ id: '1', referencia: 'L-1', cantidad: '10.0000' }],
     });
-    solicitudes.findOne.mockResolvedValue({ id: '7', ordenId: '8', items: [{ referencia: 'L-1' }, { referencia: 'L-2' }] });
+    solicitudes.findOne.mockResolvedValue({ id: '7', ordenId: '8', items: [{ referencia: 'L-1', cantidad: '10.0000' }, { referencia: 'L-2', cantidad: '5.0000' }] });
     produccion.consultarOrdenPorId.mockResolvedValue({ id: '8', codigo: 'ORD-7', producto_id: 3, producto: { codigo: 'P-3' } });
     produccion.consultarPorOrden.mockResolvedValue([
       { id: '4', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' },
@@ -424,7 +424,7 @@ describe('ABC-224: regla de concurrencia documental', () => {
     id: '10',
     solicitudSalidaId: '7',
     estado: 'BORRADOR',
-    solicitudSalida: { id: '7', ordenId: '8' },
+    solicitudSalida: { id: '7', ordenId: '8', items: [{ referencia: 'L-1', cantidad: '10.0000' }] },
     items: [{ referencia: 'L-1', cantidad: '6.0000' }],
   };
   const boletas = { findOne: jest.fn() } as any;
@@ -439,6 +439,7 @@ describe('ABC-224: regla de concurrencia documental', () => {
   } as any;
   const produccion = {
     consultarOrdenPorId: jest.fn(),
+    consultarPorOrden: jest.fn(),
     consultarConformesPorOrden: jest.fn(),
   } as any;
 
@@ -455,6 +456,9 @@ describe('ABC-224: regla de concurrencia documental', () => {
     produccion.consultarOrdenPorId.mockResolvedValue({
       id: '8', codigo: 'ORD-7', producto_id: 3, producto: { codigo: 'P-3' },
     });
+    produccion.consultarPorOrden.mockResolvedValue([
+      { id: '4', codigo: 'L-1', ordenId: '8', productoId: '3', cantidad: '10.0000' },
+    ]);
     produccion.consultarConformesPorOrden.mockResolvedValue([{ cantidad: '10.0000' }]);
   });
 
@@ -533,7 +537,14 @@ describe('ABC-225: validación de saldo documental y preservación de estado (pr
       id: '20',
       solicitudSalidaId: '15',
       estado: EstadoBoleta.BORRADOR,
-      solicitudSalida: { id: '15', ordenId: '9' },
+      solicitudSalida: {
+        id: '15',
+        ordenId: '9',
+        items: [
+          { referencia: 'LOT-99', cantidad: '20.0000' },
+          { referencia: 'LOT-88', cantidad: '5.0000' },
+        ],
+      },
       items: [{ id: '1', referencia: 'LOT-99', cantidad: '8.0000' }],
     };
     boletas = { findOne: jest.fn().mockResolvedValue(boletaMock) };
@@ -550,6 +561,10 @@ describe('ABC-225: validación de saldo documental y preservación de estado (pr
       consultarOrdenPorId: jest.fn().mockResolvedValue({
         id: '9', codigo: 'ORD-9', producto_id: 5, producto: { codigo: 'P-5' },
       }),
+      consultarPorOrden: jest.fn().mockResolvedValue([
+        { id: '4', codigo: 'LOT-99', ordenId: '9', productoId: '5', cantidad: '20.0000' },
+        { id: '5', codigo: 'LOT-88', ordenId: '9', productoId: '5', cantidad: '5.0000' },
+      ]),
       consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
     };
   });
@@ -650,7 +665,7 @@ describe('ABC-226: bloqueo concurrente y orden de operaciones (pruebas unitarias
       id: '30',
       solicitudSalidaId: '18',
       estado: EstadoBoleta.BORRADOR,
-      solicitudSalida: { id: '18', ordenId: '12' },
+      solicitudSalida: { id: '18', ordenId: '12', items: [{ referencia: 'LOT-A', cantidad: '10.0000' }] },
       items: [{ id: '1', referencia: 'LOT-A', cantidad: '4.0000' }],
     };
     boletas = { findOne: jest.fn().mockResolvedValue(boletaMock) };
@@ -667,6 +682,9 @@ describe('ABC-226: bloqueo concurrente y orden de operaciones (pruebas unitarias
       consultarOrdenPorId: jest.fn().mockResolvedValue({
         id: '12', codigo: 'ORD-12', producto_id: 7, producto: { codigo: 'P-7' },
       }),
+      consultarPorOrden: jest.fn().mockResolvedValue([
+        { id: '4', codigo: 'LOT-A', ordenId: '12', productoId: '7', cantidad: '10.0000' },
+      ]),
       consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
     };
   });
@@ -780,7 +798,7 @@ describe('ABC-232 / ABC-235: transición a EMITIDA, responsable emisor y precond
       solicitudSalidaId: '16',
       estado: EstadoBoleta.BORRADOR,
       responsableUsuarioId: '10',
-      solicitudSalida: { id: '16', ordenId: '9' },
+      solicitudSalida: { id: '16', ordenId: '9', items: [{ referencia: 'LOT-99', cantidad: '10.0000' }] },
       items: [{ id: '1', referencia: 'LOT-99', cantidad: '5.0000' }],
     };
     boletas = { findOne: jest.fn().mockResolvedValue(boletaMock) };
@@ -802,6 +820,9 @@ describe('ABC-232 / ABC-235: transición a EMITIDA, responsable emisor y precond
       consultarOrdenPorId: jest.fn().mockResolvedValue({
         id: '9', codigo: 'ORD-9', producto_id: 5, producto: { codigo: 'P-5' },
       }),
+      consultarPorOrden: jest.fn().mockResolvedValue([
+        { id: '4', codigo: 'LOT-99', ordenId: '9', productoId: '5', cantidad: '10.0000' },
+      ]),
       consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '10.0000' }]),
     };
   });
@@ -863,6 +884,126 @@ describe('ABC-232 / ABC-235: transición a EMITIDA, responsable emisor y precond
     expect(resultado.estado).toBe(EstadoBoleta.EMITIDA);
     expect(resultado.responsableUsuarioId).toBe('42');
     expect(manager.save).not.toHaveBeenCalled();
+  });
+});
+
+describe('saldo individual por lote y por solicitud de salida', () => {
+  let boletaMock: any;
+  let boletas: any;
+  let solicitudes: any;
+  let manager: any;
+  let dataSource: any;
+  let produccion: any;
+
+  function crearServicio(compromisos: Array<{ solicitud_id: string; referencia: string; total: string }>) {
+    manager.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('INSERT INTO boleta_emision_bloqueos')) return [];
+      if (sql.includes('FOR UPDATE')) return [{ orden_id: '9' }];
+      if (sql.includes('COALESCE(SUM(item.cantidad)')) return compromisos;
+      return [];
+    });
+    return new BoletasService(boletas, solicitudes, dataSource, produccion);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    boletaMock = {
+      id: '40',
+      solicitudSalidaId: '21',
+      estado: EstadoBoleta.BORRADOR,
+      solicitudSalida: {
+        id: '21',
+        ordenId: '9',
+        items: [{ referencia: 'LOTE-001', cantidad: '60.0000' }],
+      },
+      items: [{ id: '1', referencia: 'LOTE-001', cantidad: '50.0000' }],
+    };
+    boletas = { findOne: jest.fn().mockResolvedValue(boletaMock) };
+    solicitudes = {
+      findOne: jest.fn().mockResolvedValue({
+        id: '21',
+        ordenId: '9',
+        items: [{ referencia: 'LOTE-001', cantidad: '60.0000' }],
+      }),
+    };
+    manager = {
+      findOne: jest.fn().mockResolvedValue(boletaMock),
+      query: jest.fn(),
+      save: jest.fn().mockImplementation(async (_entity: unknown, value: unknown) => value),
+    };
+    dataSource = {
+      transaction: jest.fn(async (callback: any) => callback(manager)),
+    };
+    produccion = {
+      consultarOrdenPorId: jest.fn().mockResolvedValue({
+        id: '9', codigo: 'ORD-9', producto_id: 5, producto: { codigo: 'P-5' },
+      }),
+      consultarPorOrden: jest.fn().mockResolvedValue([
+        { id: '4', codigo: 'LOTE-001', ordenId: '9', productoId: '5', cantidad: '60.0000' },
+        { id: '5', codigo: 'LOTE-002', ordenId: '9', productoId: '5', cantidad: '40.0000' },
+      ]),
+      consultarConformesPorOrden: jest.fn().mockResolvedValue([{ cantidad: '100.0000' }]),
+    };
+  });
+
+  it('rechaza emitir más unidades de las que quedan en el lote', async () => {
+    const service = crearServicio([{ solicitud_id: '21', referencia: 'LOTE-001', total: '20.0000' }]);
+
+    await expect(service.emitir('40', '42', 'Bearer token'))
+      .rejects.toThrow(new ConflictException('La cantidad del lote LOTE-001 supera el saldo documental disponible del lote'));
+    expect(manager.save).not.toHaveBeenCalled();
+    expect(boletaMock.estado).toBe(EstadoBoleta.BORRADOR);
+  });
+
+  it('permite emitir exactamente las unidades que quedan disponibles en el lote', async () => {
+    boletaMock.items = [{ id: '1', referencia: 'LOTE-001', cantidad: '40.0000' }];
+    const service = crearServicio([{ solicitud_id: '21', referencia: 'LOTE-001', total: '20.0000' }]);
+
+    await expect(service.emitir('40', '42', 'Bearer token')).resolves.toMatchObject({
+      estado: EstadoBoleta.EMITIDA,
+    });
+  });
+
+  it('los compromisos se calculan solo con boletas EMITIDAS de la orden', async () => {
+    const service = crearServicio([]);
+
+    await service.emitir('40', '42', 'Bearer token');
+
+    expect(manager.query).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE solicitud.orden_id = $1 AND boleta.estado = $2'),
+      ['9', EstadoBoleta.EMITIDA],
+    );
+  });
+
+  it('rechaza una boleta que excede la cantidad autorizada por su solicitud de salida', async () => {
+    boletaMock.solicitudSalida.items = [{ referencia: 'LOTE-001', cantidad: '10.0000' }];
+    const service = crearServicio([]);
+
+    await expect(service.emitir('40', '42', 'Bearer token'))
+      .rejects.toThrow(new ConflictException('La cantidad del lote LOTE-001 supera la cantidad autorizada en la solicitud de salida'));
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('rechaza crear una boleta con más cantidad que la solicitada para el lote', async () => {
+    const service = crearServicio([]);
+
+    await expect(service.create(
+      { solicitudSalidaId: '21', items: [{ referencia: 'LOTE-001', cantidad: '61.0000' }] },
+      '42',
+      'Bearer token',
+    )).rejects.toThrow(new ConflictException('La cantidad del lote LOTE-001 supera la cantidad autorizada en la solicitud de salida'));
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un ítem que no pertenece a la solicitud de salida', async () => {
+    const service = crearServicio([]);
+
+    await expect(service.create(
+      { solicitudSalidaId: '21', items: [{ referencia: 'LOTE-002', cantidad: '1.0000' }] },
+      '42',
+      'Bearer token',
+    )).rejects.toBeInstanceOf(NotFoundException);
+    expect(dataSource.transaction).not.toHaveBeenCalled();
   });
 });
 

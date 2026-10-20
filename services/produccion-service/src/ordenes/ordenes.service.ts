@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
 import { randomUUID } from 'crypto';
 
 import { OrdenProduccion } from './entities/orden-produccion.entity';
@@ -15,6 +15,7 @@ import { EstadoOrden } from './estado-orden.enum';
 import { esTransicionValida } from './estado-orden.transiciones';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { CreateOrdenDto } from './dto/create-orden.dto';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 import { Inventario } from '../inventario/entities/inventario.entity';
 import { RecetasService } from '../recetas/recetas.service';
 import { multiplicarMateriales } from '../material-calculation/material-calculation.service';
@@ -59,6 +60,7 @@ export class OrdenesService {
     @InjectRepository(Inventario)
     private readonly inventarioRepository: Repository<Inventario>,
     private readonly recetasService: RecetasService,
+    private readonly disponibilidadSimulada: DisponibilidadSimuladaService,
   ) {}
 
   async create(
@@ -128,6 +130,10 @@ export class OrdenesService {
               motivo: null,
             }),
           );
+          // Modo local sin Inventarios: la orden nace con disponibilidad de prueba.
+          if (this.disponibilidadSimulada.activada()) {
+            await this.disponibilidadSimulada.responder(manager, orden);
+          }
           return orden;
         });
       } catch (error) {
@@ -279,7 +285,8 @@ export class OrdenesService {
              o.fecha_programada::text AS fecha_programada,
              o.estado,
              o.responsable_usuario_id::text AS responsable_usuario_id,
-             COALESCE(o.responsable_nombre, 'Usuario #' || o.responsable_usuario_id) AS responsable_nombre
+             COALESCE(o.responsable_nombre, 'Usuario #' || o.responsable_usuario_id) AS responsable_nombre,
+             o.creado_en::text AS creado_en
       FROM ordenes_produccion o
       JOIN recetas r ON r.id = o.receta_id
       WHERE ($1::text IS NULL OR o.estado = $1)
@@ -287,7 +294,7 @@ export class OrdenesService {
              OR r.producto_codigo ILIKE '%' || $2 || '%')
         AND ($3::date IS NULL OR o.fecha_programada >= $3::date)
         AND ($4::date IS NULL OR o.fecha_programada <= $4::date)
-      ORDER BY o.fecha_programada DESC, o.id DESC
+      ORDER BY o.creado_en DESC, o.id DESC
     `,
       [estado, producto, desde, hasta],
     );
@@ -334,6 +341,11 @@ export class OrdenesService {
           where: { consultaDisponibilidadId: pendiente.id },
           order: { materialId: 'ASC' },
         });
+        // Modo local: se responde aquí y no se publica nada.
+        if (this.disponibilidadSimulada.activada()) {
+          await this.disponibilidadSimulada.responder(manager, orden);
+          return this.disponibilidadRespondida(manager, orden);
+        }
         return this.respuestaDisponibilidad(orden, pendiente, itemsPendientes);
       }
 
@@ -385,6 +397,11 @@ export class OrdenesService {
         unidad: material.unidad_medida,
         estado: null,
       })));
+      // Modo local: se responde aquí y no se publica nada.
+      if (this.disponibilidadSimulada.activada()) {
+        await this.disponibilidadSimulada.responder(manager, orden);
+        return this.disponibilidadRespondida(manager, orden);
+      }
       const evento = crearEventoDisponibilidadMaterial(
         consulta,
         orden,
@@ -408,6 +425,21 @@ export class OrdenesService {
       });
       return this.respuestaDisponibilidad(orden, consulta, items);
     });
+  }
+
+  // Última consulta de la orden con sus items, ya respondida.
+  private async disponibilidadRespondida(manager: EntityManager, orden: OrdenProduccion) {
+    const consulta = await manager.findOne(ConsultaDisponibilidad, {
+      where: { ordenId: String(orden.id) },
+      order: { consultaVersion: 'DESC' },
+    });
+    const items = consulta
+      ? await manager.find(ConsultaDisponibilidadItem, {
+        where: { consultaDisponibilidadId: consulta.id },
+        order: { materialId: 'ASC' },
+      })
+      : [];
+    return this.respuestaDisponibilidad(orden, consulta, items);
   }
 
   private async respuestaDisponibilidad(

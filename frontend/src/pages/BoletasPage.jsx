@@ -2,10 +2,24 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
-import { crearBoleta, crearSolicitudSalida, listarBoletas, listarSolicitudesSalida } from "../services/boletasService.js";
+import {
+  consultarDisponibilidadLotes,
+  crearBoleta,
+  crearSolicitudSalida,
+  listarBoletas,
+  listarSolicitudesSalida,
+} from "../services/boletasService.js";
+import {
+  cantidadAutorizadaPorSolicitud,
+  cantidadSugerida,
+  formatearEscalada,
+  saldoDeLote,
+  validarCantidadContraSolicitud,
+  validarCantidadLote,
+} from "../services/saldosLotes.js";
 import { obtenerOrdenes } from "../services/ordenesService.js";
 import { listarLotesOrden } from "../services/lotesService.js";
-import { formatearFechaHora } from "../utils/format.js";
+import { formatearCantidad, formatearFechaHora } from "../utils/format.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Paginacion from "../components/ui/Paginacion.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
@@ -31,8 +45,9 @@ export default function BoletasPage() {
   const [boletas, setBoletas] = useState([]);
   const [ordenes, setOrdenes] = useState([]);
   const [lotes, setLotes] = useState([]);
+  const [saldosLotes, setSaldosLotes] = useState([]);
   const [solicitudes, setSolicitudes] = useState([]);
-  const [nuevaSolicitud, setNuevaSolicitud] = useState({ ordenId: "", destinoDocumental: "", motivo: "", items: [{ referencia: "", cantidad: "" }] });
+  const [nuevaSolicitud, setNuevaSolicitud] = useState({ ordenId: "", destinoDocumental: "", motivo: "", items: [{ referencia: "", cantidad: "", cantidadManual: false }] });
   const [solicitudId, setSolicitudId] = useState("");
   const [itemsBoleta, setItemsBoleta] = useState([]);
   const [errorFormulario, setErrorFormulario] = useState("");
@@ -45,6 +60,15 @@ export default function BoletasPage() {
   const [paginas, setPaginas] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+
+  // Cada lote de la orden con su disponibilidad real (viene del backend).
+  const opcionesLote = lotes.map((lote) => {
+    const saldo = saldoDeLote(saldosLotes, lote.codigo);
+    return { ...lote, disponible: saldo ? saldo.cantidadDisponible : null };
+  });
+
+  // La solicitud elegida: de ella vienen los lotes y las cantidades precargadas.
+  const solicitudActual = solicitudes.find((item) => String(item.id) === solicitudId);
 
   async function cargar(filtroActual = criterios, paginaActual = pagina) {
     setCargando(true);
@@ -79,18 +103,84 @@ export default function BoletasPage() {
 
   useEffect(() => {
     const orden = ordenes.find((item) => String(item.id) === nuevaSolicitud.ordenId);
-    if (!orden) { setLotes([]); return; }
+    if (!orden) { setLotes([]); setSaldosLotes([]); return; }
     let vigente = true;
     listarLotesOrden(orden.codigo)
       .then((datos) => { if (vigente) setLotes(Array.isArray(datos) ? datos : []); })
       .catch((fallo) => { if (vigente) { setLotes([]); setErrorFormulario(fallo.message); } });
+    // El saldo por lote lo calcula el backend: lo comprometido en boletas EMITIDAS.
+    consultarDisponibilidadLotes(orden.codigo)
+      .then((datos) => { if (vigente) setSaldosLotes(Array.isArray(datos?.lotes) ? datos.lotes : []); })
+      .catch((fallo) => { if (vigente) { setSaldosLotes([]); setErrorFormulario(fallo.message); } });
     return () => { vigente = false; };
   }, [nuevaSolicitud.ordenId, ordenes]);
+
+  function saldoDeReferencia(referencia) {
+    return saldoDeLote(saldosLotes, referencia);
+  }
 
   function cambiarItemSolicitud(indice, campo, valor) {
     setNuevaSolicitud((actual) => ({
       ...actual,
-      items: actual.items.map((item, posicion) => posicion === indice ? { ...item, [campo]: valor } : item),
+      items: actual.items.map((item, posicion) => posicion === indice
+        ? { ...item, [campo]: valor, ...(campo === "cantidad" ? { cantidadManual: true } : {}) }
+        : item),
+    }));
+  }
+
+  // Al elegir un lote se precarga su disponibilidad; si el usuario ya había escrito
+  // una cantidad a mano en ese mismo lote, no se pisa.
+  function seleccionarLoteSolicitud(indice, referencia) {
+    setNuevaSolicitud((actual) => ({
+      ...actual,
+      items: actual.items.map((item, posicion) => {
+        if (posicion !== indice) return item;
+        if (item.referencia === referencia) return item;
+        const saldo = saldoDeReferencia(referencia);
+        return { ...item, referencia, cantidad: cantidadSugerida(saldo), cantidadManual: false };
+      }),
+    }));
+  }
+
+  function usarTodoLoDisponible(indice) {
+    setNuevaSolicitud((actual) => ({
+      ...actual,
+      items: actual.items.map((item, posicion) => {
+        if (posicion !== indice) return item;
+        const saldo = saldoDeReferencia(item.referencia);
+        return { ...item, cantidad: cantidadSugerida(saldo), cantidadManual: false };
+      }),
+    }));
+  }
+
+  function validarNuevaSolicitud() {
+    for (const item of nuevaSolicitud.items) {
+      if (!item.referencia) return "Selecciona el lote de cada ítem de la solicitud.";
+      const saldo = saldoDeReferencia(item.referencia);
+      const revision = validarCantidadLote(item.cantidad, saldo, item.referencia);
+      if (!revision.valido) return revision.mensaje;
+    }
+    return "";
+  }
+
+  function validarItemsBoleta() {
+    const solicitud = solicitudes.find((item) => String(item.id) === solicitudId);
+    for (const item of itemsBoleta) {
+      if (!item.referencia) return "Selecciona la referencia de cada ítem de la boleta.";
+      const revision = validarCantidadContraSolicitud(item.cantidad, solicitud?.items, item.referencia);
+      if (!revision.valido) return revision.mensaje;
+    }
+    return "";
+  }
+
+  // Al cambiar la referencia de un ítem de la boleta se recarga la cantidad
+  // autorizada por la solicitud; si no cambia, no se pisa lo editado a mano.
+  function seleccionarReferenciaBoleta(indice, referencia) {
+    setItemsBoleta((actual) => actual.map((valor, posicion) => {
+      if (posicion !== indice) return valor;
+      if (valor.referencia === referencia) return valor;
+      const autorizada = cantidadAutorizadaPorSolicitud(solicitudActual?.items, referencia);
+      return { ...valor, referencia, cantidad: formatearEscalada(autorizada) };
     }));
   }
 
@@ -104,6 +194,13 @@ export default function BoletasPage() {
     evento.preventDefault();
     setErrorFormulario("");
     setMensajeFormulario("");
+
+    const problema = validarNuevaSolicitud();
+    if (problema) {
+      setErrorFormulario(problema);
+      return;
+    }
+
     setGuardando(true);
     try {
       const solicitud = await crearSolicitudSalida({
@@ -126,6 +223,13 @@ export default function BoletasPage() {
     evento.preventDefault();
     setErrorFormulario("");
     setMensajeFormulario("");
+
+    const problema = validarItemsBoleta();
+    if (problema) {
+      setErrorFormulario(problema);
+      return;
+    }
+
     setGuardando(true);
     try {
       const boleta = await crearBoleta({ solicitudSalidaId: String(solicitudId), items: itemsBoleta.map((item) => ({ referencia: item.referencia, cantidad: String(item.cantidad) })) });
@@ -165,7 +269,7 @@ export default function BoletasPage() {
               <h3>1. Nueva solicitud de salida</h3>
               <div className="ts-filters">
                 <label>Orden *
-                  <select required value={nuevaSolicitud.ordenId} onChange={(evento) => setNuevaSolicitud({ ...nuevaSolicitud, ordenId: evento.target.value, items: [{ referencia: "", cantidad: "" }] })}>
+                  <select required value={nuevaSolicitud.ordenId} onChange={(evento) => setNuevaSolicitud({ ...nuevaSolicitud, ordenId: evento.target.value, items: [{ referencia: "", cantidad: "", cantidadManual: false }] })}>
                     <option value="">Seleccionar orden</option>
                     {ordenes.map((orden) => <option key={orden.id} value={orden.id}>{orden.codigo}</option>)}
                   </select>
@@ -178,22 +282,41 @@ export default function BoletasPage() {
                 </label>
               </div>
               <h4>Ítems de la solicitud</h4>
-              {nuevaSolicitud.items.map((item, indice) => (
-                <div className="ts-filters" key={indice}>
-                  <label>Lote *
-                    <select required value={item.referencia} onChange={(evento) => cambiarItemSolicitud(indice, "referencia", evento.target.value)}>
-                      <option value="">Seleccionar lote</option>
-                      {lotes.map((lote) => <option key={lote.id} value={lote.codigo}>{lote.codigo}</option>)}
-                    </select>
-                  </label>
-                  <label>Cantidad *
-                    <input required type="number" min="0.0001" max="9999999999.9999" step="0.0001" value={item.cantidad} onChange={(evento) => cambiarItemSolicitud(indice, "cantidad", evento.target.value)} />
-                  </label>
-                  {nuevaSolicitud.items.length > 1 && <button type="button" className="ts-btn" onClick={() => setNuevaSolicitud((actual) => ({ ...actual, items: actual.items.filter((_, posicion) => posicion !== indice) }))}>Quitar ítem</button>}
-                </div>
-              ))}
+              {nuevaSolicitud.items.map((item, indice) => {
+                const saldo = saldoDeReferencia(item.referencia);
+                const disponible = saldo ? Number(saldo.cantidadDisponible) : null;
+                return (
+                  <div className="ts-filters" key={indice}>
+                    <label>Lote *
+                      <select required value={item.referencia} onChange={(evento) => seleccionarLoteSolicitud(indice, evento.target.value)}>
+                        <option value="">Seleccionar lote</option>
+                        {opcionesLote.map((lote) => (
+                          <option key={lote.id} value={lote.codigo}>
+                            {lote.codigo}{lote.disponible !== null ? " · disponible " + formatearCantidad(lote.disponible) : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>Cantidad *
+                      <input required type="number" min="0.0001" max="9999999999.9999" step="0.0001" value={item.cantidad} onChange={(evento) => cambiarItemSolicitud(indice, "cantidad", evento.target.value)} />
+                    </label>
+                    {saldo && (
+                      <p className="ts-notice" style={{ flex: "1 1 100%", margin: 0 }}>
+                        Lote {saldo.referencia}: original {formatearCantidad(saldo.cantidadOriginal)} · comprometido en boletas emitidas {formatearCantidad(saldo.cantidadComprometida)} · disponible {formatearCantidad(saldo.cantidadDisponible)}
+                      </p>
+                    )}
+                    {item.referencia && disponible !== null && disponible <= 0 && (
+                      <p className="ts-feedback ts-error" style={{ flex: "1 1 100%" }} role="alert">
+                        El lote {item.referencia} ya no tiene unidades disponibles.
+                      </p>
+                    )}
+                    <button type="button" className="ts-btn ts-btn--sm" onClick={() => usarTodoLoDisponible(indice)} disabled={!saldo || disponible <= 0}>Usar todo lo disponible</button>
+                    {nuevaSolicitud.items.length > 1 && <button type="button" className="ts-btn" onClick={() => setNuevaSolicitud((actual) => ({ ...actual, items: actual.items.filter((_, posicion) => posicion !== indice) }))}>Quitar ítem</button>}
+                  </div>
+                );
+              })}
               <div className="ts-btn-group">
-                <button type="button" className="ts-btn" onClick={() => setNuevaSolicitud((actual) => ({ ...actual, items: [...actual.items, { referencia: "", cantidad: "" }] }))}>Agregar ítem</button>
+                <button type="button" className="ts-btn" onClick={() => setNuevaSolicitud((actual) => ({ ...actual, items: [...actual.items, { referencia: "", cantidad: "", cantidadManual: false }] }))}>Agregar ítem</button>
                 <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando || lotes.length === 0}>Crear solicitud</button>
               </div>
               {nuevaSolicitud.ordenId && lotes.length === 0 && <p className="ts-notice">La orden seleccionada todavía no tiene lotes registrados.</p>}
@@ -213,14 +336,19 @@ export default function BoletasPage() {
               {itemsBoleta.map((item, indice) => (
                 <div className="ts-filters" key={indice}>
                   <label>Referencia *
-                    <select required value={item.referencia} onChange={(evento) => setItemsBoleta((actual) => actual.map((valor, posicion) => posicion === indice ? { ...valor, referencia: evento.target.value } : valor))}>
+                    <select required value={item.referencia} onChange={(evento) => seleccionarReferenciaBoleta(indice, evento.target.value)}>
                       <option value="">Seleccionar referencia</option>
-                      {(solicitudes.find((solicitud) => String(solicitud.id) === solicitudId)?.items ?? []).map((solicitudItem) => <option key={solicitudItem.id} value={solicitudItem.referencia}>{solicitudItem.referencia}</option>)}
+                      {(solicitudActual?.items ?? []).map((solicitudItem) => <option key={solicitudItem.id} value={solicitudItem.referencia}>{solicitudItem.referencia}</option>)}
                     </select>
                   </label>
                   <label>Cantidad *
                     <input required type="number" min="0.0001" max="9999999999.9999" step="0.0001" value={item.cantidad} onChange={(evento) => setItemsBoleta((actual) => actual.map((valor, posicion) => posicion === indice ? { ...valor, cantidad: evento.target.value } : valor))} />
                   </label>
+                  {item.referencia && (
+                    <p className="ts-notice" style={{ flex: "1 1 100%", margin: 0 }}>
+                      Autorizado por la solicitud: {formatearEscalada(cantidadAutorizadaPorSolicitud(solicitudActual?.items, item.referencia))}
+                    </p>
+                  )}
                   {itemsBoleta.length > 1 && <button type="button" className="ts-btn" onClick={() => setItemsBoleta((actual) => actual.filter((_, posicion) => posicion !== indice))}>Quitar ítem</button>}
                 </div>
               ))}

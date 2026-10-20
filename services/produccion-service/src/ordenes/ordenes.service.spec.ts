@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { OrdenesService } from './ordenes.service';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 import { EstadoOrden } from './estado-orden.enum';
 import { RecetasService } from '../recetas/recetas.service';
 import { UsuarioAutenticadoProduccion } from './ordenes.service';
@@ -68,6 +69,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       historialRepositorioMock as any,
       inventarioRepositorioMock as any,
       recetasServiceMock as unknown as RecetasService,
+      new DisponibilidadSimuladaService(),
     );
   });
 

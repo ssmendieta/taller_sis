@@ -88,3 +88,86 @@ describe('ABC-209: saldo documental', () => {
     expect(getRawOne).not.toHaveBeenCalled();
   });
 });
+
+describe('saldo documental por lote', () => {
+  const getRawMany = jest.fn();
+  const queryBuilder = {
+    innerJoin: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    groupBy: jest.fn().mockReturnThis(),
+    getRawMany,
+  };
+  const boletas = { createQueryBuilder: jest.fn(() => queryBuilder) } as any;
+  const produccion = {
+    consultarOrdenPorCodigo: jest.fn(),
+    consultarPorOrden: jest.fn(),
+    consultarConformesPorOrden: jest.fn(),
+  } as any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    produccion.consultarOrdenPorCodigo.mockResolvedValue({ id: '8', codigo: 'ORD-7', producto_id: 3 });
+    produccion.consultarPorOrden.mockResolvedValue([
+      { id: '4', codigo: 'LOTE-001', ordenId: '8', productoId: '3', cantidad: '60.0000' },
+      { id: '5', codigo: 'LOTE-002', ordenId: '8', productoId: '3', cantidad: '40.0000' },
+    ]);
+    getRawMany.mockResolvedValue([{ referencia: 'LOTE-001', total: '20.0000' }]);
+  });
+
+  it('calcula el saldo de cada lote restando lo comprometido en boletas EMITIDAS', async () => {
+    const result = await new DisponibilidadDocumentalService(boletas, produccion).consultarLotes('ORD-7', 'Bearer token');
+
+    expect(produccion.consultarPorOrden).toHaveBeenCalledWith('ORD-7', 'Bearer token');
+    expect(queryBuilder.andWhere).toHaveBeenCalledWith('boleta.estado = :estado', { estado: EstadoBoleta.EMITIDA });
+    expect(result).toEqual({
+      ordenCodigo: 'ORD-7',
+      ordenId: '8',
+      lotes: [
+        {
+          referencia: 'LOTE-001',
+          loteId: '4',
+          cantidadOriginal: '60.0000',
+          cantidadComprometida: '20.0000',
+          cantidadDisponible: '40.0000',
+        },
+        {
+          referencia: 'LOTE-002',
+          loteId: '5',
+          cantidadOriginal: '40.0000',
+          cantidadComprometida: '0.0000',
+          cantidadDisponible: '40.0000',
+        },
+      ],
+    });
+  });
+
+  it('suma los compromisos de varias boletas EMITIDAS del mismo lote', async () => {
+    getRawMany.mockResolvedValueOnce([
+      { referencia: 'LOTE-001', total: '20.0000' },
+      { referencia: 'LOTE-001', total: '15.0000' },
+    ]);
+
+    const result = await new DisponibilidadDocumentalService(boletas, produccion).consultarLotes('ORD-7', 'Bearer token');
+    const primerLote = result.lotes[0];
+
+    expect(primerLote.cantidadComprometida).toBe('35.0000');
+    expect(primerLote.cantidadDisponible).toBe('25.0000');
+  });
+
+  it('rechaza que Producción devuelva lotes de otra orden o de otro producto', async () => {
+    produccion.consultarPorOrden.mockResolvedValueOnce([
+      { id: '4', codigo: 'LOTE-001', ordenId: '99', productoId: '3', cantidad: '60.0000' },
+    ]);
+    await expect(new DisponibilidadDocumentalService(boletas, produccion).consultarLotes('ORD-7', 'Bearer token'))
+      .rejects.toBeInstanceOf(BadGatewayException);
+
+    produccion.consultarPorOrden.mockResolvedValueOnce([
+      { id: '4', codigo: 'LOTE-001', ordenId: '8', productoId: '77', cantidad: '60.0000' },
+    ]);
+    await expect(new DisponibilidadDocumentalService(boletas, produccion).consultarLotes('ORD-7', 'Bearer token'))
+      .rejects.toBeInstanceOf(BadGatewayException);
+  });
+});

@@ -14,43 +14,56 @@ describe('ABC-294: regla de asignacion de conformes a lotes', () => {
     select: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), getRawOne: jest.fn(),
   };
   const existsBy = jest.fn();
+  const count = jest.fn();
   const manager = {
     findOne: jest.fn(), save: jest.fn(),
     getRepository: jest.fn((entity) => entity === ResultadoConforme
       ? { createQueryBuilder: () => conformes }
-      : { existsBy, createQueryBuilder: () => asignados }),
+      : { existsBy, count, createQueryBuilder: () => asignados }),
   };
   const transaction = jest.fn(async (callback) => callback(manager));
   const service = new LotesService({ transaction } as unknown as DataSource);
-  const dto = { ordenId: 1, codigo: 'L-001', cantidad: 23 };
+  const dto = { ordenId: 1, cantidad: 23 };
 
   beforeEach(() => {
     jest.clearAllMocks();
     transaction.mockImplementation(async (callback) => callback(manager));
-    manager.findOne.mockResolvedValue({ id: 1 });
+    manager.findOne.mockResolvedValue({ id: 1, codigo: 'ORD-0001' });
     existsBy.mockResolvedValue(false);
+    count.mockResolvedValue(0);
     conformes.getRawOne.mockResolvedValue({ total: '23.0000' });
     asignados.getRawOne.mockResolvedValue({ total: '0.0000' });
     manager.save.mockImplementation(async (_entity, values) => ({ id: '1', ...values, fechaHora: new Date() }));
   });
 
   it('asigna exactamente los conformes disponibles y toma responsable y fecha del servidor', async () => {
-    const result = await service.create({ ...dto, codigo: ' L-001 ' }, 42);
-    expect(result).toMatchObject({ codigo: 'L-001', ordenId: '1', cantidad: '23.0000', responsableUsuarioId: '42' });
+    const result = await service.create(dto, 42);
+    expect(result).toMatchObject({ codigo: 'LOT-ORD-0001-001', ordenId: '1', cantidad: '23.0000', responsableUsuarioId: '42' });
     expect(result.fechaHora).toBeInstanceOf(Date);
     expect(manager.findOne).toHaveBeenCalledWith(OrdenProduccion, {
       where: { id: 1 }, lock: { mode: 'pessimistic_write' },
     });
     expect(conformes.andWhere).toHaveBeenCalledWith('resultado.tipo = :tipo', { tipo: TipoResultadoCalidad.CONFORME });
     expect(manager.save).toHaveBeenCalledWith(Lote, {
-      codigo: 'L-001', ordenId: '1', cantidad: '23.0000', responsableUsuarioId: '42',
+      codigo: 'LOT-ORD-0001-001', ordenId: '1', cantidad: '23.0000', responsableUsuarioId: '42',
     });
   });
 
-  it('409: codigo repetido no guarda otro lote', async () => {
-    existsBy.mockResolvedValue(true);
-    await expect(service.create(dto, 42)).rejects.toBeInstanceOf(ConflictException);
-    expect(manager.save).not.toHaveBeenCalled();
+  it('el codigo lo genera el servidor: el que envia el cliente se ignora', async () => {
+    const result = await service.create({ ...dto, codigo: 'L-001' }, 42);
+    expect(result.codigo).toBe('LOT-ORD-0001-001');
+  });
+
+  it('el codigo sigue la secuencia de lotes de la orden', async () => {
+    count.mockResolvedValue(2);
+    const result = await service.create(dto, 42);
+    expect(result.codigo).toBe('LOT-ORD-0001-003');
+  });
+
+  it('si el codigo generado ya existe, prueba con el siguiente', async () => {
+    existsBy.mockImplementation(async ({ codigo }: { codigo: string }) => codigo === 'LOT-ORD-0001-001');
+    const result = await service.create(dto, 42);
+    expect(result.codigo).toBe('LOT-ORD-0001-002');
   });
 
   it('409: descuenta las cantidades ya asignadas del total conforme', async () => {
@@ -85,11 +98,6 @@ describe('ABC-294: regla de asignacion de conformes a lotes', () => {
 
   it.each([0, -1, NaN, Infinity, 0.00001, 1.12345, 10000000000])('400: cantidad invalida %s', async (cantidad) => {
     await expect(service.create({ ...dto, cantidad }, 42)).rejects.toBeInstanceOf(BadRequestException);
-    expect(transaction).not.toHaveBeenCalled();
-  });
-
-  it.each(['', '   ', 'L'.repeat(81), null])('400: codigo invalido %s', async (codigo) => {
-    await expect(service.create({ ...dto, codigo }, 42)).rejects.toBeInstanceOf(BadRequestException);
     expect(transaction).not.toHaveBeenCalled();
   });
 

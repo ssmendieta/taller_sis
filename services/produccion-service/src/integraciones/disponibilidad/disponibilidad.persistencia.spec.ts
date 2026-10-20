@@ -14,6 +14,7 @@ import { ProcesadorRespuestaInventarioService } from '../inbox/procesador-respue
 import { EventoOutbox } from '../outbox/entities/evento-outbox.entity';
 import { OrdenProduccion } from '../../ordenes/entities/orden-produccion.entity';
 import { OrdenesService } from '../../ordenes/ordenes.service';
+import { DisponibilidadSimuladaService } from '../../ordenes/disponibilidad-simulada.service';
 import { DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1_EJEMPLO } from '../contratos/inventario-almacen-v1';
 import { ConsultaDisponibilidad } from './entities/consulta-disponibilidad.entity';
 import { ConsultaDisponibilidadItem } from './entities/consulta-disponibilidad-item.entity';
@@ -133,6 +134,7 @@ describeReal('ABC-278: migracion de disponibilidad en PostgreSQL', () => {
       {} as any,
       {} as any,
       { findOne: async () => ({ activa: true, unidad_producto: 'unidad' }) } as any,
+      new DisponibilidadSimuladaService(),
     );
 
     const pendiente = await ordenes.solicitarDisponibilidadMateriales(Number(orden.id));

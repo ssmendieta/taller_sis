@@ -4,6 +4,7 @@ import { ConsultaDisponibilidadItem } from '../integraciones/disponibilidad/enti
 import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { OrdenesService } from './ordenes.service';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 
 describe('ABC-278: solicitud asincrona de disponibilidad', () => {
   const orden = {
@@ -47,6 +48,7 @@ describe('ABC-278: solicitud asincrona de disponibilidad', () => {
       {} as any,
       {} as any,
       { findOne: jest.fn().mockResolvedValue({ unidad_producto: 'unidad' }) } as any,
+      new DisponibilidadSimuladaService(),
     );
     return { service, manager, outbox, itemsGuardados };
   }

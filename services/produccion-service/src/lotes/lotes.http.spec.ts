@@ -31,6 +31,7 @@ describe('ABC-294: API para crear y consultar lotes', () => {
   };
   const repositorioLotes = {
     existsBy: jest.fn(async ({ codigo }: { codigo: string }) => lotes.some((l) => l.codigo === codigo)),
+    count: jest.fn(async () => lotes.length),
     createQueryBuilder: () => total(() => suma(lotes.map((l) => l.cantidad))),
   };
   const manager = {
@@ -95,72 +96,70 @@ describe('ABC-294: API para crear y consultar lotes', () => {
     return { status: response.status, body: await response.json() };
   }
 
-  it('201: crea L-7 por 20 conformes, vinculado a la orden, con responsable de la sesión', async () => {
-    const respuesta = await crear({ ordenId: 1, codigo: 'L-7', cantidad: 20 });
+  it('201: crea el lote con codigo generado, vinculado a la orden, con responsable de la sesion', async () => {
+    const respuesta = await crear({ ordenId: 1, cantidad: 20 });
     expect(respuesta.status).toBe(201);
-    expect(respuesta.body).toMatchObject({ codigo: 'L-7', ordenId: '1', cantidad: '20.0000', responsableUsuarioId: '42' });
+    expect(respuesta.body).toMatchObject({ codigo: 'LOT-ORD-0001-001', ordenId: '1', cantidad: '20.0000', responsableUsuarioId: '42' });
     expect(Number.isNaN(Date.parse(respuesta.body.fechaHora))).toBe(false);
 
     const consulta = await consultar();
     expect(consulta.status).toBe(200);
     expect(consulta.body).toEqual([expect.objectContaining({
-      codigo: 'L-7', ordenCodigo: 'ORD-0001', cantidad: '20.0000', responsableUsuarioId: '42',
+      codigo: 'LOT-ORD-0001-001', ordenCodigo: 'ORD-0001', cantidad: '20.0000', responsableUsuarioId: '42',
     })]);
   });
 
-  it('409: con los 20 conformes ya asignados, otro lote por 20 se rechaza sin guardarse', async () => {
-    await crear({ ordenId: 1, codigo: 'L-7', cantidad: 20 });
-    const respuesta = await crear({ ordenId: 1, codigo: 'L-8', cantidad: 20 });
-    expect(respuesta.status).toBe(409);
-    expect(respuesta.body.message).toBe('La cantidad supera los conformes disponibles sin asignar de la orden');
-    expect(lotes.map((l) => l.codigo)).toEqual(['L-7']);
+  it('el codigo lo genera el servidor: el que envia el cliente se ignora', async () => {
+    const respuesta = await crear({ ordenId: 1, codigo: 'L-7', cantidad: 20 });
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body.codigo).toBe('LOT-ORD-0001-001');
   });
 
-  it('asigna en partes hasta el total: 12 + 8 caben y 0.0001 más se rechaza', async () => {
-    expect((await crear({ ordenId: 1, codigo: 'L-1', cantidad: 12 })).status).toBe(201);
-    expect((await crear({ ordenId: 1, codigo: 'L-2', cantidad: 8 })).status).toBe(201);
-    expect((await crear({ ordenId: 1, codigo: 'L-3', cantidad: 0.0001 })).status).toBe(409);
+  it('409: con los 20 conformes ya asignados, otro lote por 20 se rechaza sin guardarse', async () => {
+    await crear({ ordenId: 1, cantidad: 20 });
+    const respuesta = await crear({ ordenId: 1, cantidad: 20 });
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.message).toBe('La cantidad supera los conformes disponibles sin asignar de la orden');
+    expect(lotes.map((l) => l.codigo)).toEqual(['LOT-ORD-0001-001']);
+  });
+
+  it('asigna en partes hasta el total: 12 + 8 caben y 0.0001 mas se rechaza', async () => {
+    expect((await crear({ ordenId: 1, cantidad: 12 })).status).toBe(201);
+    expect((await crear({ ordenId: 1, cantidad: 8 })).status).toBe(201);
+    expect((await crear({ ordenId: 1, cantidad: 0.0001 })).status).toBe(409);
     expect(lotes).toHaveLength(2);
   });
 
-  it('409: un código repetido se rechaza aunque queden conformes', async () => {
-    await crear({ ordenId: 1, codigo: 'L-7', cantidad: 5 });
-    const respuesta = await crear({ ordenId: 1, codigo: 'L-7', cantidad: 5 });
-    expect(respuesta.status).toBe(409);
-    expect(respuesta.body.message).toBe('Ya existe un lote con este código');
-    expect(lotes).toHaveLength(1);
-  });
-
-  it('recorta los espacios exteriores del código', async () => {
-    expect((await crear({ ordenId: 1, codigo: '  L-9  ', cantidad: 1 })).body.codigo).toBe('L-9');
+  it('cada lote de la orden recibe el siguiente codigo generado', async () => {
+    await crear({ ordenId: 1, cantidad: 5 });
+    await crear({ ordenId: 1, cantidad: 5 });
+    expect(lotes.map((l) => l.codigo)).toEqual(['LOT-ORD-0001-001', 'LOT-ORD-0001-002']);
   });
 
   it.each([
-    ['código vacío', { ordenId: 1, codigo: '   ', cantidad: 1 }],
-    ['código de 81 caracteres', { ordenId: 1, codigo: 'L'.repeat(81), cantidad: 1 }],
-    ['cantidad cero', { ordenId: 1, codigo: 'L-7', cantidad: 0 }],
-    ['cantidad con cinco decimales', { ordenId: 1, codigo: 'L-7', cantidad: 1.00001 }],
-    ['cantidad como texto', { ordenId: 1, codigo: 'L-7', cantidad: '20' }],
-    ['responsable enviado por el cliente', { ordenId: 1, codigo: 'L-7', cantidad: 1, responsableUsuarioId: '99' }],
-    ['fecha enviada por el cliente', { ordenId: 1, codigo: 'L-7', cantidad: 1, fechaHora: '2020-01-01' }],
+    ['cantidad cero', { ordenId: 1, cantidad: 0 }],
+    ['cantidad con cinco decimales', { ordenId: 1, cantidad: 1.00001 }],
+    ['cantidad como texto', { ordenId: 1, cantidad: '20' }],
+    ['responsable enviado por el cliente', { ordenId: 1, cantidad: 1, responsableUsuarioId: '99' }],
+    ['fecha enviada por el cliente', { ordenId: 1, cantidad: 1, fechaHora: '2020-01-01' }],
   ])('400: %s', async (_caso, datos) => {
     expect((await crear(datos)).status).toBe(400);
     expect(transaction).not.toHaveBeenCalled();
   });
 
   it('404: orden inexistente', async () => {
-    expect((await crear({ ordenId: 999, codigo: 'L-7', cantidad: 1 })).status).toBe(404);
+    expect((await crear({ ordenId: 999, cantidad: 1 })).status).toBe(404);
     expect(lotes).toHaveLength(0);
   });
 
-  it('403: sin calidad.registrar_conformes no se crea el lote, pero sí se puede consultar', async () => {
-    expect((await crear({ ordenId: 1, codigo: 'L-7', cantidad: 20 }, 'consulta')).status).toBe(403);
+  it('403: sin calidad.registrar_conformes no se crea el lote, pero si se puede consultar', async () => {
+    expect((await crear({ ordenId: 1, cantidad: 20 }, 'consulta')).status).toBe(403);
     expect(transaction).not.toHaveBeenCalled();
     expect(await consultar()).toEqual({ status: 200, body: [] });
   });
 
-  it('401: sin sesión no se crea ni se consulta', async () => {
-    expect((await crear({ ordenId: 1, codigo: 'L-7', cantidad: 20 }, null)).status).toBe(401);
+  it('401: sin sesion no se crea ni se consulta', async () => {
+    expect((await crear({ ordenId: 1, cantidad: 20 }, null)).status).toBe(401);
     expect((await consultar(ORDEN.codigo, null)).status).toBe(401);
   });
 });

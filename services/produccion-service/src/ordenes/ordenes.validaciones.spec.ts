@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { OrdenesService } from './ordenes.service';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 
 function preparar(receta: any = { id: 2, activa: true }) {
   let secuencia = 0;
@@ -21,7 +22,7 @@ function preparar(receta: any = { id: 2, activa: true }) {
     if (!receta) throw new NotFoundException('Receta con id 2 no encontrada');
     return receta;
   } };
-  const servicio = new OrdenesService(ordenes, {} as any, {} as any, recetas as any);
+  const servicio = new OrdenesService(ordenes, {} as any, {} as any, recetas as any, new DisponibilidadSimuladaService());
   return { servicio, guardados };
 }
 

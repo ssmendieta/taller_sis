@@ -1,4 +1,4 @@
-import { IsInt, IsNumber, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 // Responsable y fecha no se reciben: los fija el servidor (sesión y BD).
 export class CrearLoteDto {
@@ -7,10 +7,12 @@ export class CrearLoteDto {
   @Max(Number.MAX_SAFE_INTEGER)
   ordenId: number;
 
+  // El código lo genera el servidor; se acepta por compatibilidad con
+  // clientes antiguos, pero se ignora.
+  @IsOptional()
   @IsString()
-  @Matches(/\S/, { message: 'El código de lote es obligatorio' })
   @MaxLength(80)
-  codigo: string;
+  codigo?: string;
 
   @IsNumber({ allowNaN: false, allowInfinity: false, maxDecimalPlaces: 4 })
   @Min(0.0001)

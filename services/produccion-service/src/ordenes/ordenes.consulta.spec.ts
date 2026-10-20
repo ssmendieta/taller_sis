@@ -1,5 +1,6 @@
 import { Repository } from 'typeorm';
 import { OrdenesService } from './ordenes.service';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
 
@@ -15,6 +16,7 @@ describe('ABC-169: consulta de órdenes', () => {
     {} as Repository<HistorialEstadoOrden>,
     {} as any,
     {} as any,
+    new DisponibilidadSimuladaService(),
   );
 
   beforeEach(() => query.mockClear());

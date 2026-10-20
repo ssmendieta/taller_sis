@@ -1,6 +1,6 @@
-import { BadGatewayException, BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { CrearBoletaDto } from './dto/crear-boleta.dto';
 import { ActualizarBoletaItemsDto } from './dto/actualizar-boleta-items.dto';
 import { ListarBoletasDto, PaginatedBoletasResultDto } from './dto/listar-boletas.dto';
@@ -12,16 +12,9 @@ import { EstadoBoleta } from './entities/estado-boleta.enum';
 import { esTransicionBoletaValida } from './entities/estado-boleta.transiciones';
 import { SolicitudSalida } from '../solicitudes-salida/entities/solicitud-salida.entity';
 import { LotesProduccionClient } from '../disponibilidad-documental/lotes-produccion.client';
+import { escalarCantidad } from '../disponibilidad-documental/cantidad-documental';
 
-const ESCALA_CANTIDAD = BigInt('10000');
-
-function cantidadEscalada(cantidad: string): bigint {
-  if (!/^\d+(?:\.\d{1,4})?$/.test(cantidad)) {
-    throw new BadGatewayException('Cantidad documental inválida');
-  }
-  const [entero, decimales = ''] = cantidad.split('.');
-  return BigInt(entero) * ESCALA_CANTIDAD + BigInt(decimales.padEnd(4, '0'));
-}
+const cantidadEscalada = (cantidad: string): bigint => escalarCantidad(cantidad);
 
 @Injectable()
 export class BoletasService {
@@ -61,6 +54,7 @@ export class BoletasService {
     if (dto.items.some((item) => !referencias.has(item.referencia))) {
       throw new NotFoundException('Uno o más ítems no pertenecen a la orden solicitada');
     }
+    this.validarCantidadesContraSolicitud(solicitud, dto.items);
 
     return this.dataSource.transaction(async (manager) => {
       const boleta = await manager.save(BoletaEnvio, manager.create(BoletaEnvio, {
@@ -117,6 +111,7 @@ export class BoletasService {
     if (dto.items.some((item) => !referencias.has(item.referencia))) {
       throw new NotFoundException('Uno o más ítems no pertenecen a la orden solicitada');
     }
+    this.validarCantidadesContraSolicitud(solicitud, dto.items);
 
     return this.dataSource.transaction(async (manager) => {
       await manager.delete(BoletaEnvioItem, { boletaId: boleta.id });
@@ -136,7 +131,7 @@ export class BoletasService {
     }
     const boleta = await this.boletas.findOne({
       where: { id },
-      relations: { items: true, solicitudSalida: true },
+      relations: { items: true, solicitudSalida: { items: true } },
     });
     if (!boleta) throw new NotFoundException('Boleta no encontrada');
     if (!boleta.solicitudSalida?.ordenId) {
@@ -151,6 +146,9 @@ export class BoletasService {
     }
     const ordenId = String(orden.id);
     const productoId = String(orden.producto_id);
+
+    // Cantidad original de cada lote de la orden: base del saldo documental por lote.
+    const cantidadPorLote = await this.cantidadPorLoteDeOrden(orden.codigo, ordenId, productoId, authorization);
 
     return this.dataSource.transaction(async (manager) => {
       await manager.query(
@@ -169,7 +167,7 @@ export class BoletasService {
 
       const actual = await manager.findOne(BoletaEnvio, {
         where: { id },
-        relations: { items: true, solicitudSalida: true },
+        relations: { items: true, solicitudSalida: { items: true } },
       });
       if (!actual) throw new NotFoundException('Boleta no encontrada');
       if (actual.estado === EstadoBoleta.EMITIDA) return actual;
@@ -185,15 +183,8 @@ export class BoletasService {
         (total, resultado) => total + cantidadEscalada(resultado.cantidad),
         BigInt('0'),
       );
-      const [compromiso] = await manager.query(
-        `SELECT COALESCE(SUM(item.cantidad), 0)::text AS total
-           FROM boletas_envio boleta
-           INNER JOIN boletas_envio_items item ON item.boleta_id = boleta.id
-           INNER JOIN solicitudes_salida solicitud ON solicitud.id = boleta.solicitud_salida_id
-          WHERE solicitud.orden_id = $1 AND boleta.estado = $2`,
-        [ordenId, EstadoBoleta.EMITIDA],
-      ) as Array<{ total: string }>;
-      const totalEmitido = cantidadEscalada(compromiso?.total ?? '0');
+      const compromisos = await this.compromisosPorLote(manager, ordenId);
+      const totalEmitido = compromisos.total;
       const solicitado = (actual.items ?? []).reduce(
         (total, item) => total + cantidadEscalada(item.cantidad),
         BigInt('0'),
@@ -202,10 +193,141 @@ export class BoletasService {
         throw new ConflictException('La cantidad solicitada supera el saldo documental disponible');
       }
 
+      // Saldo individual por lote: no se puede emitir más de lo que el lote tiene.
+      const porReferencia = this.cantidadesPorReferencia(actual.items ?? []);
+      for (const [referencia, cantidad] of porReferencia) {
+        const original = cantidadPorLote.get(referencia);
+        if (original === undefined) {
+          throw new NotFoundException('Uno o más ítems no pertenecen a la orden solicitada');
+        }
+        const comprometido = compromisos.porReferencia.get(referencia) ?? BigInt('0');
+        if (cantidad + comprometido > original) {
+          throw new ConflictException(
+            `La cantidad del lote ${referencia} supera el saldo documental disponible del lote`,
+          );
+        }
+      }
+
+      // La boleta tampoco puede superar lo autorizado por su solicitud de salida.
+      const autorizadas = this.cantidadesPorReferencia(actual.solicitudSalida?.items ?? []);
+      const solicitudId = String(actual.solicitudSalidaId);
+      for (const [referencia, cantidad] of porReferencia) {
+        const autorizada = autorizadas.get(referencia);
+        if (autorizada === undefined) {
+          throw new NotFoundException('Uno o más ítems no pertenecen a la solicitud de salida');
+        }
+        const comprometido = compromisos.porSolicitud.get(`${solicitudId}|${referencia}`) ?? BigInt('0');
+        if (cantidad + comprometido > autorizada) {
+          throw new ConflictException(
+            `La cantidad del lote ${referencia} supera la cantidad autorizada en la solicitud de salida`,
+          );
+        }
+      }
+
       actual.estado = EstadoBoleta.EMITIDA;
       actual.responsableUsuarioId = usuarioId;
       return manager.save(BoletaEnvio, actual);
     });
+  }
+
+  /**
+   * Cantidad original de cada lote de la orden, tomada de Producción. Si Producción
+   * devuelve lotes de otra orden o de otro producto, la emisión se detiene.
+   */
+  private async cantidadPorLoteDeOrden(
+    ordenCodigo: string,
+    ordenId: string,
+    productoId: string,
+    authorization: string,
+  ): Promise<Map<string, bigint>> {
+    const lotes = await this.produccion.consultarPorOrden(ordenCodigo, authorization);
+    const lotesDeOrden = lotes.filter((lote) => String(lote.ordenId) === ordenId);
+    if (lotesDeOrden.length !== lotes.length) {
+      throw new BadGatewayException('Producción devolvió un lote de otra orden');
+    }
+    if (lotesDeOrden.some((lote) => String(lote.productoId) !== productoId)) {
+      throw new BadGatewayException('Producción devolvió un lote de otro producto');
+    }
+    const cantidadPorLote = new Map<string, bigint>();
+    for (const lote of lotesDeOrden) {
+      cantidadPorLote.set(
+        lote.codigo,
+        escalarCantidad(lote.cantidad, 'Producción devolvió un lote con cantidad inválida'),
+      );
+    }
+    return cantidadPorLote;
+  }
+
+  /**
+   * Cantidad comprometida por las boletas EMITIDAS de la orden: total, por lote y
+   * por lote dentro de cada solicitud de salida. Los borradores no comprometen nada
+   * y las boletas anuladas dejan de hacerlo.
+   */
+  private async compromisosPorLote(
+    manager: EntityManager,
+    ordenId: string,
+  ): Promise<{ total: bigint; porReferencia: Map<string, bigint>; porSolicitud: Map<string, bigint> }> {
+    const filas = await manager.query(
+      `SELECT boleta.solicitud_salida_id AS solicitud_id,
+              item.referencia AS referencia,
+              COALESCE(SUM(item.cantidad), 0)::text AS total
+         FROM boletas_envio boleta
+         INNER JOIN boletas_envio_items item ON item.boleta_id = boleta.id
+         INNER JOIN solicitudes_salida solicitud ON solicitud.id = boleta.solicitud_salida_id
+        WHERE solicitud.orden_id = $1 AND boleta.estado = $2
+        GROUP BY boleta.solicitud_salida_id, item.referencia`,
+      [ordenId, EstadoBoleta.EMITIDA],
+    ) as Array<{ solicitud_id: string; referencia: string; total: string }>;
+
+    const porReferencia = new Map<string, bigint>();
+    const porSolicitud = new Map<string, bigint>();
+    let total = BigInt('0');
+    for (const fila of filas ?? []) {
+      const comprometido = cantidadEscalada(fila?.total ?? '0');
+      total += comprometido;
+      const referencia = String(fila?.referencia ?? '').trim();
+      porReferencia.set(referencia, (porReferencia.get(referencia) ?? BigInt('0')) + comprometido);
+      const clave = `${String(fila?.solicitud_id ?? '')}|${referencia}`;
+      porSolicitud.set(clave, (porSolicitud.get(clave) ?? BigInt('0')) + comprometido);
+    }
+    return { total, porReferencia, porSolicitud };
+  }
+
+  /** Suma las cantidades de los ítems agrupadas por referencia de lote. */
+  private cantidadesPorReferencia(items: Array<{ referencia: string; cantidad: string }>): Map<string, bigint> {
+    const mapa = new Map<string, bigint>();
+    for (const item of items ?? []) {
+      const referencia = String(item?.referencia ?? '').trim();
+      const cantidad = cantidadEscalada(item?.cantidad);
+      mapa.set(referencia, (mapa.get(referencia) ?? BigInt('0')) + cantidad);
+    }
+    return mapa;
+  }
+
+  /**
+   * Una boleta no puede incluir una cantidad superior a la solicitada para un lote
+   * de su solicitud de salida.
+   */
+  private validarCantidadesContraSolicitud(
+    solicitud: SolicitudSalida,
+    items: Array<{ referencia: string; cantidad: string }>,
+  ): void {
+    const autorizadas = this.cantidadesPorReferencia(solicitud?.items ?? []);
+    const solicitadas = new Map<string, bigint>();
+    for (const item of items ?? []) {
+      const referencia = String(item?.referencia ?? '').trim();
+      const autorizada = autorizadas.get(referencia);
+      if (autorizada === undefined) {
+        throw new NotFoundException('Uno o más ítems no pertenecen a la solicitud de salida');
+      }
+      const total = (solicitadas.get(referencia) ?? BigInt('0')) + cantidadEscalada(item?.cantidad);
+      if (total > autorizada) {
+        throw new ConflictException(
+          `La cantidad del lote ${referencia} supera la cantidad autorizada en la solicitud de salida`,
+        );
+      }
+      solicitadas.set(referencia, total);
+    }
   }
 
   async anular(id: string, dto: AnularBoletaDto, usuarioId: string): Promise<BoletaEnvio> {

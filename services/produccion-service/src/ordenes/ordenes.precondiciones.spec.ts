@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { OrdenesService } from './ordenes.service';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 import { EstadoOrden } from './estado-orden.enum';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
@@ -60,7 +61,7 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
       materialId: 3, cantidadDisponible: disponible,
     } };
     const recetas = { findOne: async () => ({ id: 5, activa: recetaActiva }) };
-    service = new OrdenesService(ordenRepo as any, {} as any, inventarioRepo as any, recetas as any);
+    service = new OrdenesService(ordenRepo as any, {} as any, inventarioRepo as any, recetas as any, new DisponibilidadSimuladaService());
   });
 
   function sinCambios() {

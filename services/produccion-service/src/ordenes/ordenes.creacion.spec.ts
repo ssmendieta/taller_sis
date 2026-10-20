@@ -2,6 +2,7 @@ import { INestApplication, ServiceUnavailableException, ValidationPipe } from '@
 import { Test } from '@nestjs/testing';
 import { OrdenesController } from './ordenes.controller';
 import { OrdenesService } from './ordenes.service';
+import { DisponibilidadSimuladaService } from './disponibilidad-simulada.service';
 import { MaterialCalculationService } from '../material-calculation/material-calculation.service';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { Repository } from 'typeorm';
@@ -104,7 +105,7 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
       },
     } as unknown as Repository<OrdenProduccion>;
     const recetas = { findOne: async () => ({ id: 2, activa: true }) } as any;
-    const servicio = new OrdenesService(ordenes, {} as Repository<HistorialEstadoOrden>, {} as any, recetas);
+    const servicio = new OrdenesService(ordenes, {} as Repository<HistorialEstadoOrden>, {} as any, recetas, new DisponibilidadSimuladaService());
     const actor = { sub: 7, rolNombre: 'Encargado de Producción', nombre: 'Ana' };
     const primera = await servicio.create({ ...ordenValida, fecha_programada: '2099-10-01' } as any, actor);
     const segunda = await servicio.create({ ...ordenValida, fecha_programada: '2099-10-01' } as any, actor);
