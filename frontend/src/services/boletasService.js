@@ -36,7 +36,7 @@ const LOGISTICA = `${apiConfig.gatewayUrl}/api/logistica`;
 // Todas las boletas guardadas, de la más reciente a la más antigua.
 export async function listarBoletas(filtros = {}) {
   const parametros = new URLSearchParams();
-  for (const clave of ["orden", "estado", "page", "limit"]) {
+  for (const clave of ["orden", "ordenId", "estado", "fechaDesde", "fechaHasta", "page", "limit"]) {
     const valor = filtros[clave];
     if (valor !== undefined && valor !== null && String(valor).trim() !== "") {
       parametros.set(clave, String(valor).trim());
@@ -51,10 +51,12 @@ export async function listarBoletas(filtros = {}) {
 
 // Crea una boleta persistida a partir de una solicitud de salida y sus lotes.
 export async function crearBoleta(solicitudSalidaId, items) {
+  const datos = typeof solicitudSalidaId === "object" && solicitudSalidaId !== null
+    ? solicitudSalidaId : { solicitudSalidaId, items };
   const response = await fetch(`${LOGISTICA}/boletas`, {
     method: "POST",
     headers: encabezados({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ solicitudSalidaId: String(solicitudSalidaId), items }),
+    body: JSON.stringify({ solicitudSalidaId: String(datos.solicitudSalidaId), items: datos.items }),
   });
 
   await exigirOk(response, "No se pudo crear la boleta.");
@@ -106,6 +108,8 @@ export async function actualizarItemsBoleta(id, items) {
   await exigirOk(response, "No se pudieron actualizar los ítems de la boleta.");
   return response.json();
 }
+
+export const actualizarBoletaItems = actualizarItemsBoleta;
 
 // Emite una boleta en borrador; pasa a EMITIDA y registra el autor emisor en el backend.
 export async function emitirBoleta(id) {

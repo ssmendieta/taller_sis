@@ -41,8 +41,17 @@ beforeEach(() => {
   llamadas = []; errorHttp = 0; errorOrden = false;
   globalThis.fetch = async (url, opciones = {}) => {
     const parsed = new URL(url);
-    llamadas.push({ url: parsed, headers: opciones.headers, method: opciones.method || 'GET' });
+    llamadas.push({ url: parsed, headers: opciones.headers, method: opciones.method || 'GET',
+      body: opciones.body ? JSON.parse(opciones.body) : undefined });
+    if (parsed.pathname.endsWith('/solicitudes-salida')) {
+      return respuesta(opciones.method === 'POST'
+        ? { ...JSON.parse(opciones.body), id: '28', estado: 'BORRADOR' }
+        : [{ id: '27', ordenId: '7', destinoDocumental: 'Destino', items: [{ id: '1', referencia: 'LOTE-7', cantidad: '10.0000' }] }]);
+    }
+    if (parsed.pathname.endsWith('/ordenes/buscar')) return respuesta(Object.entries(ordenes).map(([id, codigo]) => ({ id, codigo })));
+    if (parsed.pathname.includes('/lotes/orden/')) return respuesta([{ id: '1', codigo: 'LOTE-7', ordenId: '7' }]);
     if (parsed.pathname.endsWith('/boletas')) {
+      if (opciones.method === 'POST') return respuesta({ ...JSON.parse(opciones.body), id: '99', estado: 'BORRADOR' }, 201);
       if (errorHttp) return respuesta({ message: `Error real ${errorHttp}` }, errorHttp);
       const filtros = parsed.searchParams;
       const items = datos.filter((boleta) => (!filtros.get('orden') || ordenes[boleta.solicitudSalida.ordenId] === filtros.get('orden'))
@@ -99,6 +108,49 @@ test('servicio: sin filtros conserva la URL sin query y omite valores vacíos', 
   assert.equal(listado()[0].url.search, '');
   await servicio.listarBoletas({ orden: '   ', estado: '', page: undefined, limit: null });
   assert.equal(listado()[1].url.search, '');
+});
+
+test('integración remota: conserva filtros por fecha y el alias de edición existente', async () => {
+  await montar();
+  await cambiar('boletas-desde', '2026-10-01'); await cambiar('boletas-hasta', '2026-10-31'); await aplicar();
+  assert.equal(ultimaConsulta().get('fechaDesde'), '2026-10-01');
+  assert.equal(ultimaConsulta().get('fechaHasta'), '2026-10-31');
+  assert.equal(servicio.actualizarBoletaItems, servicio.actualizarItemsBoleta);
+  await pulsar('Limpiar filtros');
+  assert.equal(ultimaConsulta().has('fechaDesde'), false);
+  assert.equal(ultimaConsulta().has('fechaHasta'), false);
+});
+
+test('integración remota: el formulario de creación conserva el contrato con objeto y el servicio acepta ambos llamados', async () => {
+  globalThis.__usuarioConsultaPrueba.permisos.push('logistica.boletas.gestionar');
+  await montar('/', Pagina);
+  const formulario = root.root.findByProps({ 'aria-label': 'Crear boleta de salida' });
+  await act(async () => formulario.findAllByType('select')[0].props.onChange({ target: { value: '27' } }));
+  await act(async () => { await formulario.props.onSubmit({ preventDefault() {} }); });
+  const posts = llamadas.filter((llamada) => llamada.method === 'POST');
+  assert.deepEqual(posts[0].body, { solicitudSalidaId: '27', items: [{ referencia: 'LOTE-7', cantidad: '10.0000' }] });
+  await servicio.crearBoleta('27', posts[0].body.items);
+  assert.deepEqual(llamadas.at(-1).body, posts[0].body);
+});
+
+test('integración remota: el formulario de solicitud envía orden y lotes consultados por HTTP', async () => {
+  globalThis.__usuarioConsultaPrueba.permisos.push('logistica.solicitudes.gestionar', 'logistica.solicitudes.consultar');
+  await montar('/', Pagina);
+  const formulario = root.root.findByProps({ 'aria-label': 'Crear solicitud de salida' });
+  await act(async () => formulario.findAllByType('select')[0].props.onChange({ target: { value: '7' } }));
+  await act(async () => {
+    formulario.findAllByType('input')[0].props.onChange({ target: { value: 'Destino real' } });
+  });
+  await act(async () => {
+    formulario.findAllByType('input')[1].props.onChange({ target: { value: 'Traslado' } });
+  });
+  await act(async () => formulario.findAllByType('select')[1].props.onChange({ target: { value: 'LOTE-7' } }));
+  await act(async () => formulario.findAllByType('input')[2].props.onChange({ target: { value: '10.0000' } }));
+  await act(async () => { await formulario.props.onSubmit({ preventDefault() {} }); });
+  assert.deepEqual(llamadas.find((llamada) => llamada.method === 'POST').body, {
+    ordenId: '7', destinoDocumental: 'Destino real', motivo: 'Traslado', items: [{ referencia: 'LOTE-7', cantidad: '10.0000' }],
+  });
+  assert.match(texto(), /Solicitud de salida #28 creada en BORRADOR/);
 });
 
 test('la navegación real abre Boletas con datos HTTP y muestra total, orden y estado', async () => {

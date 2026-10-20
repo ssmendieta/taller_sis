@@ -6,6 +6,7 @@ import { listarBoletas, PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES
 import { obtenerOrden } from "../services/ordenesService.js";
 import { formatearFechaHora } from "../utils/format.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import DocumentosSalidaFormularios from "../components/logistica/DocumentosSalidaFormularios.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
 
 // Cada estado documental con su propio color: las anuladas no se confunden con las emitidas.
@@ -15,7 +16,7 @@ const ESTADOS = {
   ANULADA: { texto: "Anulada", clase: "ts-badge--CANCELADA" },
 };
 
-const FILTROS_INICIALES = { orden: "", estado: "", limit: 10 };
+const FILTROS_INICIALES = { orden: "", estado: "", fechaDesde: "", fechaHasta: "", limit: 10 };
 const RESULTADO_VACIO = { items: [], total: 0, page: 1, limit: 10, totalPages: 0 };
 
 function mensajeError(fallo) {
@@ -30,6 +31,8 @@ export default function BoletasPage() {
   const [codigosOrden, setCodigosOrden] = useState({});
   const [orden, setOrden] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("");
+  const [fechaDesde, setFechaDesde] = useState("");
+  const [fechaHasta, setFechaHasta] = useState("");
   const [limite, setLimite] = useState(10);
   const [filtrosAplicados, setFiltrosAplicados] = useState(FILTROS_INICIALES);
   const [cargando, setCargando] = useState(true);
@@ -77,7 +80,7 @@ export default function BoletasPage() {
 
   function aplicarFiltros(evento) {
     evento.preventDefault();
-    const filtros = { orden: orden.trim(), estado: estadoFiltro, limit: limite };
+    const filtros = { orden: orden.trim(), estado: estadoFiltro, fechaDesde, fechaHasta, limit: limite };
     setFiltrosAplicados(filtros);
     cargar(filtros, 1);
   }
@@ -85,6 +88,8 @@ export default function BoletasPage() {
   function limpiarFiltros() {
     setOrden("");
     setEstadoFiltro("");
+    setFechaDesde("");
+    setFechaHasta("");
     setLimite(FILTROS_INICIALES.limit);
     setFiltrosAplicados(FILTROS_INICIALES);
     cargar(FILTROS_INICIALES, 1);
@@ -104,6 +109,8 @@ export default function BoletasPage() {
           {tienePermiso(usuario, "logistica.boletas.gestionar") && <Link className="ts-btn ts-btn-primary" to="/logistica/boletas/nueva">Crear boleta</Link>}
         </div>}
       />
+
+      <DocumentosSalidaFormularios />
 
       <div className="ts-panel">
         <div className="ts-panel-title">
@@ -127,6 +134,12 @@ export default function BoletasPage() {
               <select id="boletas-limite" value={limite} onChange={(evento) => setLimite(Number(evento.target.value))}>
                 {[5, 10, 20].map((cantidad) => <option key={cantidad} value={cantidad}>{cantidad}</option>)}
               </select>
+            </label>
+            <label htmlFor="boletas-desde">Desde
+              <input id="boletas-desde" type="date" value={fechaDesde} onChange={(evento) => setFechaDesde(evento.target.value)} />
+            </label>
+            <label htmlFor="boletas-hasta">Hasta
+              <input id="boletas-hasta" type="date" value={fechaHasta} onChange={(evento) => setFechaHasta(evento.target.value)} />
             </label>
           </div>
           <div className="ts-btn-group" style={{ marginTop: "1rem" }}>
