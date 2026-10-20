@@ -130,6 +130,8 @@
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_DATABASE=${DB_LOGISTICA_DATABASE:-logistica_db}
       - SKIP_DB=${SKIP_DB:-false}
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - PRODUCCION_SERVICE_URL=http://produccion-service:3002
     depends_on:
       postgres:
         condition: service_healthy

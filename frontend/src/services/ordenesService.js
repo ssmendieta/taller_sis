@@ -19,7 +19,9 @@ async function exigirOk(response, mensaje) {
     } catch {
       if (texto) detalle = texto;
     }
-    throw new Error(detalle);
+    const error = new Error(detalle);
+    error.status = response.status;
+    throw error;
   }
   return response;
 }
@@ -98,6 +100,20 @@ export async function obtenerDisponibilidadOrden(id) {
   await exigirOk(response, "Error al obtener disponibilidad de materiales");
 
   return await response.json();
+}
+
+export async function solicitarDisponibilidadOrden(id) {
+  const response = await fetch(
+    `${apiConfig.apiUrl}/api/produccion/ordenes/${id}/disponibilidad-materiales/consultar`,
+    {
+      method: "POST",
+      headers: encabezados({ "Content-Type": "application/json" }),
+      body: JSON.stringify({}),
+    },
+  );
+
+  await exigirOk(response, "No se pudo solicitar la disponibilidad de materiales.");
+  return response.json();
 }
 
 
