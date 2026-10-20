@@ -21,12 +21,14 @@ import { multiplicarMateriales } from '../material-calculation/material-calculat
 import {
   ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
   ESTADO_CONSULTA_DISPONIBILIDAD_RESPONDIDA,
+  ESPERA_DISPONIBILIDAD_MS,
   ConsultaDisponibilidad,
 } from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
 import { ConsultaDisponibilidadItem } from '../integraciones/disponibilidad/entities/consulta-disponibilidad-item.entity';
 import { crearEventoDisponibilidadMaterial } from '../integraciones/outbox/crear-evento-disponibilidad-material';
 import {
   ESTADO_OUTBOX_PENDIENTE,
+  ESTADO_OUTBOX_PROCESANDO,
   EventoOutbox,
 } from '../integraciones/outbox/entities/evento-outbox.entity';
 
@@ -311,7 +313,9 @@ export class OrdenesService {
         where: { consultaDisponibilidadId: consulta.id },
         order: { materialId: 'ASC' },
       });
-    return this.respuestaDisponibilidad(orden, consulta, items);
+    const evento = await this.ordenRepository.manager.getRepository(EventoOutbox)
+      .findOne({ where: { eventId: consulta.requestEventId } });
+    return this.respuestaDisponibilidad(orden, consulta, items, evento);
   }
 
   async solicitarDisponibilidadMateriales(id: number) {
@@ -328,13 +332,31 @@ export class OrdenesService {
           estado: ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
         },
         order: { consultaVersion: 'DESC' },
+        lock: { mode: 'pessimistic_write' },
       });
       if (pendiente) {
+        const evento = await manager.findOne(EventoOutbox, {
+          where: { eventId: pendiente.requestEventId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        const ahora = new Date();
+        const vencida = pendiente.respuestaEsperadaHasta?.getTime() <= ahora.getTime();
+        // Reencolar el mismo evento; nunca crear otra consulta pendiente ni tomar un lease activo.
+        if (evento && evento.estado !== ESTADO_OUTBOX_PROCESANDO
+          && (vencida || pendiente.errorRespuesta || evento.ultimoError)) {
+          evento.estado = ESTADO_OUTBOX_PENDIENTE;
+          evento.proximoIntentoEn = ahora;
+          evento.ultimoError = null;
+          pendiente.errorRespuesta = null;
+          pendiente.respuestaEsperadaHasta = new Date(ahora.getTime() + ESPERA_DISPONIBILIDAD_MS);
+          await manager.save(EventoOutbox, evento);
+          await manager.save(ConsultaDisponibilidad, pendiente);
+        }
         const itemsPendientes = await manager.find(ConsultaDisponibilidadItem, {
           where: { consultaDisponibilidadId: pendiente.id },
           order: { materialId: 'ASC' },
         });
-        return this.respuestaDisponibilidad(orden, pendiente, itemsPendientes);
+        return this.respuestaDisponibilidad(orden, pendiente, itemsPendientes, evento);
       }
 
       const materiales = await manager.query(`
@@ -397,7 +419,7 @@ export class OrdenesService {
         })),
         { eventId: requestEventId, correlationId },
       );
-      await manager.save(EventoOutbox, {
+      const eventoGuardado = await manager.save(EventoOutbox, {
         eventId: evento.eventId,
         correlationId: evento.correlationId,
         eventType: evento.eventType,
@@ -406,7 +428,7 @@ export class OrdenesService {
         payload: evento,
         estado: ESTADO_OUTBOX_PENDIENTE,
       });
-      return this.respuestaDisponibilidad(orden, consulta, items);
+      return this.respuestaDisponibilidad(orden, consulta, items, eventoGuardado);
     });
   }
 
@@ -414,6 +436,7 @@ export class OrdenesService {
     orden: OrdenProduccion,
     consulta: ConsultaDisponibilidad | null,
     items: ConsultaDisponibilidadItem[],
+    evento?: EventoOutbox | null,
   ) {
     return {
       orden_id: orden.id,
@@ -424,6 +447,14 @@ export class OrdenesService {
       consulta_id: consulta?.consultaId ?? null,
       consulta_version: consulta?.consultaVersion ?? null,
       request_event_id: consulta?.requestEventId ?? null,
+      correlation_id: consulta?.correlationId ?? null,
+      respuesta_esperada_hasta: consulta?.respuestaEsperadaHasta?.toISOString() ?? null,
+      error_respuesta: consulta?.errorRespuesta ?? null,
+      publicacion: evento ? {
+        estado: evento.estado,
+        intentos: evento.intentos ?? 0,
+        ultimo_error: evento.ultimoError ?? null,
+      } : null,
       vigente_en: consulta?.vigenteEn?.toISOString() ?? null,
       materiales: items.map((item) => ({
         material_id: Number(item.materialId),

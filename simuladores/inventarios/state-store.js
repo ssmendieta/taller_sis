@@ -102,7 +102,7 @@ class StateStore {
       this.stmtInsertInbox.run(
         request.eventId,
         request.correlationId,
-        request.data.solicitudId,
+        request.data.solicitudId ?? request.data.consultaId,
         payloadHash,
         JSON.stringify(request),
         now,
@@ -112,7 +112,7 @@ class StateStore {
         response.eventId,
         request.eventId,
         response.correlationId,
-        response.data.solicitudId,
+        response.data.solicitudId ?? response.data.consultaId,
         JSON.stringify(response),
         now,
       );

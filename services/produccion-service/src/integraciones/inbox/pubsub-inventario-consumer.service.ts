@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Message, PubSub, Subscription } from '@google-cloud/pubsub';
 import { EventoInventarioV1InvalidoError } from '../contratos/inventario-almacen-v1.validator';
+import { DISPONIBILIDAD_MATERIAL_SOLICITADA_V1, SOLICITUD_MATERIAL_ALMACEN_V1 } from '../contratos/inventario-almacen-v1';
 import { PUBSUB_CLIENT } from '../pubsub/pubsub-client.provider';
 import { PUBSUB_CONSUMER_CONFIG, PubSubConsumerConfig } from '../pubsub/pubsub-consumer.config';
 import {
@@ -48,6 +49,12 @@ export class PubSubInventarioConsumerService implements OnModuleInit, OnModuleDe
     try {
       const payload = JSON.parse(message.data.toString('utf8')) as Record<string, unknown>;
       this.validarAtributos(message, payload);
+      // El topic compartido también entrega nuestros propios eventos de solicitud.
+      if (payload.source === 'produccion-service'
+        && (payload.eventType === DISPONIBILIDAD_MATERIAL_SOLICITADA_V1 || payload.eventType === SOLICITUD_MATERIAL_ALMACEN_V1)) {
+        message.ack();
+        return;
+      }
       const resultado = await this.processor.procesar(payload, message.id);
       message.ack();
       this.logger.log(JSON.stringify({

@@ -50,6 +50,16 @@ describe('ABC-244: ACK y NACK del consumidor Pub/Sub', () => {
     await service.onModuleDestroy();
   });
 
+  it('ignora las solicitudes propias del topic compartido sin tratarlas como respuestas inválidas', async () => {
+    const procesar = jest.fn();
+    const { service, subscription } = crear(procesar);
+    const msg = mensaje(JSON.stringify({ eventType: 'DisponibilidadMaterialSolicitada.v1', source: 'produccion-service' }));
+    subscription.emit('message', msg); await siguienteTurno();
+    expect(msg.ack).toHaveBeenCalledTimes(1);
+    expect(msg.nack).not.toHaveBeenCalled(); expect(procesar).not.toHaveBeenCalled();
+    await service.onModuleDestroy();
+  });
+
   it('confirma un rechazo permanente para evitar un mensaje venenoso', async () => {
     const procesar = jest.fn().mockRejectedValue(new EventoInventarioV1InvalidoError(
       'SolicitudMaterialAlmacenEstadoActualizado.v1', 'evento-1',

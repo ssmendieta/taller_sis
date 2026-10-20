@@ -49,6 +49,7 @@ async function main() {
   if (process.env.INVENTARIOS_STOCK_JSON) {
     try {
       stock = JSON.parse(process.env.INVENTARIOS_STOCK_JSON);
+      if (!stock || typeof stock !== 'object' || Array.isArray(stock)) throw new Error();
     } catch {
       throw new Error('INVENTARIOS_STOCK_JSON debe contener un objeto JSON válido');
     }
@@ -83,7 +84,7 @@ async function main() {
 
     console.log(JSON.stringify({
       process: 'inventarios-simulator',
-      action: 'RESPONSE_SENT',
+      action: response.eventType === 'DisponibilidadMaterialRespondida.v1' ? 'AVAILABILITY_RESPONSE_SENT' : 'RESPONSE_SENT',
       messageId,
       eventId: response.eventId,
       requestEventId: response.data.requestEventId,
@@ -130,29 +131,10 @@ async function main() {
         if (payload?.eventType === DISPONIBILIDAD_MATERIAL_SOLICITADA_V1) {
           const request = validarSolicitudDisponibilidad(payload, message.attributes);
           const response = crearRespuestaDisponibilidad(request, { stock });
-          // Publicar primero y confirmar después: así Pub/Sub reentrega si falla el publish.
-          const responseMessageId = await client.topic(outputTopicId).publishMessage({
-            data: Buffer.from(JSON.stringify(response), 'utf8'),
-            attributes: {
-              eventId: response.eventId,
-              eventType: response.eventType,
-              source: response.source,
-              correlationId: response.correlationId,
-            },
-          });
+          const stored = store.receive(request, response);
+          // Persistir antes de ACK. Un reintento reutiliza el eventId y las cantidades originales.
           message.ack();
-          console.log(JSON.stringify({
-            process: 'inventarios-simulator',
-            action: 'AVAILABILITY_RESPONSE_SENT',
-            messageId: responseMessageId,
-            requestEventId: request.eventId,
-            responseEventId: response.eventId,
-            consultaId: response.data.consultaId,
-            correlationId: response.correlationId,
-            materiales: response.data.materiales.map(({ materialCodigo, cantidadDisponible, estado }) => ({
-              materialCodigo, cantidadDisponible, estado,
-            })),
-          }));
+          await publish(stored.response);
           return;
         }
 

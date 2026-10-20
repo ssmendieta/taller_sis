@@ -4,6 +4,7 @@ import { EstadoOrden } from './estado-orden.enum';
 import { OrdenProduccion } from './entities/orden-produccion.entity';
 import { HistorialEstadoOrden } from './entities/historial-estado-orden.entity';
 import { ConsultaDisponibilidad } from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 
 // ABC-190: calcula materiales reales y observa la persistencia, sin simular el resultado del cálculo.
 describe('ABC-190: precondiciones de inicio de orden', () => {
@@ -42,7 +43,7 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
             requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
             estado: 'RESPONDIDA', vigenteEn: new Date('2026-10-17T12:00:00.000Z'),
           }) }
-          : { find: async () => [{
+          : entity === EventoOutbox ? { findOne: async () => null } : { find: async () => [{
             materialId: '3', materialCodigo: 'MAT-3', materialNombre: 'Harina',
             unidad: 'kg', cantidadRequerida: '20.0000',
             cantidadDisponible: String(disponible ?? 0),

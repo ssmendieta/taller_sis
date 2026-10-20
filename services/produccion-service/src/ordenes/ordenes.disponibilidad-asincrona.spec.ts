@@ -11,12 +11,13 @@ describe('ABC-278: solicitud asincrona de disponibilidad', () => {
     fecha_programada: '2026-10-20', estado: 'PLANIFICADA',
   } as OrdenProduccion;
 
-  function escenario(pendiente: ConsultaDisponibilidad | null = null) {
+  function escenario(pendiente: ConsultaDisponibilidad | null = null, evento?: Partial<EventoOutbox>) {
     const outbox: Record<string, unknown>[] = [];
     const itemsGuardados: ConsultaDisponibilidadItem[] = [];
     const manager = {
       findOne: jest.fn(async (entity: unknown, options: { where: Record<string, unknown> }) => {
         if (entity === OrdenProduccion) return orden;
+        if (entity === EventoOutbox) return evento ?? null;
         if (entity === ConsultaDisponibilidad && options.where.estado === 'PENDIENTE') return pendiente;
         if (entity === ConsultaDisponibilidad) return null;
         return null;
@@ -87,5 +88,31 @@ describe('ABC-278: solicitud asincrona de disponibilidad', () => {
     });
     expect(ctx.manager.query).not.toHaveBeenCalled();
     expect(ctx.outbox).toHaveLength(0);
+  });
+
+  it.each(['PUBLICADO', 'PENDIENTE'])('reintenta un envío %s vencido con el mismo eventId y correlación', async (estado) => {
+    const consulta = { id: '41', consultaId: 'DISP-ORD-15-V1', consultaVersion: 1, ordenId: '15',
+      requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      correlationId: '67bfbe4d-9a02-4cb9-b707-d68434ba2c4a', estado: 'PENDIENTE',
+      respuestaEsperadaHasta: new Date(0), errorRespuesta: 'Respuesta inválida',
+    } as ConsultaDisponibilidad;
+    const evento = { eventId: consulta.requestEventId, correlationId: consulta.correlationId,
+      estado: estado as EventoOutbox['estado'], ultimoError: 'Broker no disponible' };
+    const ctx = escenario(consulta, evento);
+    const respuesta = await ctx.service.solicitarDisponibilidadMateriales(15);
+    expect(respuesta).toMatchObject({ request_event_id: consulta.requestEventId,
+      correlation_id: consulta.correlationId, error_respuesta: null, publicacion: { estado: 'PENDIENTE', ultimo_error: null } });
+    expect(ctx.manager.query).not.toHaveBeenCalled();
+    expect(ctx.outbox).toHaveLength(1);
+    expect(ctx.outbox[0].eventId).toBe(consulta.requestEventId);
+  });
+
+  it('un doble clic no toma un evento cuyo publicador tiene un lease activo', async () => {
+    const consulta = { id: '41', consultaId: 'DISP-ORD-15-V1', estado: 'PENDIENTE',
+      requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa', respuestaEsperadaHasta: new Date(0),
+    } as ConsultaDisponibilidad;
+    const ctx = escenario(consulta, { estado: 'PROCESANDO' });
+    await ctx.service.solicitarDisponibilidadMateriales(15);
+    expect(ctx.manager.save).not.toHaveBeenCalled();
   });
 });

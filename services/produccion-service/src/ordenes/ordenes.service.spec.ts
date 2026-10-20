@@ -9,6 +9,7 @@ import { RecetasService } from '../recetas/recetas.service';
 import { UsuarioAutenticadoProduccion } from './ordenes.service';
 import { ConsultaDisponibilidad } from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
 import { ConsultaDisponibilidadItem } from '../integraciones/disponibilidad/entities/consulta-disponibilidad-item.entity';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 
 describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   let service: OrdenesService;
@@ -26,7 +27,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   const consultaItemsFind = jest.fn();
   const managerGetRepository = jest.fn((entity: unknown) => entity === ConsultaDisponibilidad
     ? { findOne: consultaFindOne }
-    : { find: consultaItemsFind });
+    : entity === EventoOutbox ? { findOne: async () => null } : { find: consultaItemsFind });
 
   const repositorioMock = {
     find,
@@ -95,6 +96,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     findOne.mockResolvedValue(ordenBase(estado));
     recetaFindOne.mockResolvedValue({ id: 1, activa: true });
     jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
+      correlation_id: null, respuesta_esperada_hasta: null, error_respuesta: null, publicacion: null,
       orden_id: 1,
       orden_codigo: 'OP-001',
       cantidad_producir: 10,
@@ -139,6 +141,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     findOne.mockResolvedValue(ordenBase('PLANIFICADA'));
     recetaFindOne.mockResolvedValue({ id: 1, activa: true });
     jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
+      correlation_id: null, respuesta_esperada_hasta: null, error_respuesta: null, publicacion: null,
       orden_id: 1,
       orden_codigo: 'OP-001',
       cantidad_producir: 10,
@@ -210,6 +213,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
     it('rechaza iniciar mientras la disponibilidad externa sigue pendiente', async () => {
       prepararInicio();
       jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
+        correlation_id: null, respuesta_esperada_hasta: null, error_respuesta: null, publicacion: null,
         orden_id: 1, orden_codigo: 'OP-001', cantidad_producir: 10, unidad_producto: 'unidad',
         estado_consulta: 'PENDIENTE', consulta_id: 'DISP-ORD-1-V1', consulta_version: 1,
         request_event_id: 'd59541e7-d44c-4138-92e1-3432310cd1aa', vigente_en: null,
@@ -241,6 +245,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
           estado: estado as 'FALTANTE' | 'INSUFICIENTE',
         };
         jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
+          correlation_id: null, respuesta_esperada_hasta: null, error_respuesta: null, publicacion: null,
           orden_id: 1,
           orden_codigo: 'OP-001',
           cantidad_producir: 10,

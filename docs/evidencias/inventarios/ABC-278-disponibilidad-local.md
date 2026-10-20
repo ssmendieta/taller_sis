@@ -2,8 +2,9 @@
 
 Esta prueba conecta la pantalla de Producción, su API, el emulador local de
 Pub/Sub y el simulador de Inventarios. No usa Google Cloud ni credenciales
-reales. El simulador responde con la cantidad requerida como disponible por
-defecto, para que la orden de demostración pueda iniciar.
+reales. El simulador exige stock explícito en `INVENTARIOS_STOCK_JSON`; no toma
+lo requerido como disponibilidad. La guía actualizada, con migración, reintentos
+y pruebas, está en [ABC-113-disponibilidad.md](ABC-113-disponibilidad.md).
 
 ## 1. Iniciar el emulador y crear el topic compartido
 
@@ -57,13 +58,15 @@ $env:PUBSUB_EMULATOR_HOST = '127.0.0.1:8085'
 $env:GCP_PROJECT_ID = 'taller-local'
 $env:INVENTARIOS_INPUT_SUBSCRIPTION_ID = 'taller-inventarios-simulator-local'
 $env:INVENTARIOS_OUTPUT_TOPIC_ID = 'taller-inventarios-local'
+$env:INVENTARIOS_STOCK_JSON = Read-Host 'JSON de existencias configuradas de Inventarios, por código de material'
 node .\index.js
 ```
 
-Se requiere Node.js 22. Al ver `"action":"READY"`, deja esa ventana abierta.
+Se requiere Node.js 22.13 o posterior. Al ver `"action":"READY"`, deja esa ventana abierta.
 Para ensayar falta de stock, antes de iniciar el simulador puedes establecer,
-por ejemplo, `$env:INVENTARIOS_STOCK_JSON = '{"HAR-001":0}'`. Sin esa variable,
-la demo responde que cada material tiene disponible exactamente lo requerido.
+por ejemplo, `$env:INVENTARIOS_STOCK_JSON = '{"HAR-001":0}'`, exclusivamente
+como fixture de prueba. Sin esa variable no se inventa disponibilidad: el
+simulador registra un error y mantiene el mensaje para reintento.
 
 ## 4. Probar desde la aplicación
 
@@ -71,8 +74,8 @@ la demo responde que cada material tiene disponible exactamente lo requerido.
 2. Abre una orden en estado **Planificada** y entra a su detalle.
 3. En **Materiales requeridos**, pulsa **Solicitar disponibilidad**.
 4. Espera el aviso de respuesta y comprueba cantidad y estado de cada material.
-5. Si todos aparecen como **Suficiente**, pulsa **Iniciar producción**.
-6. Si aparece **Insuficiente** o **Faltante**, el inicio debe seguir bloqueado.
+5. La consulta no cambia recetas ni inicia producción. Una receta inactiva
+   mantiene bloqueado el inicio, incluso si hay disponibilidad suficiente.
 
 Evidencia técnica esperada: el simulador imprime
 `AVAILABILITY_RESPONSE_SENT`; Producción registra la respuesta del consumidor

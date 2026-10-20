@@ -236,9 +236,13 @@ function crearRespuestaDisponibilidad(solicitud, options = {}) {
   const stock = options.stock ?? {};
   const materiales = solicitud.data.materiales.map((item) => {
     const requerido = Number(item.cantidadRequerida);
-    // Para una demo reproducible, si no se configura stock se simula lo justo para cubrir la receta.
-    const disponible = Number(stock[item.materialCodigo] ?? stock[item.materialId] ?? requerido);
-    if (!Number.isFinite(disponible) || disponible < 0) {
+    const valor = stock[item.materialCodigo] ?? stock[item.materialId];
+    if (valor === undefined || valor === null || valor === '' || typeof valor === 'boolean') {
+      throw new Error(`Configura INVENTARIOS_STOCK_JSON para ${item.materialCodigo}; no se inventa disponibilidad`);
+    }
+    const disponible = Number(valor);
+    if (!Number.isFinite(disponible) || disponible < 0 || disponible >= 10 ** 10
+      || !/^\d+(\.\d{1,4})?$/.test(String(valor))) {
       throw new Error(`Stock inválido para ${item.materialCodigo}`);
     }
     const estado = disponible === 0 ? 'FALTANTE'

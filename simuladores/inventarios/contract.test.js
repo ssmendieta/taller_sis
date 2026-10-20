@@ -46,6 +46,7 @@ test('simulador valida y responde una consulta de disponibilidad correlacionada'
 
   const respuesta = crearRespuestaDisponibilidad(solicitud, {
     now: new Date('2026-10-19T10:00:02.000Z'),
+    stock: { 'HAR-001': 100 },
   });
   assert.equal(respuesta.eventType, DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1);
   assert.equal(respuesta.source, 'inventario-service');
@@ -63,6 +64,33 @@ test('simulador representa stock insuficiente y faltante con estados coherentes'
   assert.equal(insuficiente.data.materiales[0].estado, 'INSUFICIENTE');
   assert.equal(insuficiente.data.materiales[0].cantidadDisponible, '50.0000');
   assert.equal(faltante.data.materiales[0].estado, 'FALTANTE');
+});
+
+test('no inventa disponibilidad si falta stock explícito o es inválido', () => {
+  const solicitud = disponibilidadValida();
+  assert.throws(() => crearRespuestaDisponibilidad(solicitud), /INVENTARIOS_STOCK_JSON/);
+  for (const valor of [-1, true, '', '1.00001', 'NaN', 10000000000]) {
+    assert.throws(() => crearRespuestaDisponibilidad(solicitud, { stock: { 'HAR-001': valor } }));
+  }
+});
+
+test('persistencia de disponibilidad reutiliza la misma respuesta tras reiniciar', () => {
+  const { StateStore } = require('./state-store');
+  const { mkdtempSync, rmSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const path = require('node:path');
+  const dir = mkdtempSync(path.join(tmpdir(), 'disponibilidad-'));
+  const file = path.join(dir, 'state.db');
+  const solicitud = disponibilidadValida();
+  let store = new StateStore(file);
+  try {
+    const original = store.receive(solicitud, crearRespuestaDisponibilidad(solicitud, { stock: { 'HAR-001': 50 } }));
+    store.close(); store = new StateStore(file);
+    const repetida = store.receive(solicitud, crearRespuestaDisponibilidad(solicitud, { stock: { 'HAR-001': 90 } }));
+    assert.equal(repetida.isNew, false);
+    assert.deepEqual(repetida.response, original.response);
+    assert.equal(store.getPendingResponses().length, 1);
+  } finally { store.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
 function muestraValida() {
