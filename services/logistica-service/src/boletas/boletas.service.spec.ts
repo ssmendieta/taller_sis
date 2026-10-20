@@ -328,7 +328,7 @@ describe('ABC-258: listado paginado y filtros de boletas', () => {
     expect(repository.createQueryBuilder).toHaveBeenCalledWith('boleta');
     expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('boleta.items', 'item');
     expect(qb.leftJoinAndSelect).toHaveBeenCalledWith('boleta.solicitudSalida', 'solicitud');
-    expect(qb.orderBy).toHaveBeenCalledWith('boleta.creado_en', 'DESC');
+    expect(qb.orderBy).toHaveBeenCalledWith('boleta.creadoEn', 'DESC');
     expect(qb.addOrderBy).toHaveBeenCalledWith('boleta.id', 'DESC');
     expect(qb.skip).toHaveBeenCalledWith(0);
     expect(qb.take).toHaveBeenCalledWith(10);

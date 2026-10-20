@@ -130,6 +130,10 @@
       - DB_PASSWORD=${DB_PASSWORD:-postgres}
       - DB_DATABASE=${DB_LOGISTICA_DATABASE:-logistica_db}
       - SKIP_DB=${SKIP_DB:-false}
+      # Dentro de la red de Compose el host de Auth es el nombre del servicio,
+      # no localhost (el contenedor solo escucha en su propio puerto).
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - PRODUCCION_SERVICE_URL=http://produccion-service:3002
     depends_on:
       postgres:
         condition: service_healthy
