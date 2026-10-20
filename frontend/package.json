@@ -10,6 +10,7 @@
     "test:audit": "node --test scripts/auditoria.test.mjs",
     "test:logistica": "node --test scripts/logistica.test.mjs",
     "test:boleta-anulacion": "node --test scripts/boleta-anulacion.test.mjs",
+    "test:boletas-consulta": "node --test scripts/boletas-consulta.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {

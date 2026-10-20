@@ -34,8 +34,16 @@ export const ESTADO_BOLETA_EMITIDA = "EMITIDA";
 const LOGISTICA = `${apiConfig.gatewayUrl}/api/logistica`;
 
 // Todas las boletas guardadas, de la más reciente a la más antigua.
-export async function listarBoletas() {
-  const response = await fetch(`${LOGISTICA}/boletas`, { headers: encabezados() });
+export async function listarBoletas(filtros = {}) {
+  const parametros = new URLSearchParams();
+  for (const clave of ["orden", "estado", "page", "limit"]) {
+    const valor = filtros[clave];
+    if (valor !== undefined && valor !== null && String(valor).trim() !== "") {
+      parametros.set(clave, String(valor).trim());
+    }
+  }
+  const consulta = parametros.toString();
+  const response = await fetch(`${LOGISTICA}/boletas${consulta ? `?${consulta}` : ""}`, { headers: encabezados() });
 
   await exigirOk(response, "No se pudieron cargar las boletas.");
   return response.json();

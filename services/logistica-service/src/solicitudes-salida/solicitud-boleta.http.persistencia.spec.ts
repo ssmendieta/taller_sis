@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -31,10 +31,17 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
   let creado = false;
   let permisos: string[];
   let usuarioId: string;
+  const ordenesPorCodigo: Record<string, string> = { 'ORD-PRUEBA': '8', 'ORD-2026-00007': '700', 'ORD-2026-00008': '800' };
+  const codigoOrden = (id: string) => Object.keys(ordenesPorCodigo).find((codigo) => ordenesPorCodigo[codigo] === id) ?? 'ORD-PRUEBA';
   const produccion = {
-    consultarOrdenPorId: jest.fn(async (id: string) => ({ id, codigo: 'ORD-PRUEBA', producto_id: 3, producto: { codigo: 'P-PRUEBA' } })),
-    consultarPorOrden: jest.fn(async () => ['LOTE-A', 'LOTE-B'].map((codigo, indice) => ({
-      id: String(indice + 1), codigo, ordenId: '8', productoId: '3', cantidad: '20.0000',
+    consultarOrdenPorId: jest.fn(async (id: string) => ({ id, codigo: codigoOrden(id), producto_id: 3, producto: { codigo: 'P-PRUEBA' } })),
+    consultarOrdenPorCodigo: jest.fn(async (codigo: string) => {
+      const id = ordenesPorCodigo[codigo];
+      if (!id) throw new NotFoundException('Orden no encontrada');
+      return { id, codigo };
+    }),
+    consultarPorOrden: jest.fn(async (ordenCodigo: string) => ['LOTE-A', 'LOTE-B'].map((codigo, indice) => ({
+      id: String(indice + 1), codigo, ordenId: ordenesPorCodigo[ordenCodigo], productoId: '3', cantidad: '20.0000',
     }))),
     consultarConformesPorOrden: jest.fn(async () => [{ cantidad: '1000.0000' }]),
   };
@@ -174,8 +181,8 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
     } finally { await source.query(`ALTER TABLE "${schema}".solicitudes_salida_items DROP CONSTRAINT fallo_item_prueba`); }
   });
 
-  async function crearBoleta(emitida = false) {
-    const solicitud = await request('/solicitudes-salida', 'POST', body);
+  async function crearBoleta(emitida = false, ordenId = '8') {
+    const solicitud = await request('/solicitudes-salida', 'POST', { ...body, ordenId });
     expect(solicitud.status).toBe(201);
     const creada = await request('/boletas', 'POST', { solicitudSalidaId: solicitud.body.id, items: body.items });
     expect(creada.status).toBe(201);
@@ -229,5 +236,37 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
     expect((await request(`/boletas/${emitida.id}/anular`, 'POST', { motivo: 'Repetida' })).status).toBe(409);
     expect(await request(`/boletas/${emitida.id}`)).toEqual(primera);
     expect(await source.getRepository(BoletaEnvioHistorial).countBy({ boletaId: emitida.id })).toBe(1);
+  });
+
+  it('ABC-123: filtra código y estado en PostgreSQL, pagina y al limpiar devuelve el total sin filtros', async () => {
+    const borrador = await crearBoleta(false, '700');
+    const emitida = await crearBoleta(true, '700');
+    const otraOrden = await crearBoleta(false, '800');
+    const porOrden = await request('/boletas?orden=ORD-2026-00007');
+    expect(porOrden.status).toBe(200);
+    expect(porOrden.body).toMatchObject({ total: 2, page: 1, limit: 10, totalPages: 1 });
+    expect(porOrden.body.items.map((item: BoletaEnvio) => item.id).sort()).toEqual([borrador.id, emitida.id].sort());
+    expect(porOrden.body.items.every((item: BoletaEnvio) => item.solicitudSalida.ordenId === '700')).toBe(true);
+    const combinada = await request('/boletas?orden=ORD-2026-00007&estado=EMITIDA');
+    expect(combinada.status).toBe(200);
+    expect(combinada.body).toMatchObject({ total: 1, items: [expect.objectContaining({ id: emitida.id, estado: 'EMITIDA' })] });
+    const primera = await request('/boletas?orden=ORD-2026-00007&page=1&limit=1');
+    const segunda = await request('/boletas?orden=ORD-2026-00007&page=2&limit=1');
+    expect(primera.body).toMatchObject({ total: 2, page: 1, limit: 1, totalPages: 2 });
+    expect(segunda.body).toMatchObject({ total: 2, page: 2, limit: 1, totalPages: 2 });
+    expect(primera.body.items).toHaveLength(1);
+    expect(segunda.body.items).toHaveLength(1);
+    expect(primera.body.items[0].id).not.toBe(segunda.body.items[0].id);
+    const todas = await request('/boletas?page=1&limit=100');
+    expect(todas.body.total).toBe(await source.getRepository(BoletaEnvio).count());
+    expect(todas.body.items).toEqual(expect.arrayContaining([borrador, emitida, otraOrden].map(({ id }) => expect.objectContaining({ id }))));
+  });
+
+  it('ABC-123: código inexistente devuelve 200 sin resultados y ausencia de permiso devuelve 403', async () => {
+    const inexistente = await request('/boletas?orden=ORD-INEXISTENTE&estado=EMITIDA&page=1&limit=5');
+    expect(inexistente).toEqual({ status: 200, body: { items: [], total: 0, page: 1, limit: 5, totalPages: 0 } });
+    permisos = ['logistica.boletas.gestionar'];
+    expect((await request('/boletas?orden=ORD-2026-00007&estado=EMITIDA')).status).toBe(403);
+    expect((await request('/boletas')).status).toBe(403);
   });
 });
