@@ -173,7 +173,8 @@ export default function OrdenesPage() {
                     <th scope="col">Código</th>
                     <th scope="col">Producto</th>
                     <th scope="col">Cantidad</th>
-                    <th scope="col">Fecha programada</th>
+                    <th scope="col">Creada</th>
+                    <th scope="col">Programada</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Responsable</th>
                     <th scope="col">Avance</th>
@@ -195,6 +196,7 @@ export default function OrdenesPage() {
                         <td className="ts-code">{orden.codigo ?? "—"}</td>
                         <td>{nombreProductoOrden(orden)}</td>
                         <td>{formatearCantidad(solicitada, unidadDe(orden))}</td>
+                        <td>{formatearFecha(orden.creado_en)}</td>
                         <td>{formatearFecha(fechaProgramadaOrden(orden))}</td>
                         <td><BadgeEstadoOrden estado={orden.estado} /></td>
                         <td>{responsableOrden(orden)}</td>

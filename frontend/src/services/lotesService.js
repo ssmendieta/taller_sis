@@ -25,8 +25,6 @@ async function exigirOk(response, mensaje) {
   return response;
 }
 
-export const MAX_CODIGO_LOTE = 80;
-
 const BASE = `${apiConfig.gatewayUrl}/api/produccion/lotes`;
 
 // ABC-294: la consulta usa el código de la orden, como la de Logística.
@@ -39,13 +37,13 @@ export async function listarLotesOrden(ordenCodigo) {
   return response.json();
 }
 
-// Responsable y fecha los fija el servidor; el backend valida código único
-// y que la cantidad no supere los conformes sin asignar.
-export async function crearLote({ ordenId, codigo, cantidad }) {
+// El código del lote lo genera el servidor; el usuario solo indica la cantidad.
+// El backend valida que la cantidad no supere los conformes sin asignar.
+export async function crearLote({ ordenId, cantidad }) {
   const response = await fetch(BASE, {
     method: "POST",
     headers: encabezados({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ ordenId, codigo, cantidad }),
+    body: JSON.stringify({ ordenId, cantidad }),
   });
 
   await exigirOk(response, "No se pudo crear el lote.");

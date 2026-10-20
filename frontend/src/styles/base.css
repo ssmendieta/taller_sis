@@ -14,6 +14,17 @@
 /* Panel, secciones y mensajes */
 .ts-panel, .ts-feedback { border: 1px solid var(--ts-border); border-radius: var(--ts-radius-card); background: var(--ts-surface); box-shadow: var(--ts-shadow-rest); }
 .ts-panel { margin-bottom: 16px; }
+/* Panel con formulario: el panel aporta el inset de 20px y los bloques hijos
+   (ts-panel-title, ts-filters, ts-table-wrap) lo ceden, para que títulos,
+   campos y botones queden alineados a la misma línea. */
+.ts-panel--form { padding: 4px 20px 20px; }
+.ts-panel--form > .ts-panel-title { padding: 16px 0 4px; }
+.ts-panel--form .ts-filters { padding-inline: 0; }
+.ts-panel--form .ts-section { padding-inline: 0; }
+.ts-panel--form .ts-table-wrap { margin-inline: 0; }
+.ts-panel--form h3 { margin: 18px 0 10px; font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; }
+.ts-panel--form h4 { margin: 16px 0 8px; font-size: 0.85rem; font-weight: 600; color: var(--ts-secondary); }
+.ts-panel--form .ts-btn-group { margin-top: 4px; }
 .ts-feedback { padding: 20px; color: var(--ts-secondary); font-size: 0.85rem; }
 .ts-error { border-color: var(--ts-danger-border); background: var(--ts-danger-bg); color: var(--ts-danger); }
 .ts-error p { margin-top: 0; }
@@ -21,6 +32,8 @@
 .ts-success { margin: 0 0 16px; padding: 10px 12px; border: 1px solid var(--ts-success-border); border-radius: var(--ts-radius-control); background: var(--ts-success-bg); color: var(--ts-success); font-size: 0.8rem; }
 .ts-panel-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px 4px; }
 .ts-panel-title h2 { margin: 0; font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; }
+/* Subtítulo de un bloque dentro del panel: un nivel por debajo del título. */
+.ts-panel-title h3 { margin: 0; font-size: 0.88rem; font-weight: 600; letter-spacing: -0.01em; }
 .ts-panel-title span { color: var(--ts-secondary); font-size: 0.77rem; }
 .ts-section { padding: 4px 20px 18px; }
 .ts-field-help { margin: 4px 0 0; color: var(--ts-secondary); font-size: 0.75rem; }
@@ -81,6 +94,17 @@ td.ts-actions .ts-btn { margin: 0 0 4px 6px; }
 .ts-btn--login { width: 100%; min-height: 42px; font-size: 0.86rem; font-weight: 600; }
 .ts-btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
 .ts-btn-group--end { justify-content: flex-end; }
+/* Navegación interna de una página: salta a cada bloque sin recorrerla entera. */
+.ts-subnav { position: sticky; top: 0; z-index: 20; display: flex; gap: 4px; flex-wrap: wrap; margin: 0 0 16px; padding: 6px; border: 1px solid var(--ts-border); border-radius: var(--ts-radius-card); background: var(--ts-surface); box-shadow: var(--ts-shadow-rest); }
+.ts-subnav a { padding: 5px 10px; border-radius: var(--ts-radius-control); color: var(--ts-secondary); font-size: 0.78rem; font-weight: 500; text-decoration: none; }
+.ts-subnav a:hover { background: var(--ts-row-hover); color: var(--ts-text); }
+.ts-subnav a:focus-visible { outline: 2px solid var(--ts-accent); outline-offset: 1px; }
+/* Los bloques con ancla no quedan tapados por la navegación fija. */
+[id^="sec-"] { scroll-margin-top: 64px; }
+
+/* Fila de acciones al pie de un panel o de un formulario.
+   Solo para el bloque <div>: en las celdas, td.ts-actions sigue alineando a la derecha. */
+div.ts-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .ts-row-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 
 /* Compatibilidad: clases heredadas con la misma apariencia ts-btn */
@@ -137,8 +161,11 @@ td.ts-actions .ts-btn { margin: 0 0 4px 6px; }
 /* Modal */
 .ts-modal-overlay { position: fixed; inset: 0; background: rgb(29 29 31 / 0.4); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
 .ts-modal { width: min(560px, 100%); max-height: 90vh; overflow: auto; background: var(--ts-surface); border-radius: var(--ts-radius-modal); padding: 22px; box-shadow: var(--ts-shadow-raised); }
+/* Modal ancho: para el detalle con tabla, que no cabe en 560px */
+.ts-modal--ancho { width: min(760px, 100%); }
 .ts-modal h2 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
 .ts-modal > p { margin: 0 0 14px; color: var(--ts-secondary); font-size: 0.83rem; }
+.ts-modal > p strong { color: var(--ts-text); }
 .ts-modal form label { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; color: var(--ts-secondary); font-size: 0.76rem; font-weight: 500; }
 .ts-modal form textarea { min-height: 84px; resize: vertical; }
 .ts-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }

@@ -27,7 +27,7 @@ import {
   resumenCalidad,
   sumarCantidades,
 } from "../services/calidadService.js";
-import { MAX_CODIGO_LOTE, crearLote, listarLotesOrden } from "../services/lotesService.js";
+import { crearLote, listarLotesOrden } from "../services/lotesService.js";
 import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 import {
   PERMISO_PREPARAR_CIERRE,
@@ -134,7 +134,6 @@ export default function OrdenDetallePage() {
   // ABC-294: lotes que identifican unidades conformes.
   const [lotes, setLotes] = useState([]);
   const [errorCargaLotes, setErrorCargaLotes] = useState("");
-  const [codigoLote, setCodigoLote] = useState("");
   const [cantidadLote, setCantidadLote] = useState("");
   const [guardandoLote, setGuardandoLote] = useState(false);
   const [errorLote, setErrorLote] = useState("");
@@ -573,13 +572,7 @@ export default function OrdenDetallePage() {
     setErrorLote("");
     setAvisoLote("");
 
-    const codigo = codigoLote.trim();
     const cantidad = Number(cantidadLote);
-
-    if (!codigo) {
-      setErrorLote("Indica el código del lote.");
-      return;
-    }
 
     if (!cantidadLote || !Number.isFinite(cantidad) || cantidad <= 0) {
       setErrorLote("La cantidad del lote debe ser mayor a cero.");
@@ -601,11 +594,10 @@ export default function OrdenDetallePage() {
     setGuardandoLote(true);
 
     try {
-      const lote = await crearLote({ ordenId: Number(id), codigo, cantidad });
-      setCodigoLote("");
+      const lote = await crearLote({ ordenId: Number(id), cantidad });
       setCantidadLote("");
       setAvisoLote(
-        `Lote ${lote?.codigo ?? codigo} creado con ${formatearCantidad(lote?.cantidad ?? cantidad, unidad)}.`,
+        `Lote ${lote?.codigo ?? ""} creado con ${formatearCantidad(lote?.cantidad ?? cantidad, unidad)}.`,
       );
     } catch (fallo) {
       setErrorLote(fallo.message || "No se pudo crear el lote.");
@@ -697,6 +689,9 @@ export default function OrdenDetallePage() {
   if (!orden) return null;
 
   const enProduccion = orden.estado === "EN_PRODUCCION";
+  // El cierre solo existe para órdenes finalizadas: no se muestra un bloque
+  // vacío explicando que todavía no hay nada que cerrar.
+  const muestraCierre = orden.estado === "FINALIZADA" || estadoCierre === "preparado";
   const reporteContable = resumenReporteContable(cierre);
 
   return (
@@ -719,7 +714,17 @@ export default function OrdenDetallePage() {
 
       {aviso && <p className="ts-success" role="status">{aviso}</p>}
 
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
+      {/* Navegación interna: salta a cada bloque sin recorrer toda la página. */}
+      <nav className="ts-subnav" aria-label="Secciones de la orden">
+        <a href="#sec-datos">Datos</a>
+        <a href="#sec-materiales">Materiales</a>
+        <a href="#sec-produccion">Producción</a>
+        <a href="#sec-lotes">Lotes</a>
+        {muestraCierre && <a href="#sec-cierre">Cierre</a>}
+        <a href="#sec-historial">Historial</a>
+      </nav>
+
+      <div className="ts-panel ts-panel--form" id="sec-datos">
         <div className="ts-panel-title">
           <h2 id="detalle-orden-titulo">Datos generales</h2>
           <BadgeEstadoOrden estado={orden.estado} />
@@ -761,15 +766,9 @@ export default function OrdenDetallePage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {muestraAcciones && acciones.length > 0 && (
-        <div className="ts-panel" style={{ marginBottom: 16 }}>
-          <div className="ts-panel-title">
-            <h2>Acciones</h2>
-          </div>
-
-          <div className="ts-filters">
+        {muestraAcciones && acciones.length > 0 && (
+          <div className="ts-section">
             <div className="ts-btn-group">
               {acciones.map((a) => {
                 const bloqueado =
@@ -800,19 +799,19 @@ export default function OrdenDetallePage() {
                 );
               })}
             </div>
+
+            {motivoBloqueoInicio && (
+              <p className="ts-field-help" role="note">
+                {motivoBloqueoInicio}
+              </p>
+            )}
           </div>
+        )}
+      </div>
 
-          {motivoBloqueoInicio && (
-            <p className="ts-field-help" role="note">
-              {motivoBloqueoInicio}
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
+      <div className="ts-panel ts-panel--form" id="sec-materiales">
         <div className="ts-panel-title">
-          <h2>Materiales requeridos</h2>
+          <h2>Materiales</h2>
           <span>{materiales.length} líneas</span>
         </div>
 
@@ -864,12 +863,10 @@ export default function OrdenDetallePage() {
             </table>
           </div>
         )}
-      </div>
 
-      {/* ABC: registro de consumos reales y comparación con la receta. */}
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
+        {/* Consumo real de materiales: registro y comparación con la receta. */}
         <div className="ts-panel-title">
-          <h2>Consumo real de materiales</h2>
+          <h3>Consumo real</h3>
           <span>{consumos.length} registros</span>
         </div>
 
@@ -978,13 +975,12 @@ export default function OrdenDetallePage() {
           </p>
         )}
 
-        <p className="ts-field-help" role="note" style={{ padding: "0 20px" }}>
-          Diferencia = utilizado − requerido. Positiva (+): se usó más de lo
-          requerido por la receta; negativa (-): se usó menos.
+        <p className="ts-field-help" role="note">
+          Diferencia = utilizado − requerido.
         </p>
 
         {errorComparacion && (
-          <p className="ts-modal-error" role="alert" style={{ padding: "0 20px" }}>
+          <p className="ts-modal-error" role="alert">
             {errorComparacion}
           </p>
         )}
@@ -1073,13 +1069,17 @@ export default function OrdenDetallePage() {
         </div>
       </div>
 
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
+      <div className="ts-panel ts-panel--form" id="sec-produccion">
         <div className="ts-panel-title">
-          <h2>Avance</h2>
+          <h2>Producción y calidad</h2>
           <span>
             {formatearCantidad(total, unidad)} de{" "}
             {formatearCantidad(solicitada, unidad)}
           </span>
+        </div>
+
+        <div className="ts-panel-title">
+          <h3>Avance</h3>
         </div>
 
         <div style={{ padding: "4px 20px 16px" }}>
@@ -1198,15 +1198,13 @@ export default function OrdenDetallePage() {
             </div>
           )}
         </div>
-      </div>
 
       {/* ABC-82 y ABC-83: conformes y defectuosas se muestran por separado. */}
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
         <div className="ts-panel-title">
-          <h2>Calidad del producto terminado</h2>
+          <h3>Calidad del producto terminado</h3>
           <span>
-            {conformesCalidad.length} registros conformes ·{" "}
-            {defectosCalidad.length} de defectos
+            {conformesCalidad.length} conformes ·{" "}
+            {defectosCalidad.length} defectos
           </span>
         </div>
 
@@ -1243,20 +1241,14 @@ export default function OrdenDetallePage() {
           </table>
         </div>
 
-        {!errorCargaCalidad && (
-          <p className="ts-field-help" role="note" style={{ padding: "0 20px" }}>
-            {calidad.porClasificar > 0
-              ? `${formatearCantidad(calidad.producido, unidad)} producidas − ${formatearCantidad(calidad.conformes, unidad)} conformes − ${formatearCantidad(calidad.defectuosos, unidad)} defectuosas = ${formatearCantidad(calidad.porClasificar, unidad)} pendientes de clasificación (aún no registradas como conformes ni como defectuosas).`
-              : calidad.producido > 0
-                ? "No hay unidades pendientes de clasificación: todo lo producido ya está registrado como conforme o defectuoso."
-                : "La orden todavía no tiene unidades producidas que clasificar."}
+        {!errorCargaCalidad && calidad.porClasificar > 0 && (
+          <p className="ts-field-help" role="note">
+            {formatearCantidad(calidad.porClasificar, unidad)} pendientes de clasificar.
           </p>
         )}
 
         <div className="ts-panel-title">
-          <h3 style={{ margin: 0, fontSize: ".88rem", fontWeight: 600 }}>
-            Unidades conformes
-          </h3>
+          <h3>Unidades conformes</h3>
           <span>
             Acumulado: {formatearCantidad(calidad.conformes, unidad)}
           </span>
@@ -1359,9 +1351,7 @@ export default function OrdenDetallePage() {
         </div>
 
         <div className="ts-panel-title">
-          <h3 style={{ margin: 0, fontSize: ".88rem", fontWeight: 600 }}>
-            Unidades defectuosas
-          </h3>
+          <h3>Unidades defectuosas</h3>
           <span>
             Acumulado: {formatearCantidad(calidad.defectuosos, unidad)}
           </span>
@@ -1498,7 +1488,7 @@ export default function OrdenDetallePage() {
       </div>
 
       {/* ABC-294: lotes que identifican unidades conformes de la orden. */}
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
+      <div className="ts-panel ts-panel--form" id="sec-lotes">
         <div className="ts-panel-title">
           <h2>Lotes de unidades conformes</h2>
           <span>{lotes.length} lotes</span>
@@ -1543,35 +1533,6 @@ export default function OrdenDetallePage() {
             noValidate
             style={{ padding: "12px 20px 16px" }}
           >
-            <label
-              htmlFor="codigo-lote"
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 5,
-                maxWidth: 320,
-                marginBottom: 12,
-              }}
-            >
-              Código de lote *
-              <input
-                id="codigo-lote"
-                type="text"
-                maxLength={MAX_CODIGO_LOTE}
-                placeholder="Ej.: L-7"
-                value={codigoLote}
-                onChange={(e) => setCodigoLote(e.target.value)}
-                required
-                disabled={guardandoLote}
-                style={{
-                  minHeight: 36,
-                  padding: "7px 10px",
-                  border: "1px solid #e0e0e2",
-                  borderRadius: 5,
-                }}
-              />
-            </label>
-
             <label
               htmlFor="cantidad-lote"
               style={{
@@ -1664,43 +1625,28 @@ export default function OrdenDetallePage() {
       </div>
 
       {/* ABC-299: resumen de cierre tal como lo guardó la API, sin recalcular. */}
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
+      {muestraCierre && (
+      <div className="ts-panel ts-panel--form" id="sec-cierre">
         <div className="ts-panel-title">
           <h2>Resumen de cierre</h2>
           <span
             className={`ts-badge ${
               estadoCierre === "preparado"
                 ? "ts-badge--FINALIZADA"
-                : estadoCierre === "sin-preparar" && orden.estado === "FINALIZADA"
-                  ? "ts-badge--PENDIENTE"
-                  : "ts-badge--inactivo"
+                : "ts-badge--PENDIENTE"
             }`}
           >
-            {estadoCierre === "preparado"
-              ? "Preparado"
-              : estadoCierre === "cargando"
-                ? "Cargando…"
-                : estadoCierre === "sin-preparar" && orden.estado === "FINALIZADA"
-                  ? "Pendiente de preparar"
-                  : "No disponible"}
+            {estadoCierre === "preparado" ? "Preparado" : "Pendiente de preparar"}
           </span>
         </div>
 
-        <p className="ts-field-help" role="note" style={{ padding: "0 20px" }}>
-          Estado del reporte:{" "}
-          <strong>
-            {estadoCierre === "preparado"
-              ? (() => {
-                  const { fecha, hora } = mostrarFechaHora(cierre.fechaCierre);
-                  return `preparado, versión ${cierre.cierreVersion}, el ${fecha} a las ${hora}.`;
-                })()
-              : estadoCierre === "error"
-                ? "no se pudo consultar."
-                : orden.estado === "FINALIZADA"
-                  ? `versión ${VERSION_CIERRE_INICIAL} pendiente de preparar.`
-                  : `no disponible: la orden debe estar FINALIZADA (actual: ${mostrarEstadoOrden(orden.estado).toLowerCase()}).`}
-          </strong>{" "}
-          Es una copia fija de los registros al cerrar; no incluye costos, asientos ni impuestos.
+        <p className="ts-field-help" role="note">
+          {estadoCierre === "preparado"
+            ? (() => {
+                const { fecha, hora } = mostrarFechaHora(cierre.fechaCierre);
+                return `Copia fija de los registros al cerrar: versión ${cierre.cierreVersion}, ${fecha} ${hora}.`;
+              })()
+            : `Pendiente de preparar la versión ${VERSION_CIERRE_INICIAL}.`}
         </p>
 
         {errorCargaCierre && (
@@ -1757,9 +1703,8 @@ export default function OrdenDetallePage() {
               </div>
             )}
 
-            <p className="ts-field-help" style={{ padding: "0 20px" }}>
-              Pendiente: Contabilidad aún no responde. Recibido: Contabilidad recibió el
-              resumen; no significa aprobación contable.
+            <p className="ts-field-help" role="note">
+              Pendiente: Contabilidad todavía no responde.
             </p>
 
             <div className="ts-table-wrap">
@@ -1883,8 +1828,9 @@ export default function OrdenDetallePage() {
           </p>
         )}
       </div>
+      )}
 
-      <div className="ts-panel">
+      <div className="ts-panel ts-panel--form" id="sec-historial">
         <div className="ts-panel-title">
           <h2>Historial</h2>
           <span>{historial.length} movimientos</span>

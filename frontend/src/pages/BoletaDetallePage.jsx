@@ -275,8 +275,10 @@ export default function BoletaDetallePage() {
         {mensajeItems && <p className="ts-feedback ts-notice" role="status">{mensajeItems}</p>}
 
         {editandoItems && boleta.estado === "BORRADOR" && (
-          <form className="ts-panel" onSubmit={handleGuardarItems}>
-            <h2>Ítems del borrador</h2>
+          <form className="ts-panel ts-panel--form" onSubmit={handleGuardarItems}>
+            <div className="ts-panel-title">
+              <h2>Ítems del borrador</h2>
+            </div>
             <p>Las referencias deben pertenecer a la solicitud de salida y a los lotes de la orden.</p>
             {itemsEdicion.map((item, indice) => (
               <div className="ts-filters" key={indice}>
@@ -378,8 +380,10 @@ export default function BoletaDetallePage() {
       </article>
 
       {historial.length > 0 && (
-        <div className="ts-panel boleta-pantalla">
-          <h2>Historial de la boleta</h2>
+        <div className="ts-panel ts-panel--form boleta-pantalla">
+          <div className="ts-panel-title">
+            <h2>Historial de la boleta</h2>
+          </div>
           {historial.map((evento) => (
             <p key={evento.id}>
               {fechaHoraTexto(evento.fechaHora)} — {evento.estadoAnterior} → {evento.estadoNuevo}: {evento.motivo}

@@ -154,8 +154,10 @@ export default function BoletasPage() {
       <p className="ts-notice">Consulta las boletas registradas en el servidor y filtra por orden, estado o fecha.</p>
 
       {(puedeCrearSolicitud || puedeCrearBoleta) && (
-        <div className="ts-panel">
-          <h2>Crear documentos de salida</h2>
+        <div className="ts-panel ts-panel--form">
+          <div className="ts-panel-title">
+            <h2>Crear documentos de salida</h2>
+          </div>
           {errorFormulario && <p className="ts-feedback ts-error" role="alert">{errorFormulario}</p>}
           {mensajeFormulario && <p className="ts-feedback ts-notice" role="status">{mensajeFormulario}</p>}
           {puedeCrearSolicitud && (
@@ -200,12 +202,14 @@ export default function BoletasPage() {
           {puedeCrearBoleta && (
             <form onSubmit={guardarBoleta}>
               <h3>2. Crear boleta en BORRADOR</h3>
-              <label>Solicitud de salida *
-                <select required value={solicitudId} onChange={(evento) => seleccionarSolicitud(evento.target.value)}>
-                  <option value="">Seleccionar solicitud</option>
-                  {solicitudes.map((solicitud) => <option key={solicitud.id} value={solicitud.id}>#{solicitud.id} · orden #{solicitud.ordenId} · {solicitud.destinoDocumental}</option>)}
-                </select>
-              </label>
+              <div className="ts-filters">
+                <label>Solicitud de salida *
+                  <select required value={solicitudId} onChange={(evento) => seleccionarSolicitud(evento.target.value)}>
+                    <option value="">Seleccionar solicitud</option>
+                    {solicitudes.map((solicitud) => <option key={solicitud.id} value={solicitud.id}>#{solicitud.id} · orden #{solicitud.ordenId} · {solicitud.destinoDocumental}</option>)}
+                  </select>
+                </label>
+              </div>
               {itemsBoleta.map((item, indice) => (
                 <div className="ts-filters" key={indice}>
                   <label>Referencia *
@@ -220,8 +224,10 @@ export default function BoletasPage() {
                   {itemsBoleta.length > 1 && <button type="button" className="ts-btn" onClick={() => setItemsBoleta((actual) => actual.filter((_, posicion) => posicion !== indice))}>Quitar ítem</button>}
                 </div>
               ))}
-              {solicitudId && <button type="button" className="ts-btn" onClick={() => setItemsBoleta((actual) => [...actual, { referencia: "", cantidad: "" }])}>Agregar ítem</button>}
-              <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando || !solicitudId || itemsBoleta.length === 0}>Crear boleta</button>
+              <div className="ts-btn-group">
+                {solicitudId && <button type="button" className="ts-btn" onClick={() => setItemsBoleta((actual) => [...actual, { referencia: "", cantidad: "" }])}>Agregar ítem</button>}
+                <button type="submit" className="ts-btn ts-btn-primary" disabled={guardando || !solicitudId || itemsBoleta.length === 0}>Crear boleta</button>
+              </div>
             </form>
           )}
         </div>
@@ -248,7 +254,7 @@ export default function BoletasPage() {
         <button type="submit" className="ts-btn ts-btn-primary">Filtrar</button>
       </form>
 
-      <div className="ts-panel">
+      <div className="ts-panel ts-panel--form">
         <div className="ts-panel-title">
           <h2 id="boletas-titulo">Boletas</h2>
         </div>

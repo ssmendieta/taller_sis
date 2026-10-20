@@ -88,6 +88,18 @@ export default function SolicitudesMaterialPage() {
     cargarDatos();
   }, []);
 
+  // El detalle se abre en modal: Escape lo cierra.
+  useEffect(() => {
+    if (!detalle) return undefined;
+
+    function alPulsarEscape(evento) {
+      if (evento.key === "Escape") setDetalle(null);
+    }
+
+    document.addEventListener("keydown", alPulsarEscape);
+    return () => document.removeEventListener("keydown", alPulsarEscape);
+  }, [detalle]);
+
   function cambiarItem(indice, campo, valor) {
     setItems((actuales) =>
       actuales.map((item, i) => {
@@ -228,7 +240,7 @@ export default function SolicitudesMaterialPage() {
         </p>
       )}
 
-      <div className="ts-panel">
+      <div className="ts-panel ts-panel--form">
         <div className="ts-panel-title">
           <h2 id="solicitudes-title">Registrar solicitud</h2>
         </div>
@@ -333,7 +345,7 @@ export default function SolicitudesMaterialPage() {
         </form>
       </div>
 
-      <div className="ts-panel">
+      <div className="ts-panel ts-panel--form">
         <div className="ts-panel-title">
           <h2>Listado de solicitudes</h2>
           <button
@@ -409,76 +421,87 @@ export default function SolicitudesMaterialPage() {
       </div>
 
       {detalle && (
-        <div className="ts-panel">
-          <div className="ts-panel-title">
-            <h2>Detalle de solicitud #{detalle.id}</h2>
-            <button
-              type="button"
-              className="ts-btn ts-btn-quiet"
-              onClick={() => setDetalle(null)}
-            >
-              Cerrar detalle
-            </button>
-          </div>
+        <div className="ts-modal-overlay" onClick={() => setDetalle(null)}>
+          <div
+            className="ts-modal ts-modal--ancho"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detalle-solicitud-titulo"
+            onClick={(evento) => evento.stopPropagation()}
+          >
+            <h2 id="detalle-solicitud-titulo">
+              Detalle de solicitud #{detalle.id}
+            </h2>
 
-          <p>
-            <strong>Orden:</strong>{" "}
-            {detalle.orden?.codigo ?? detalle.ordenId ?? "—"}
-          </p>
-          {(() => {
-            const inventario = estadoInventario(detalle);
+            <p>
+              <strong>Orden:</strong>{" "}
+              {detalle.orden?.codigo ?? detalle.ordenId ?? "—"}
+            </p>
+            {(() => {
+              const inventario = estadoInventario(detalle);
 
-            return (
-              <>
-                <p>
-                  <strong>Estado:</strong>{" "}
-                  <span className={`ts-badge ${inventario.clase}`}>
-                    {inventario.etiqueta}
-                  </span>
-                </p>
-                {inventario.estado === "PENDIENTE" && (
-                  <p className="ts-field-help" role="note">
-                    Registrada y enviada a Inventarios. Su respuesta llega después; usa
-                    «Actualizar» en el listado para consultarla.
-                  </p>
-                )}
-                {inventario.respondidaEn && (
+              return (
+                <>
                   <p>
-                    <strong>Respuesta de Inventarios:</strong>{" "}
-                    {fechaSolicitud(inventario.respondidaEn)}
-                    {inventario.motivo ? ` · ${inventario.motivo}` : ""}
+                    <strong>Estado:</strong>{" "}
+                    <span className={`ts-badge ${inventario.clase}`}>
+                      {inventario.etiqueta}
+                    </span>
                   </p>
-                )}
-              </>
-            );
-          })()}
-          <p>
-            <strong>Fecha:</strong> {fechaSolicitud(detalle.fecha)}
-          </p>
+                  {inventario.estado === "PENDIENTE" && (
+                    <p className="ts-field-help" role="note">
+                      Registrada y enviada a Inventarios. Su respuesta llega después; usa
+                      «Actualizar» en el listado para consultarla.
+                    </p>
+                  )}
+                  {inventario.respondidaEn && (
+                    <p>
+                      <strong>Respuesta de Inventarios:</strong>{" "}
+                      {fechaSolicitud(inventario.respondidaEn)}
+                      {inventario.motivo ? ` · ${inventario.motivo}` : ""}
+                    </p>
+                  )}
+                </>
+              );
+            })()}
+            <p>
+              <strong>Fecha:</strong> {fechaSolicitud(detalle.fecha)}
+            </p>
 
-          <div className="ts-table-wrap">
-            <table className="ts-table">
-              <thead>
-                <tr>
-                  <th>Material</th>
-                  <th>Cantidad</th>
-                  <th>Unidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(detalle.items ?? []).map((item) => (
-                  <tr key={item.id ?? `${item.materialId}-${item.unidad}`}>
-                    <td>
-                      {item.material?.nombre ??
-                        item.material?.descripcion ??
-                        item.materialId}
-                    </td>
-                    <td>{item.cantidad}</td>
-                    <td>{item.unidad}</td>
+            <div className="ts-table-wrap">
+              <table className="ts-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Cantidad</th>
+                    <th>Unidad</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(detalle.items ?? []).map((item) => (
+                    <tr key={item.id ?? `${item.materialId}-${item.unidad}`}>
+                      <td>
+                        {item.material?.nombre ??
+                          item.material?.descripcion ??
+                          item.materialId}
+                      </td>
+                      <td>{item.cantidad}</td>
+                      <td>{item.unidad}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="ts-modal-actions">
+              <button
+                type="button"
+                className="ts-btn"
+                onClick={() => setDetalle(null)}
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
