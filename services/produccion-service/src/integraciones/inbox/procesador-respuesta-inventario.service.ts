@@ -92,6 +92,47 @@ export class ProcesadorRespuestaInventarioService {
   constructor(private readonly dataSource: DataSource) {}
 
   async procesar(payload: unknown, messageId?: string): Promise<ResultadoProcesamientoRespuesta> {
+    try {
+      return await this.procesarRespuesta(payload, messageId);
+    } catch (error) {
+      if (error instanceof EventoInventarioV1InvalidoError || error instanceof ConflictException) {
+        await this.registrarErrorDisponibilidad(payload, error.message);
+      }
+      throw error;
+    }
+  }
+
+  private async registrarErrorDisponibilidad(payload: unknown, motivo: string): Promise<void> {
+    const evento = payload as Partial<DisponibilidadMaterialRespondidaV1Event> | null;
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (evento?.eventType !== DISPONIBILIDAD_MATERIAL_RESPONDIDA_V1
+      || evento.source !== 'inventario-service' || !evento.data
+      || !uuid.test(evento.data.requestEventId ?? '')
+      || !uuid.test(evento.correlationId ?? '')
+      || !Number.isSafeInteger(evento.data.ordenId)
+      || !Number.isSafeInteger(evento.data.consultaVersion)
+      || typeof evento.data.consultaId !== 'string') return;
+
+    await this.dataSource.transaction(async (manager) => {
+      const consulta = await manager.findOne(ConsultaDisponibilidad, {
+        where: {
+          requestEventId: evento.data!.requestEventId,
+          correlationId: evento.correlationId,
+          consultaId: evento.data!.consultaId,
+          consultaVersion: evento.data!.consultaVersion,
+          ordenId: String(evento.data!.ordenId),
+          estado: 'PENDIENTE',
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (consulta) {
+        consulta.errorRespuesta = `Inventarios devolvió una respuesta no válida: ${motivo}`.slice(0, 500);
+        await manager.save(ConsultaDisponibilidad, consulta);
+      }
+    });
+  }
+
+  private async procesarRespuesta(payload: unknown, messageId?: string): Promise<ResultadoProcesamientoRespuesta> {
     const evento = this.validarRespuesta(payload);
     const payloadHash = hashPayload(evento);
 
@@ -243,6 +284,7 @@ export class ProcesadorRespuestaInventarioService {
       await manager.save(ConsultaDisponibilidadItem, items);
       consulta.estado = ESTADO_CONSULTA_DISPONIBILIDAD_RESPONDIDA;
       consulta.responseEventId = evento.eventId;
+      consulta.errorRespuesta = null;
       consulta.vigenteEn = new Date(evento.data.vigenteAt);
       await manager.save(ConsultaDisponibilidad, consulta);
     }

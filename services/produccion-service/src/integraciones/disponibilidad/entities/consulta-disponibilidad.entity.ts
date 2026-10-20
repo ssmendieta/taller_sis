@@ -9,6 +9,7 @@ import {
 
 export const ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE = 'PENDIENTE' as const;
 export const ESTADO_CONSULTA_DISPONIBILIDAD_RESPONDIDA = 'RESPONDIDA' as const;
+export const ESPERA_DISPONIBILIDAD_MS = 20_000;
 
 export type EstadoConsultaDisponibilidad =
   | typeof ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE
@@ -43,6 +44,12 @@ export class ConsultaDisponibilidad {
 
   @Column({ name: 'response_event_id', type: 'uuid', nullable: true })
   responseEventId: string | null;
+
+  @Column({ name: 'error_respuesta', type: 'varchar', length: 500, nullable: true })
+  errorRespuesta: string | null;
+
+  @Column({ name: 'respuesta_esperada_hasta', type: 'timestamptz', default: () => "NOW() + INTERVAL '20 seconds'" })
+  respuestaEsperadaHasta: Date;
 
   @Column({ name: 'vigente_en', type: 'timestamptz', nullable: true })
   vigenteEn: Date | null;

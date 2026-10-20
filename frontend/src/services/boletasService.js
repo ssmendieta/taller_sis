@@ -14,8 +14,9 @@ function encabezados(extra = {}) {
 // Conserva el código HTTP para distinguir 403 y 404 en la pantalla.
 async function exigirOk(response, mensaje) {
   if (!response.ok) {
-    const datos = await response.json().catch(() => null);
-    const detalle = datos?.message;
+    const texto = await response.text().catch(() => "");
+    let detalle = texto;
+    try { detalle = JSON.parse(texto)?.message || texto; } catch { /* Respuesta sin JSON. */ }
     const error = new Error(
       (Array.isArray(detalle) ? detalle.join(". ") : detalle) || mensaje
     );
@@ -26,39 +27,42 @@ async function exigirOk(response, mensaje) {
 }
 
 export const PERMISO_CONSULTAR_BOLETAS = "logistica.boletas.consultar";
+export const PERMISO_CONSULTAR_SOLICITUDES = "logistica.solicitudes.consultar";
+export const PERMISO_GESTIONAR_SOLICITUDES = "logistica.solicitudes.gestionar";
 export const ESTADO_BOLETA_EMITIDA = "EMITIDA";
 
 const LOGISTICA = `${apiConfig.gatewayUrl}/api/logistica`;
 
-// Listado paginado con filtros opcionales; llamar sin argumentos conserva los valores del servidor.
+// Todas las boletas guardadas, de la más reciente a la más antigua.
 export async function listarBoletas(filtros = {}) {
-  const params = new URLSearchParams();
-  for (const campo of ["orden", "ordenId", "estado", "fechaDesde", "fechaHasta", "page", "limit"]) {
-    if (filtros[campo] !== undefined && String(filtros[campo]).trim()) {
-      params.set(campo, String(filtros[campo]).trim());
+  const parametros = new URLSearchParams();
+  for (const clave of ["orden", "ordenId", "estado", "fechaDesde", "fechaHasta", "page", "limit"]) {
+    const valor = filtros[clave];
+    if (valor !== undefined && valor !== null && String(valor).trim() !== "") {
+      parametros.set(clave, String(valor).trim());
     }
   }
-  const query = params.toString() ? `?${params}` : "";
-  const response = await fetch(`${LOGISTICA}/boletas${query}`, { headers: encabezados() });
+  const consulta = parametros.toString();
+  const response = await fetch(`${LOGISTICA}/boletas${consulta ? `?${consulta}` : ""}`, { headers: encabezados() });
 
   await exigirOk(response, "No se pudieron cargar las boletas.");
   return response.json();
 }
 
-export async function listarSolicitudesSalida() {
-  const response = await fetch(`${LOGISTICA}/solicitudes-salida`, { headers: encabezados() });
-  await exigirOk(response, "No se pudieron cargar las solicitudes de salida.");
-  return response.json();
-}
-
-export async function crearSolicitudSalida(datos) {
-  const response = await fetch(`${LOGISTICA}/solicitudes-salida`, {
-    method: "POST",
-    headers: encabezados({ "Content-Type": "application/json" }),
-    body: JSON.stringify(datos),
+export async function obtenerDisponibilidadDocumental(ordenCodigo, { signal } = {}) {
+  const codigo = ordenCodigo.trim();
+  const response = await fetch(`${LOGISTICA}/disponibilidad/${encodeURIComponent(codigo)}`, {
+    headers: encabezados(),
+    signal,
   });
-  await exigirOk(response, "No se pudo crear la solicitud de salida.");
-  return response.json();
+  await exigirOk(response, "No se pudo consultar la disponibilidad documental.");
+  const disponibilidad = await response.json();
+  if (disponibilidad?.ordenCodigo !== codigo ||
+      ["totalConforme", "totalEmitido", "saldoDocumental"].some((campo) =>
+        typeof disponibilidad[campo] !== "string" || !/^-?\d+(?:\.\d{1,4})?$/.test(disponibilidad[campo]))) {
+    throw new Error("El servidor devolvió una disponibilidad documental incompleta o inválida.");
+  }
+  return disponibilidad;
 }
 
 // Saldo documental de cada lote de la orden: cantidad original, cantidad comprometida
@@ -72,23 +76,42 @@ export async function consultarDisponibilidadLotes(ordenCodigo) {
   return response.json();
 }
 
-export async function crearBoleta(datos) {
+// Crea una boleta persistida a partir de una solicitud de salida y sus lotes.
+// Acepta (solicitudSalidaId, items) o un único objeto { solicitudSalidaId, items }.
+export async function crearBoleta(solicitudSalidaId, items) {
+  const datos = typeof solicitudSalidaId === "object" && solicitudSalidaId !== null
+    ? solicitudSalidaId : { solicitudSalidaId, items };
   const response = await fetch(`${LOGISTICA}/boletas`, {
     method: "POST",
     headers: encabezados({ "Content-Type": "application/json" }),
-    body: JSON.stringify(datos),
+    body: JSON.stringify({ solicitudSalidaId: String(datos.solicitudSalidaId), items: datos.items }),
   });
+
   await exigirOk(response, "No se pudo crear la boleta.");
-  return response.json();
+  const boleta = await response.json();
+  if (!boleta?.id || !boleta.estado) throw new Error("El servidor no confirmó el registro de la boleta.");
+  return boleta;
 }
 
-export async function actualizarBoletaItems(id, items) {
-  const response = await fetch(`${LOGISTICA}/boletas/${encodeURIComponent(id)}/items`, {
-    method: "PUT",
+export async function crearSolicitudSalida({ ordenId, destinoDocumental, motivo, items }) {
+  const response = await fetch(`${LOGISTICA}/solicitudes-salida`, {
+    method: "POST",
     headers: encabezados({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ ordenId, destinoDocumental, motivo,
+      items: items.map(({ referencia, cantidad }) => ({ referencia, cantidad })) }),
   });
-  await exigirOk(response, "No se pudieron actualizar los ítems de la boleta.");
+  await exigirOk(response, "No se pudo registrar la solicitud de salida.");
+  const solicitud = await response.json();
+  if (!solicitud?.id || !solicitud.estado || !Array.isArray(solicitud.items) || !solicitud.items.length) {
+    throw new Error("El servidor no confirmó el registro de la solicitud. Revisa el listado antes de volver a enviarla.");
+  }
+  return solicitud;
+}
+
+export async function listarSolicitudesSalida() {
+  const response = await fetch(`${LOGISTICA}/solicitudes-salida`, { headers: encabezados() });
+
+  await exigirOk(response, "No se pudieron cargar las solicitudes de salida.");
   return response.json();
 }
 
@@ -101,6 +124,20 @@ export async function obtenerBoleta(id) {
   await exigirOk(response, "No se pudo cargar la boleta.");
   return response.json();
 }
+
+// ABC-78: reemplaza los ítems de una boleta BORRADOR en una sola operación.
+export async function actualizarItemsBoleta(id, items) {
+  const response = await fetch(`${LOGISTICA}/boletas/${encodeURIComponent(id)}/items`, {
+    method: "PUT",
+    headers: encabezados({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ items }),
+  });
+
+  await exigirOk(response, "No se pudieron actualizar los ítems de la boleta.");
+  return response.json();
+}
+
+export const actualizarBoletaItems = actualizarItemsBoleta;
 
 // Emite una boleta en borrador; pasa a EMITIDA y registra el autor emisor en el backend.
 export async function emitirBoleta(id) {

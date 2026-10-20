@@ -11,8 +11,7 @@ import SolicitudesMaterialPage from "../pages/SolicitudesMaterialPage.jsx";
 import IntegracionesPage from "../pages/IntegracionesPage.jsx";
 import BoletaDetallePage from "../pages/BoletaDetallePage.jsx";
 import BoletasPage from "../pages/BoletasPage.jsx";
-import BoletasLocalPage from "../pages/BoletasLocalPage.jsx";
-import BoletaDetalleLocalPage from "../pages/BoletaDetalleLocalPage.jsx";
+import BoletaNuevaPage from "../pages/BoletaNuevaPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
@@ -21,7 +20,7 @@ import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
-import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
+import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
 
 const privada = (pagina, permisos) => (
   <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>
@@ -39,6 +38,10 @@ function InicioRedirect() {
     return <Navigate to="/usuarios" replace />;
   }
 
+  if (tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES)) {
+    return <Navigate to="/logistica/inicio" replace />;
+  }
+
   if (tienePermiso(usuario, "ordenes.consultar")) {
     return <Navigate to="/ordenes" replace />;
   }
@@ -46,6 +49,10 @@ function InicioRedirect() {
   // Logística y roles de solo lectura de boletas (consultar no permite crear ni emitir).
   if (tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS)) {
     return <Navigate to="/logistica/boletas" replace />;
+  }
+
+  if (tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES)) {
+    return <Navigate to="/logistica/inicio" replace />;
   }
 
   if (tienePermiso(usuario, "auditoria.consultar")) {
@@ -168,14 +175,17 @@ export default function AppRoutes() {
           element={privada(<BoletaDetallePage />, [PERMISO_CONSULTAR_BOLETAS])}
         />
 
-        {/* Rutas del prototipo local, aisladas de las boletas de la API. */}
+        <Route
+          path="/logistica/boletas/nueva"
+          element={privada(<BoletaNuevaPage />, ["logistica.boletas.gestionar"])}
+        />
         <Route
           path="/logistica/boletas/local/nueva"
-          element={privada(<BoletasLocalPage />, [PERMISO_CONSULTAR_BOLETAS])}
+          element={<Navigate to="/logistica/boletas/nueva" replace />}
         />
         <Route
           path="/logistica/boletas/local/:id"
-          element={privada(<BoletaDetalleLocalPage />, [PERMISO_CONSULTAR_BOLETAS])}
+          element={<Navigate to="/logistica/boletas" replace />}
         />
         <Route
           path="/logistica/boletas/consulta"
@@ -187,7 +197,7 @@ export default function AppRoutes() {
         />
         <Route
           path="/logistica/inicio"
-          element={privada(<LogisticaPage />, [PERMISO_CONSULTAR_BOLETAS])}
+          element={privada(<LogisticaPage />, [PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES])}
         />
 
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />

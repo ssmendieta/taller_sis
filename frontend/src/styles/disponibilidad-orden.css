@@ -1,0 +1,26 @@
+.ts-panel.disponibilidad-orden {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.disponibilidad-orden .ts-panel-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 0;
+}
+.disponibilidad-orden__encabezado { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.disponibilidad-orden .ts-panel-title span { overflow-wrap: anywhere; }
+.disponibilidad-orden :is(.ts-field-help, .ts-error, .ts-success, .ts-notice, .ts-empty) { margin: 0; }
+.disponibilidad-orden .ts-field-help { max-width: 80ch; line-height: 1.6; }
+.disponibilidad-orden .ts-table-wrap { margin: 0; min-width: 0; width: 100%; overflow-x: auto; }
+.disponibilidad-orden .ts-table { min-width: 620px; }
+@media (max-width: 767px) {
+  .ts-panel.disponibilidad-orden { padding: 16px; }
+  .disponibilidad-orden .ts-panel-title { grid-template-columns: minmax(0, 1fr); }
+  .disponibilidad-orden .ts-panel-title .ts-btn { width: 100%; min-width: 0; white-space: normal; }
+}

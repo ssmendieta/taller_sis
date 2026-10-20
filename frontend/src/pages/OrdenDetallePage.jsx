@@ -5,7 +5,6 @@ import { useSesion } from "../context/SesionContext.jsx";
 import {
   cambiarEstadoOrden,
   obtenerAvancesOrden,
-  obtenerDisponibilidadOrden,
   obtenerHistorialOrden,
   obtenerMaterialesOrden,
   obtenerOrden,
@@ -60,6 +59,8 @@ import {
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
+import useDisponibilidadOrden from "../hooks/useDisponibilidadOrden.js";
+import "../styles/disponibilidad-orden.css";
 
 const ETIQUETAS = {
   PLANIFICADA: { titulo: "planificación", verbo: "Planificar" },
@@ -90,7 +91,18 @@ export default function OrdenDetallePage() {
 
   const [orden, setOrden] = useState(null);
   const [materiales, setMateriales] = useState([]);
-  const [disponibilidad, setDisponibilidad] = useState([]);
+  // La disponibilidad se consulta bajo demanda y llega de Inventarios por Pub/Sub.
+  const consultaDisponibilidad = useDisponibilidadOrden(id);
+  const estadoConsultaDisponibilidad = consultaDisponibilidad.estado;
+  const disponibilidad = useMemo(() => estadoConsultaDisponibilidad === "RESPONDIDA"
+    ? materialesNormalizados(consultaDisponibilidad.datos) : [],
+  [estadoConsultaDisponibilidad, consultaDisponibilidad.datos]);
+  const {
+    error: errorDisponibilidad,
+    aviso: avisoDisponibilidad,
+    bloqueada: solicitandoDisponibilidad,
+    solicitar: consultarDisponibilidad,
+  } = consultaDisponibilidad;
   const [historial, setHistorial] = useState([]);
   const [avances, setAvances] = useState([]);
   const [total, setTotal] = useState(0);
@@ -150,6 +162,7 @@ export default function OrdenDetallePage() {
 
   const muestraAcciones = puedeVerAcciones(usuario);
   const permiteAvance = puedeRegistrarAvance(usuario);
+  const permiteConsultarDisponibilidad = tienePermiso(usuario, "materiales.consultar_disponibilidad");
   const permiteConsumo = tienePermiso(usuario, "materiales.registrar_consumo");
   // El mismo permiso de calidad registra conformes y defectuosos.
   const permiteCalidad = tienePermiso(usuario, "calidad.registrar_conformes");
@@ -236,13 +249,6 @@ export default function OrdenDetallePage() {
 
       // Disponibilidad y avance no bloquean el detalle si fallan.
       try {
-        const disp = await obtenerDisponibilidadOrden(id);
-        setDisponibilidad(materialesNormalizados(disp));
-      } catch {
-        setDisponibilidad([]);
-      }
-
-      try {
         setTotal(totalProducidoDe(await obtenerTotalProducido(id)));
       } catch {
         setTotal(Number(detalle?.avance?.acumulado ?? 0));
@@ -325,6 +331,11 @@ export default function OrdenDetallePage() {
   const motivoBloqueoInicio = useMemo(() => {
     if (orden?.estado !== "PLANIFICADA") return "";
     if (recetaActiva === false) return "La receta de esta orden está inactiva.";
+    if (estadoConsultaDisponibilidad !== "RESPONDIDA") {
+      return estadoConsultaDisponibilidad === "PENDIENTE"
+        ? "La consulta de disponibilidad está pendiente. Espera la respuesta de Inventario."
+        : "Primero solicita la disponibilidad de materiales y espera la respuesta de Inventario.";
+    }
 
     if (faltantes.length > 0) {
       const nombres = faltantes
@@ -338,7 +349,7 @@ export default function OrdenDetallePage() {
     }
 
     return "";
-  }, [orden, recetaActiva, faltantes]);
+  }, [orden, recetaActiva, faltantes, estadoConsultaDisponibilidad]);
 
   const acciones = useMemo(
     () => (orden ? accionesPara(usuario, orden.estado) : []),
@@ -809,11 +820,31 @@ export default function OrdenDetallePage() {
         )}
       </div>
 
-      <div className="ts-panel ts-panel--form" id="sec-materiales">
+      <div className="ts-panel ts-panel--form disponibilidad-orden" id="sec-materiales">
         <div className="ts-panel-title">
-          <h2>Materiales</h2>
-          <span>{materiales.length} líneas</span>
+          <div className="disponibilidad-orden__encabezado">
+            <h2>Materiales</h2>
+            <span>{materiales.length} líneas · Disponibilidad: {estadoConsultaDisponibilidad.replaceAll("_", " ").toLowerCase()}</span>
+          </div>
+          {permiteConsultarDisponibilidad && orden.estado === "PLANIFICADA" && materiales.length > 0 && (
+            <button
+              type="button"
+              className="ts-btn ts-btn-primary"
+              onClick={consultarDisponibilidad}
+              disabled={solicitandoDisponibilidad}
+            >
+              {solicitandoDisponibilidad ? "Consultando…" : errorDisponibilidad ? "Reintentar disponibilidad" : "Solicitar disponibilidad"}
+            </button>
+          )}
         </div>
+
+        {errorDisponibilidad && <p className="ts-error" role="alert">{errorDisponibilidad}</p>}
+        {avisoDisponibilidad && <p className={estadoConsultaDisponibilidad === "RESPONDIDA" ? "ts-success" : "ts-notice"} role="status">{avisoDisponibilidad}</p>}
+        {estadoConsultaDisponibilidad !== "RESPONDIDA" && orden.estado === "PLANIFICADA" && permiteConsultarDisponibilidad && (
+          <p className="ts-field-help" role="note">
+            Solicita la disponibilidad de los materiales de esta orden. Las cantidades aparecerán cuando Inventarios responda; esta consulta no cambia la receta ni inicia la producción.
+          </p>
+        )}
 
         {materiales.length === 0 ? (
           <p className="ts-empty">Sin materiales.</p>

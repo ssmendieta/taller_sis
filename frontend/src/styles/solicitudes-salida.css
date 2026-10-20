@@ -1,0 +1,163 @@
+.solicitudes-salida {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.solicitudes-salida > :is(.ts-heading, .ts-panel, p, .ts-success) {
+  margin: 0;
+}
+
+.solicitudes-salida__formulario,
+.solicitudes-salida__listado,
+.solicitudes-salida__campos,
+.solicitudes-salida__disponibilidad {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.solicitudes-salida__formulario,
+.solicitudes-salida__listado {
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.solicitudes-salida .ts-panel-title {
+  padding: 0;
+  flex-wrap: wrap;
+}
+
+.solicitudes-salida__campos {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.solicitudes-salida__fila {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+  min-width: 0;
+}
+
+.solicitudes-salida__fila--item {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+}
+
+.solicitudes-salida label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ts-secondary);
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.solicitudes-salida :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.solicitudes-salida__disponibilidad :is(h3, p),
+.solicitudes-salida__campos > p {
+  margin: 0;
+}
+
+.solicitudes-salida__disponibilidad h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.solicitudes-salida__totales {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.solicitudes-salida__totales > div {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--ts-border);
+  border-radius: var(--ts-radius-control);
+  background: var(--ts-field-bg);
+}
+
+.solicitudes-salida__totales dt {
+  color: var(--ts-secondary);
+  font-size: 0.8rem;
+}
+
+.solicitudes-salida__totales dd {
+  margin: 0;
+  color: var(--ts-text);
+  font-size: 1.1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.solicitudes-salida__botones,
+.solicitudes-salida__accion {
+  gap: 12px;
+}
+
+.solicitudes-salida__accion {
+  display: grid;
+  min-width: 220px;
+}
+
+.solicitudes-salida__accion p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.solicitudes-salida__accion p a {
+  display: block;
+}
+
+.solicitudes-salida__listado > .ts-table-wrap {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.solicitudes-salida .ts-heading > *,
+.solicitudes-salida .ts-heading-actions {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .solicitudes-salida__formulario,
+  .solicitudes-salida__listado {
+    padding: 16px;
+  }
+
+  .solicitudes-salida__fila,
+  .solicitudes-salida__fila--item,
+  .solicitudes-salida__totales {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .solicitudes-salida > .ts-heading,
+  .solicitudes-salida__botones,
+  .solicitudes-salida .ts-panel-title {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .solicitudes-salida .ts-heading-actions,
+  .solicitudes-salida .ts-heading-actions > .ts-btn,
+  .solicitudes-salida__botones > .ts-btn {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}

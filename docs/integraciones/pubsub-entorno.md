@@ -87,7 +87,10 @@ después de aceptar la publicación.
 - Existe outbox y reintento persistente para `SolicitudMaterialAlmacen.v1`
   y `ProduccionCerrada.v1`. Ambos reutilizan el mismo publicador y configuración.
 - Existe inbox persistente para evitar efectos duplicados y snapshots
-  versionados de disponibilidad. El simulador de Inventarios continúa fuera
-  del alcance.
+  versionados de disponibilidad. El simulador local de
+  `simuladores/inventarios/` responde a solicitudes de materiales y, para las
+  pruebas ABC-278, a consultas de disponibilidad. Consulta
+  `docs/evidencias/inventarios/ABC-278-disponibilidad-local.md` para iniciar la
+  prueba local.
 - Los contratos están documentados en `contabilidad-v1.md` e
   `inventario-almacen-v1.md`.

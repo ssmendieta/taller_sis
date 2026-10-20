@@ -1,0 +1,7 @@
+services:
+  logistica-service:
+    environment:
+      - AUTH_SERVICE_URL=http://auth-service:3001
+    depends_on:
+      auth-service:
+        condition: service_started

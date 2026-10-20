@@ -4,13 +4,14 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import {
   ESTADO_BOLETA_EMITIDA,
-  actualizarBoletaItems,
+  actualizarItemsBoleta,
   anularBoleta,
   emitirBoleta,
   obtenerBoleta,
   obtenerSolicitudSalida,
 } from "../services/boletasService.js";
 import { obtenerOrden } from "../services/ordenesService.js";
+import { listarLotesOrden } from "../services/lotesService.js";
 import { formatearFechaHora, formatearNumero } from "../utils/format.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
@@ -56,62 +57,168 @@ export default function BoletaDetallePage() {
   const [emitiendo, setEmitiendo] = useState(false);
   const [mensajeEmision, setMensajeEmision] = useState("");
   const [errorEmision, setErrorEmision] = useState("");
-  const [mostrarAnulacion, setMostrarAnulacion] = useState(false);
+  const [editandoItems, setEditandoItems] = useState(false);
+  const [itemsBorrador, setItemsBorrador] = useState([]);
+  const [lotesDisponibles, setLotesDisponibles] = useState([]);
+  const [cargandoLotes, setCargandoLotes] = useState(false);
+  const [guardandoItems, setGuardandoItems] = useState(false);
+  const [mensajeItems, setMensajeItems] = useState("");
+  const [errorItems, setErrorItems] = useState("");
+  const [nuevoLote, setNuevoLote] = useState("");
+  const [cantidadNuevoLote, setCantidadNuevoLote] = useState("1");
+  const [mostrandoAnulacion, setMostrandoAnulacion] = useState(false);
   const [motivoAnulacion, setMotivoAnulacion] = useState("");
   const [anulando, setAnulando] = useState(false);
+  const [anulacionConfirmada, setAnulacionConfirmada] = useState(false);
   const [mensajeAnulacion, setMensajeAnulacion] = useState("");
   const [errorAnulacion, setErrorAnulacion] = useState("");
-  const [editandoItems, setEditandoItems] = useState(false);
-  const [itemsEdicion, setItemsEdicion] = useState([]);
-  const [guardandoItems, setGuardandoItems] = useState(false);
-  const [errorItems, setErrorItems] = useState("");
-  const [mensajeItems, setMensajeItems] = useState("");
 
   const puedeEmitir = tienePermiso(usuario, "logistica.boletas.gestionar");
 
-  async function handleGuardarItems(evento) {
-    evento.preventDefault();
-    setErrorItems("");
-    if (itemsEdicion.length === 0) {
-      setErrorItems("La boleta debe conservar al menos un ítem.");
-      return;
-    }
-    setGuardandoItems(true);
-    try {
-      await actualizarBoletaItems(id, itemsEdicion.map((item) => ({ referencia: item.referencia, cantidad: String(item.cantidad) })));
-      setEditandoItems(false);
-      setMensajeItems("Ítems del borrador actualizados.");
-      await cargar();
-    } catch (fallo) {
-      if (fallo?.status === 409) setErrorItems("La boleta ya no está en BORRADOR. Actualiza el detalle.");
-      else if (fallo?.status === 403) setErrorItems("No tienes permiso para editar boletas.");
-      else setErrorItems(fallo?.message || "No se pudieron guardar los ítems.");
-    } finally {
-      setGuardandoItems(false);
-    }
+  async function recargarBoletaAnulada() {
+    const actualizada = await obtenerBoleta(id);
+    setBoleta(actualizada);
+    setErrorAnulacion("");
   }
 
   async function handleAnular(evento) {
     evento.preventDefault();
+    if (anulando || anulacionConfirmada || !puedeEmitir || boleta?.estado !== ESTADO_BOLETA_EMITIDA) return;
+    const motivo = motivoAnulacion.trim();
     setErrorAnulacion("");
-    if (!motivoAnulacion.trim()) {
-      setErrorAnulacion("El motivo de anulación es obligatorio.");
+    if (!motivo) {
+      setErrorAnulacion("El motivo de anulación es obligatorio y no puede estar vacío.");
       return;
     }
+    if (motivo.length > 500) {
+      setErrorAnulacion("El motivo no puede exceder los 500 caracteres.");
+      return;
+    }
+    if (!window.confirm(`¿Confirmas anular la boleta ${boleta.numero}?\nMotivo: ${motivo}`)) return;
+
     setAnulando(true);
+    let confirmada = false;
     try {
-      await anularBoleta(id, motivoAnulacion.trim());
-      setMostrarAnulacion(false);
+      await anularBoleta(id, motivo);
+      confirmada = true;
+      setAnulacionConfirmada(true);
+      setMostrandoAnulacion(false);
       setMotivoAnulacion("");
-      setMensajeAnulacion("Boleta anulada correctamente.");
-      await cargar();
+      setMensajeAnulacion("Boleta anulada correctamente en el servidor.");
+      await recargarBoletaAnulada();
     } catch (fallo) {
-      if (fallo?.status === 400) setErrorAnulacion("El motivo de anulación es obligatorio y debe ser válido.");
-      else if (fallo?.status === 403) setErrorAnulacion("No tienes permiso para anular boletas.");
-      else if (fallo?.status === 409) setErrorAnulacion("La boleta ya no está EMITIDA. Actualiza el detalle.");
-      else setErrorAnulacion(fallo?.message || "No se pudo anular la boleta.");
+      setErrorAnulacion(confirmada
+        ? `La anulación fue confirmada, pero no se pudo actualizar el detalle: ${fallo?.message || "Error de consulta"}. Recarga el detalle.`
+        : fallo?.message || "No se pudo anular la boleta.");
     } finally {
       setAnulando(false);
+    }
+  }
+
+  async function abrirEdicionItems() {
+    if (!puedeEmitir || boleta?.estado !== "BORRADOR" || cargandoLotes) return;
+    setErrorItems("");
+    setMensajeItems("");
+    setCargandoLotes(true);
+    try {
+      if (!ordenCodigo) {
+        throw new Error("No se pudo verificar la orden. Comprueba tu permiso para consultar órdenes e inténtalo otra vez.");
+      }
+      const [lotes, solicitudActual] = await Promise.all([
+        listarLotesOrden(ordenCodigo),
+        obtenerSolicitudSalida(boleta.solicitudSalidaId),
+      ]);
+      const referenciasSolicitadas = new Set(
+        (Array.isArray(solicitudActual?.items) ? solicitudActual.items : [])
+          .map((item) => String(item.referencia ?? "").trim())
+          .filter(Boolean),
+      );
+      const referenciasValidas = [...new Set(
+        (Array.isArray(lotes) ? lotes : [])
+          .filter((lote) => referenciasSolicitadas.has(String(lote.codigo ?? "").trim()))
+          .map((lote) => String(lote.codigo).trim())
+          .filter(Boolean),
+      )];
+      const referenciasActuales = (Array.isArray(boleta.items) ? boleta.items : [])
+        .map((item) => String(item.referencia ?? "").trim())
+        .filter(Boolean);
+      if (referenciasValidas.length === 0 && referenciasActuales.length === 0) {
+        throw new Error("No hay lotes válidos de esta orden incluidos en la solicitud de salida.");
+      }
+      // Conserva los ítems actuales aunque su lote ya no aparezca en la consulta externa.
+      setLotesDisponibles([...new Set([...referenciasValidas, ...referenciasActuales])]);
+      setItemsBorrador((Array.isArray(boleta.items) ? boleta.items : []).map((item) => ({
+        referencia: String(item.referencia ?? ""),
+        cantidad: String(item.cantidad ?? ""),
+      })));
+      setNuevoLote(referenciasValidas.find((referencia) => !referenciasActuales.includes(referencia)) ?? "");
+      setCantidadNuevoLote("1");
+      setEditandoItems(true);
+    } catch (fallo) {
+      setErrorItems(fallo?.message || "No se pudieron cargar los lotes válidos para editar.");
+    } finally {
+      setCargandoLotes(false);
+    }
+  }
+
+  function cambiarItem(indice, campo, valor) {
+    setItemsBorrador((actuales) => actuales.map((item, i) => (
+      i === indice ? { ...item, [campo]: valor } : item
+    )));
+  }
+
+  function agregarItem() {
+    setErrorItems("");
+    if (!nuevoLote) {
+      setErrorItems("Selecciona un lote válido de la orden.");
+      return;
+    }
+    if (itemsBorrador.some((item) => item.referencia === nuevoLote)) {
+      setErrorItems("Ese lote ya está en la boleta. Edita su cantidad en la fila existente.");
+      return;
+    }
+    setItemsBorrador((actuales) => [...actuales, { referencia: nuevoLote, cantidad: cantidadNuevoLote }]);
+    setNuevoLote(lotesDisponibles.find((lote) => lote !== nuevoLote && !itemsBorrador.some((item) => item.referencia === lote)) ?? "");
+    setCantidadNuevoLote("1");
+  }
+
+  async function guardarItems() {
+    setErrorItems("");
+    setMensajeItems("");
+    if (itemsBorrador.length === 0) {
+      setErrorItems("La boleta debe conservar al menos un ítem.");
+      return;
+    }
+    const itemsNormalizados = [];
+    for (const item of itemsBorrador) {
+      const referencia = String(item.referencia ?? "").trim();
+      const cantidad = String(item.cantidad ?? "").trim();
+      if (!referencia) {
+        setErrorItems("Cada ítem necesita una referencia de lote.");
+        return;
+      }
+      if (!/^(?:0|[1-9]\d{0,9})(?:\.\d{1,4})?$/.test(cantidad) || Number(cantidad) <= 0) {
+        setErrorItems("La cantidad debe ser positiva y admitir hasta cuatro decimales.");
+        return;
+      }
+      const [entero, decimales = ""] = cantidad.split(".");
+      itemsNormalizados.push({ referencia, cantidad: `${entero}.${decimales.padEnd(4, "0")}` });
+    }
+    if (new Set(itemsNormalizados.map((item) => item.referencia)).size !== itemsNormalizados.length) {
+      setErrorItems("No repitas el mismo lote en varias filas.");
+      return;
+    }
+
+    setGuardandoItems(true);
+    try {
+      await actualizarItemsBoleta(id, itemsNormalizados);
+      setEditandoItems(false);
+      setMensajeItems("Ítems actualizados. La boleta conserva su número y sigue en BORRADOR.");
+      await cargar();
+    } catch (fallo) {
+      setErrorItems(fallo?.message || "No se pudieron guardar los cambios.");
+    } finally {
+      setGuardandoItems(false);
     }
   }
 
@@ -154,7 +261,6 @@ export default function BoletaDetallePage() {
       const salida = await obtenerSolicitudSalida(datos.solicitudSalidaId);
       setBoleta(datos);
       setSolicitud(salida);
-      setItemsEdicion((datos.items ?? []).map((item) => ({ referencia: item.referencia, cantidad: item.cantidad })));
 
       // El código de la orden es opcional: requiere permiso de consulta en Producción.
       try {
@@ -175,12 +281,11 @@ export default function BoletaDetallePage() {
   useEffect(() => {
     setMensajeEmision("");
     setErrorEmision("");
+    setMostrandoAnulacion(false);
+    setMotivoAnulacion("");
+    setAnulacionConfirmada(false);
     setMensajeAnulacion("");
     setErrorAnulacion("");
-    setMostrarAnulacion(false);
-    setEditandoItems(false);
-    setErrorItems("");
-    setMensajeItems("");
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -209,9 +314,7 @@ export default function BoletaDetallePage() {
 
   const emitida = boleta.estado === ESTADO_BOLETA_EMITIDA;
   const items = Array.isArray(boleta.items) ? boleta.items : [];
-  const historial = Array.isArray(boleta.historial) ? [...boleta.historial].sort(
-    (a, b) => new Date(a.fechaHora) - new Date(b.fechaHora)
-  ) : [];
+  const historial = Array.isArray(boleta.historial) ? boleta.historial : [];
   const orden = ordenCodigo ?? `Orden #${solicitud.ordenId}`;
   const datos = [
     ["Número", boleta.numero],
@@ -224,13 +327,24 @@ export default function BoletaDetallePage() {
 
   return (
     <section className="ts-page" aria-labelledby="boleta-titulo">
-      <div className="boleta-pantalla">
+      <div className="ts-panel ts-panel--form boleta-pantalla">
         <PageHeader
           titulo={`Boleta ${boleta.numero}`}
           descripcion={`Estado: ${ETIQUETAS_ESTADO[boleta.estado] ?? boleta.estado}`}
           accion={
             <div className="ts-btn-group">
-              {puedeEmitir && !emitida && boleta.estado === "BORRADOR" && (
+              {puedeEmitir && boleta.estado === "BORRADOR" && !editandoItems && (
+                <button
+                  type="button"
+                  className="ts-btn"
+                  onClick={abrirEdicionItems}
+                  disabled={cargandoLotes}
+                  data-feature="ABC-78"
+                >
+                  {cargandoLotes ? "Cargando lotes…" : "Editar ítems"}
+                </button>
+              )}
+              {puedeEmitir && !emitida && boleta.estado === "BORRADOR" && !editandoItems && (
                 <button
                   type="button"
                   className="ts-btn ts-btn-primary"
@@ -241,23 +355,57 @@ export default function BoletaDetallePage() {
                   {emitiendo ? "Emitiendo…" : "Emitir boleta"}
                 </button>
               )}
-              {puedeEmitir && boleta.estado === "BORRADOR" && (
-                <button type="button" className="ts-btn" onClick={() => setEditandoItems(true)}>Editar ítems</button>
-              )}
               {emitida && (
                 <button type="button" className="ts-btn ts-btn-primary" onClick={() => window.print()}>
                   Imprimir
                 </button>
               )}
-              {puedeEmitir && emitida && (
-                <button type="button" className="ts-btn ts-btn-danger" onClick={() => setMostrarAnulacion(true)}>
+              {puedeEmitir && emitida && !mostrandoAnulacion && !anulacionConfirmada && (
+                <button type="button" className="ts-btn" onClick={() => {
+                  setErrorAnulacion("");
+                  setMostrandoAnulacion(true);
+                }}>
                   Anular boleta
                 </button>
+              )}
+              {editandoItems && (
+                <>
+                  <button type="button" className="ts-btn" onClick={() => { setEditandoItems(false); setErrorItems(""); }} disabled={guardandoItems}>Cancelar edición</button>
+                  <button type="button" className="ts-btn ts-btn-primary" onClick={guardarItems} disabled={guardandoItems}>
+                    {guardandoItems ? "Guardando…" : "Guardar ítems"}
+                  </button>
+                </>
               )}
               <Link className="ts-btn" to="/logistica/boletas">Volver</Link>
             </div>
           }
         />
+
+        {mensajeAnulacion && <p className="ts-feedback ts-notice" role="status">{mensajeAnulacion}</p>}
+        {errorAnulacion && <p className="ts-feedback ts-error" role="alert">{errorAnulacion}</p>}
+        {anulacionConfirmada && boleta.estado !== "ANULADA" && (
+          <button type="button" className="ts-btn" disabled={anulando} onClick={async () => {
+            try { await recargarBoletaAnulada(); }
+            catch (fallo) { setErrorAnulacion(fallo?.message || "No se pudo actualizar el detalle."); }
+          }}>Recargar detalle</button>
+        )}
+        {mostrandoAnulacion && puedeEmitir && emitida && (
+          <form onSubmit={handleAnular} className="ts-card" aria-label="Anulación de boleta">
+            <label htmlFor="motivo-anulacion">Motivo de anulación (obligatorio)</label>
+            <textarea id="motivo-anulacion" required maxLength={500} value={motivoAnulacion}
+              disabled={anulando} onChange={(evento) => setMotivoAnulacion(evento.target.value)} />
+            <div className="ts-btn-group">
+              <button type="submit" className="ts-btn ts-btn-primary" disabled={anulando}>
+                {anulando ? "Anulando…" : "Confirmar anulación"}
+              </button>
+              <button type="button" className="ts-btn" disabled={anulando} onClick={() => {
+                setMostrandoAnulacion(false);
+                setMotivoAnulacion("");
+                setErrorAnulacion("");
+              }}>Cancelar anulación</button>
+            </div>
+          </form>
+        )}
 
         {mensajeEmision && (
           <div className="ts-feedback ts-notice" role="status" style={{ marginBottom: "1rem" }}>
@@ -271,51 +419,62 @@ export default function BoletaDetallePage() {
           </div>
         )}
 
-        {mensajeAnulacion && <p className="ts-feedback ts-notice" role="status">{mensajeAnulacion}</p>}
-        {mensajeItems && <p className="ts-feedback ts-notice" role="status">{mensajeItems}</p>}
-
-        {editandoItems && boleta.estado === "BORRADOR" && (
-          <form className="ts-panel ts-panel--form" onSubmit={handleGuardarItems}>
-            <div className="ts-panel-title">
-              <h2>Ítems del borrador</h2>
-            </div>
-            <p>Las referencias deben pertenecer a la solicitud de salida y a los lotes de la orden.</p>
-            {itemsEdicion.map((item, indice) => (
-              <div className="ts-filters" key={indice}>
-                <label>Referencia *
-                  <select required value={item.referencia} onChange={(evento) => setItemsEdicion((actual) => actual.map((valor, posicion) => posicion === indice ? { ...valor, referencia: evento.target.value } : valor))}>
-                    <option value="">Seleccionar referencia</option>
-                    {(solicitud.items ?? []).map((solicitudItem) => <option key={solicitudItem.id} value={solicitudItem.referencia}>{solicitudItem.referencia}</option>)}
-                  </select>
-                </label>
-                <label>Cantidad *
-                  <input required type="number" min="0.0001" max="9999999999.9999" step="0.0001" value={item.cantidad} onChange={(evento) => setItemsEdicion((actual) => actual.map((valor, posicion) => posicion === indice ? { ...valor, cantidad: evento.target.value } : valor))} />
-                </label>
-                {itemsEdicion.length > 1 && <button type="button" className="ts-btn" onClick={() => setItemsEdicion((actual) => actual.filter((_, posicion) => posicion !== indice))}>Quitar ítem</button>}
-              </div>
-            ))}
-            {errorItems && <p className="ts-feedback ts-error" role="alert">{errorItems}</p>}
-            <div className="ts-btn-group">
-              <button type="button" className="ts-btn" onClick={() => setItemsEdicion((actual) => [...actual, { referencia: "", cantidad: "" }])}>Agregar ítem</button>
-              <button type="button" className="ts-btn" onClick={() => { setEditandoItems(false); setErrorItems(""); setItemsEdicion(items.map((item) => ({ referencia: item.referencia, cantidad: item.cantidad }))); }}>Cancelar</button>
-              <button type="submit" className="ts-btn ts-btn-primary" disabled={guardandoItems || itemsEdicion.length === 0}>{guardandoItems ? "Guardando…" : "Guardar ítems"}</button>
-            </div>
-          </form>
+        {mensajeItems && (
+          <div className="ts-feedback ts-notice" role="status" style={{ marginBottom: "1rem" }}>
+            <p>{mensajeItems}</p>
+          </div>
         )}
 
-        {mostrarAnulacion && (
-          <div className="ts-modal-overlay">
-            <form className="ts-modal" role="dialog" aria-modal="true" aria-labelledby="anular-titulo" onSubmit={handleAnular}>
-              <h2 id="anular-titulo">Anular boleta {boleta.numero}</h2>
-              <p>La boleta conservará su número e ítems, pero dejará de contar para el saldo documental.</p>
-              <label htmlFor="motivo-anulacion">Motivo de anulación *</label>
-              <textarea id="motivo-anulacion" value={motivoAnulacion} onChange={(evento) => setMotivoAnulacion(evento.target.value)} maxLength={500} required rows={3} />
-              {errorAnulacion && <p className="ts-error" role="alert">{errorAnulacion}</p>}
-              <div className="ts-modal-actions">
-                <button type="button" className="ts-btn" disabled={anulando} onClick={() => { setMostrarAnulacion(false); setErrorAnulacion(""); }}>Cancelar</button>
-                <button type="submit" className="ts-btn ts-btn-danger" disabled={anulando}>{anulando ? "Anulando…" : "Confirmar anulación"}</button>
+        {errorItems && (
+          <div className="ts-feedback ts-error" role="alert" style={{ marginBottom: "1rem" }}>
+            <p>{errorItems}</p>
+          </div>
+        )}
+
+        {editandoItems && (
+          <div className="ts-panel ts-panel--form boleta-edicion" aria-label="Editor de ítems de boleta">
+            <h2>Editar ítems del borrador</h2>
+            <p>Solo puedes editar esta boleta mientras está en BORRADOR. Los lotes disponibles pertenecen a la orden y a la solicitud de salida. La vista previa conservará los valores anteriores hasta que guardes.</p>
+            {itemsBorrador.map((item, indice) => (
+              <div className="boleta-edicion__fila" key={`${item.referencia}-${indice}`}>
+                <label>
+                  <span>Lote</span>
+                  <select value={item.referencia} onChange={(evento) => cambiarItem(indice, "referencia", evento.target.value)}>
+                    {!lotesDisponibles.includes(item.referencia) && <option value={item.referencia}>{item.referencia} (actual)</option>}
+                    {lotesDisponibles.map((lote) => <option key={lote} value={lote}>{lote}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Cantidad</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={item.cantidad}
+                    onChange={(evento) => cambiarItem(indice, "cantidad", evento.target.value)}
+                    aria-label={`Cantidad del lote ${item.referencia}`}
+                  />
+                </label>
+                <button type="button" className="ts-btn ts-btn--sm" onClick={() => setItemsBorrador((actuales) => actuales.filter((_, i) => i !== indice))} disabled={itemsBorrador.length <= 1}>
+                  Quitar
+                </button>
               </div>
-            </form>
+            ))}
+            <div className="boleta-edicion__agregar">
+              <label>
+                <span>Agregar lote de la solicitud</span>
+                <select value={nuevoLote} onChange={(evento) => setNuevoLote(evento.target.value)}>
+                  <option value="">Selecciona un lote</option>
+                  {lotesDisponibles.filter((lote) => !itemsBorrador.some((item) => item.referencia === lote)).map((lote) => (
+                    <option key={lote} value={lote}>{lote}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Cantidad</span>
+                <input type="text" inputMode="decimal" value={cantidadNuevoLote} onChange={(evento) => setCantidadNuevoLote(evento.target.value)} />
+              </label>
+              <button type="button" className="ts-btn ts-btn--sm" onClick={agregarItem} disabled={!nuevoLote}>Agregar ítem</button>
+            </div>
           </div>
         )}
 
@@ -379,18 +538,27 @@ export default function BoletaDetallePage() {
         </footer>
       </article>
 
-      {historial.length > 0 && (
-        <div className="ts-panel ts-panel--form boleta-pantalla">
-          <div className="ts-panel-title">
-            <h2>Historial de la boleta</h2>
-          </div>
-          {historial.map((evento) => (
-            <p key={evento.id}>
-              {fechaHoraTexto(evento.fechaHora)} — {evento.estadoAnterior} → {evento.estadoNuevo}: {evento.motivo}
-            </p>
-          ))}
+      <section className="ts-panel ts-panel--form boleta-pantalla" aria-labelledby="historial-boleta-titulo">
+        <div className="ts-panel-title">
+          <h2 id="historial-boleta-titulo">Historial de auditoría</h2>
         </div>
-      )}
+        {historial.length === 0 ? <p>No hay cambios de estado registrados.</p> : (
+          <table className="ts-table">
+            <caption>Cambios de estado de la boleta</caption>
+            <thead><tr>
+              <th scope="col">Fecha y hora</th><th scope="col">Usuario que realizó el cambio</th>
+              <th scope="col">Estado anterior</th><th scope="col">Estado nuevo</th><th scope="col">Motivo</th>
+            </tr></thead>
+            <tbody>{historial.map((entrada) => (
+              <tr key={entrada.id}>
+                <td>{fechaHoraTexto(entrada.fechaHora)}</td>
+                <td>{responsableDe({ responsableUsuarioId: entrada.usuarioActorId }, usuario)}</td>
+                <td>{entrada.estadoAnterior}</td><td>{entrada.estadoNuevo}</td><td>{entrada.motivo}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </section>
 
       {!emitida && (
         <p className="boleta-no-imprimible">

@@ -8,7 +8,15 @@ try {
   PubSub = require('../../services/produccion-service/node_modules/@google-cloud/pubsub').PubSub;
 }
 
-const { crearRespuesta, MensajePermanenteError, validarEntrada } = require('./contract');
+const {
+  DISPONIBILIDAD_MATERIAL_SOLICITADA_V1,
+  SOLICITUD_MATERIAL_ALMACEN_V1,
+  crearRespuesta,
+  crearRespuestaDisponibilidad,
+  MensajePermanenteError,
+  validarEntrada,
+  validarSolicitudDisponibilidad,
+} = require('./contract');
 const { StateStore } = require('./state-store');
 
 function envOrDefault(name, defaultValue) {
@@ -37,6 +45,15 @@ async function main() {
   const subscriptionId = envOrDefault('INVENTARIOS_INPUT_SUBSCRIPTION_ID', 'taller-inventarios-simulator-local');
   const outputTopicId = envOrDefault('INVENTARIOS_OUTPUT_TOPIC_ID', 'taller-inventarios-respuestas-local');
   const statePath = envOrDefault('INVENTARIOS_STATE_PATH', path.join(__dirname, 'data', 'inventarios.db'));
+  let stock = {};
+  if (process.env.INVENTARIOS_STOCK_JSON) {
+    try {
+      stock = JSON.parse(process.env.INVENTARIOS_STOCK_JSON);
+      if (!stock || typeof stock !== 'object' || Array.isArray(stock)) throw new Error();
+    } catch {
+      throw new Error('INVENTARIOS_STOCK_JSON debe contener un objeto JSON válido');
+    }
+  }
   const crashAfterSave = /^(true|1|yes)$/i.test(process.env.INVENTARIOS_SIMULADOR_CRASH_AFTER_SAVE_ONCE || '');
 
   console.log(JSON.stringify({
@@ -67,13 +84,15 @@ async function main() {
 
     console.log(JSON.stringify({
       process: 'inventarios-simulator',
-      action: 'RESPONSE_SENT',
+      action: response.eventType === 'DisponibilidadMaterialRespondida.v1' ? 'AVAILABILITY_RESPONSE_SENT' : 'RESPONSE_SENT',
       messageId,
       eventId: response.eventId,
       requestEventId: response.data.requestEventId,
       correlationId: response.correlationId,
-      estadoNuevo: response.data.estadoNuevo,
+      eventType: response.eventType,
+      consultaId: response.data.consultaId,
       solicitudId: response.data.solicitudId,
+      estadoNuevo: response.data.estadoNuevo,
     }));
 
     return messageId;
@@ -109,6 +128,21 @@ async function main() {
       try {
         const rawData = message.data.toString('utf8');
         const payload = JSON.parse(rawData);
+        if (payload?.eventType === DISPONIBILIDAD_MATERIAL_SOLICITADA_V1) {
+          const request = validarSolicitudDisponibilidad(payload, message.attributes);
+          const response = crearRespuestaDisponibilidad(request, { stock });
+          const stored = store.receive(request, response);
+          // Persistir antes de ACK. Un reintento reutiliza el eventId y las cantidades originales.
+          message.ack();
+          await publish(stored.response);
+          return;
+        }
+
+        if (payload?.eventType !== SOLICITUD_MATERIAL_ALMACEN_V1) {
+          // La suscripción comparte el topic de eventos; no procesar respuestas ni eventos ajenos.
+          message.ack();
+          return;
+        }
         const request = validarEntrada(payload, message.attributes);
         const response = crearRespuesta(request);
         const stored = store.receive(request, response);
