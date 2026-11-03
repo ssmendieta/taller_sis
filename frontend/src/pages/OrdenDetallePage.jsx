@@ -57,6 +57,8 @@ import {
   resumenReporteContable,
 } from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
+import ObservacionesOrden from "../components/ordenes/ObservacionesOrden.jsx";
+import { PERMISO_REGISTRAR_OBSERVACION } from "../services/observacionesService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import useDisponibilidadOrden from "../hooks/useDisponibilidadOrden.js";
@@ -1908,6 +1910,11 @@ export default function OrdenDetallePage() {
           </p>
         )}
       </div>
+
+      <ObservacionesOrden
+        ordenId={orden.id}
+        puedeRegistrar={tienePermiso(usuario, PERMISO_REGISTRAR_OBSERVACION)}
+      />
 
       <div className="ts-panel">
         <div className="ts-panel-title">
