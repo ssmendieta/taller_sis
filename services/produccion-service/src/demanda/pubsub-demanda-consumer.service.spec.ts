@@ -45,12 +45,14 @@ describe('ABC-356: validación del sobre versionado', () => {
 describe('ABC-356: ProcesadorDemandaService', () => {
   let manager: any;
   let inbox: EventoInbox | null;
+  let existente: Demanda | null;
   let service: ProcesadorDemandaService;
 
   beforeEach(() => {
     inbox = null;
+    existente = null;
     manager = {
-      findOne: jest.fn(async (entity: unknown) => entity === EventoInbox ? inbox : { id: '10' }),
+      findOne: jest.fn(async (entity: unknown) => entity === EventoInbox ? inbox : existente),
       create: jest.fn((_e: unknown, value: unknown) => value),
       save: jest.fn(async (entity: unknown, value: any) => entity === Demanda ? { id: '10', ...value } : value),
     };
@@ -72,6 +74,7 @@ describe('ABC-356: ProcesadorDemandaService', () => {
   it('una redelivery del mismo evento no duplica registros', async () => {
     const primero = await service.procesar(evento(), 'msg-1');
     inbox = { payloadHash: manager.save.mock.calls[2][1].payloadHash } as EventoInbox;
+    existente = { id: '10' } as Demanda;
     manager.save.mockClear();
     await expect(service.procesar(evento(), 'msg-2')).resolves.toEqual({ ...primero, resultado: 'DUPLICADO' });
     expect(manager.save).not.toHaveBeenCalled();
@@ -82,17 +85,15 @@ describe('ABC-356: ProcesadorDemandaService', () => {
     await expect(service.procesar(evento())).rejects.toBeInstanceOf(ConflictoEventoDemandaError);
   });
 
-  it('una entrega concurrente que choca con la unicidad del inbox se resuelve como duplicado', async () => {
-    const choque = Object.assign(new Error('duplicate key'), { driverError: { code: '23505', constraint: 'uq_eventos_inbox_event_id' } });
-    const dataSource = {
-      transaction: jest.fn().mockRejectedValue(choque),
-      manager: { ...manager, findOne: jest.fn(async (entity: unknown) => entity === EventoInbox ? { payloadHash: hash } : { id: '10' }) },
-    };
-    let hash = '';
-    const svc = new ProcesadorDemandaService(dataSource as any);
+  it('una entrega concurrente que choca con la unicidad del inbox se reintenta y queda como duplicado', async () => {
     await service.procesar(evento());
-    hash = manager.save.mock.calls[2][1].payloadHash;
+    const hash = manager.save.mock.calls[2][1].payloadHash;
+    const choque = Object.assign(new Error('duplicate key'), { driverError: { code: '23505', constraint: 'uq_eventos_inbox_event_id' } });
+    const ganador = { ...manager, findOne: jest.fn(async (entity: unknown) => entity === EventoInbox ? { payloadHash: hash } : { id: '10' }) };
+    const dataSource = { transaction: jest.fn().mockRejectedValueOnce(choque).mockImplementation(async (cb: any) => cb(ganador)) };
+    const svc = new ProcesadorDemandaService(dataSource as any);
     await expect(svc.procesar(evento())).resolves.toMatchObject({ resultado: 'DUPLICADO', demandaId: '10' });
+    expect(dataSource.transaction).toHaveBeenCalledTimes(2);
   });
 });
 
