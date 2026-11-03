@@ -25,6 +25,16 @@ Ejemplos:
 | Una en estado `ANULADA` | Rechazo `ESTADO_NO_AGRUPABLE` |
 | Destino vacío o fecha 30/02 | Rechazo `DATOS_INCOMPLETOS` |
 
+## Cálculo de prioridad (ABC-361)
+
+`reglas/prioridad.ts` ordena solicitudes sin modificarlas. Con las mismas
+solicitudes y la misma fecha de referencia el orden es siempre el mismo:
+
+1. **Nivel**: `URGENTE` (vencida o vence en 1 día o menos) → `ALTA` → `MEDIA` → `BAJA`.
+   Sin prioridad explícita se usa `MEDIA`.
+2. **Fecha requerida** más próxima primero.
+3. **Id** numérico ascendente como desempate final.
+
 Pendiente de integración: `solicitudes_salida` todavía no guarda fecha
 requerida, tipo ni unidad de carga. La entidad de grupo (ABC-362) debe mapear
 esos datos a `SolicitudAgrupable` antes de llamar a la regla.
