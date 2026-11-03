@@ -17,6 +17,7 @@ import { LotesModule } from './lotes/lotes.module';
 import { IntegracionesModule } from './integraciones/integraciones.module';
 import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.module';
 import { ObservacionesModule } from './observaciones/observaciones.module';
+import { DemandaModule } from './demanda/demanda.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ObservacionesModule } from './observaciones/observaciones.module';
     LotesModule,
     CierreProduccionModule,
     ObservacionesModule,
+    DemandaModule,
     CalidadModule,
     PubSubModule,
     CalidadModule,
