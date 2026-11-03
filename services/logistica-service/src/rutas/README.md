@@ -48,3 +48,18 @@ Reglas aplicadas:
 Pendiente en otras subtareas: solapamiento de vehículo/chofer y capacidad de
 carga (ABC-371), verificación del grupo (ABC-362) y validación contra el
 catálogo del ERP (ABC-115).
+
+## Historial de rutas (ABC-391)
+
+`GET /historial/rutas` (permiso `logistica.rutas.consultar`), solo lectura.
+
+| Parámetro | Uso |
+| --- | --- |
+| `fechaDesde`, `fechaHasta` | días `YYYY-MM-DD` sobre la fecha programada (inclusive) |
+| `estado` | `PLANIFICADA`, `DESPACHADA`, `COMPLETADA` o `CANCELADA` |
+| `chofer` | coincidencia parcial del id externo, sin distinguir mayúsculas |
+| `page`, `limit` | página desde 1; 1 a 100 registros (10 por defecto) |
+
+Los filtros se combinan con AND. Orden estable: fecha programada descendente y
+luego id descendente. Respuesta `{ items, total, page, limit, totalPages }` con
+`totalParadas` y `totalBoletas` por ruta, calculados sin duplicar filas.
