@@ -19,6 +19,9 @@ import { RutaParada } from './ruta-parada.entity';
 @Check('ck_ruta_chofer', 'LENGTH(BTRIM(chofer_externo_id)) > 0')
 @Check('ck_ruta_grupo', 'grupo_id IS NULL OR grupo_id > 0')
 @Check('ck_ruta_responsable', 'responsable_usuario_id > 0')
+@Check('ck_ruta_despacho_autor', '(despachada_en IS NULL AND despachada_por_usuario_id IS NULL) OR (despachada_en IS NOT NULL AND despachada_por_usuario_id > 0)')
+@Check('ck_ruta_despacho_estado', "estado NOT IN ('DESPACHADA','COMPLETADA') OR despachada_en IS NOT NULL")
+@Check('ck_ruta_completada_fecha', "(estado = 'COMPLETADA') = (completada_en IS NOT NULL)")
 export class Ruta {
   @PrimaryGeneratedColumn('identity', { type: 'bigint', generatedIdentity: 'ALWAYS' })
   id!: string;
@@ -43,6 +46,15 @@ export class Ruta {
 
   @Column({ name: 'responsable_usuario_id', type: 'bigint' })
   responsableUsuarioId!: string;
+
+  @Column({ name: 'despachada_en', type: 'timestamptz', nullable: true })
+  despachadaEn!: Date | null;
+
+  @Column({ name: 'despachada_por_usuario_id', type: 'bigint', nullable: true })
+  despachadaPorUsuarioId!: string | null;
+
+  @Column({ name: 'completada_en', type: 'timestamptz', nullable: true })
+  completadaEn!: Date | null;
 
   @OneToMany(() => RutaParada, (parada) => parada.ruta, { cascade: false })
   paradas!: RutaParada[];
