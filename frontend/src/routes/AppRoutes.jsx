@@ -15,6 +15,9 @@ import BoletaNuevaPage from "../pages/BoletaNuevaPage.jsx";
 import LogisticaPage from "../pages/LogisticaPage.jsx";
 import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
+import HistorialLogisticoPage from "../pages/HistorialLogisticoPage.jsx";
+import RutaDetallePage from "../pages/RutaDetallePage.jsx";
+import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
@@ -194,6 +197,14 @@ export default function AppRoutes() {
         <Route
           path="/logistica/trazabilidad"
           element={privada(<TrazabilidadPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        <Route
+          path="/logistica/rutas/historial"
+          element={privada(<HistorialLogisticoPage />, [PERMISO_CONSULTAR_RUTAS])}
+        />
+        <Route
+          path="/logistica/rutas/:id"
+          element={privada(<RutaDetallePage />, [PERMISO_CONSULTAR_RUTAS])}
         />
         <Route
           path="/logistica/inicio"
