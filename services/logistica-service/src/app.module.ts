@@ -6,6 +6,7 @@ import { SolicitudesSalidaModule } from './solicitudes-salida/solicitudes-salida
 import { BoletasModule } from './boletas/boletas.module';
 import { DisponibilidadDocumentalModule } from './disponibilidad-documental/disponibilidad-documental.module';
 import { TrazabilidadModule } from './trazabilidad/trazabilidad.module';
+import { RutasModule } from './rutas/rutas.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { TrazabilidadModule } from './trazabilidad/trazabilidad.module';
     BoletasModule,
     DisponibilidadDocumentalModule,
     TrazabilidadModule,
+    RutasModule,
   ],
   controllers: [AppController],
 })
