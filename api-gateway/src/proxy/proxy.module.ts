@@ -1,5 +1,5 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 
 @Module({})
 export class ProxyModule implements NestModule {
@@ -15,6 +15,7 @@ export class ProxyModule implements NestModule {
           target: authTarget,
           changeOrigin: true,
           pathRewrite: { '^/api/auth': '' },
+          onProxyReq: fixRequestBody,
           logLevel: 'warn',
         }) as any,
       )
@@ -26,6 +27,7 @@ export class ProxyModule implements NestModule {
           target: prodTarget,
           changeOrigin: true,
           pathRewrite: { '^/api/produccion': '' },
+          onProxyReq: fixRequestBody,
           logLevel: 'warn',
         }) as any,
       )
@@ -37,6 +39,7 @@ export class ProxyModule implements NestModule {
           target: logiTarget,
           changeOrigin: true,
           pathRewrite: { '^/api/logistica': '' },
+          onProxyReq: fixRequestBody,
           logLevel: 'warn',
         }) as any,
       )

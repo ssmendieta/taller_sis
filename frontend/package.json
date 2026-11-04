@@ -6,9 +6,16 @@
   "scripts": {
     "dev": "vite --port 5173",
     "build": "vite build",
+    "test:session": "node --test scripts/sesion.test.mjs",
+    "test:audit": "node --test scripts/auditoria.test.mjs",
+    "test:logistica": "node --test scripts/logistica.test.mjs",
+    "test:boleta-anulacion": "node --test scripts/boleta-anulacion.test.mjs",
+    "test:boletas-consulta": "node --test scripts/boletas-consulta.test.mjs",
+    "test:disponibilidad": "node --test scripts/disponibilidad-orden.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
+    "lucide-react": "^1.48.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.1"
@@ -17,6 +24,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "react-test-renderer": "18.3.1",
     "vite": "^5.4.0"
   }
 }

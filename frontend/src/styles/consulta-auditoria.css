@@ -1,0 +1,35 @@
+.audit-page { max-width: 1440px; margin: 0 auto; color: #181b21; }
+.audit-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+.audit-heading h1 { margin: 0 0 5px; color: #12151b; font-size: 1.45rem; font-weight: 650; letter-spacing: -.025em; }
+.audit-heading p { margin: 0; color: #70747b; font-size: .85rem; }
+.audit-heading > span { color: #6b7077; font-size: .78rem; white-space: nowrap; }
+.audit-notice { margin: 0 0 16px; padding: 9px 12px; border: 1px solid #e6e6e6; border-radius: 5px; background: #fff; color: #666a70; font-size: .8rem; }
+.audit-panel, .audit-feedback { border: 1px solid #e4e4e5; border-radius: 7px; background: #fff; }
+.audit-feedback { padding: 20px; color: #5b6069; font-size: .85rem; }
+.audit-feedback a, .audit-error a { display: inline-block; margin-left: 12px; color: #164777; text-underline-offset: 2px; }
+.audit-error { border-color: #d9bab9; color: #8b3030; }
+.audit-error p { margin-top: 0; }
+.audit-error button, .audit-pagination button, .audit-clear { min-height: 34px; padding: 0 11px; border: 1px solid #e2e2e3; border-radius: 5px; background: #fff; color: #343840; font: inherit; font-size: .78rem; cursor: pointer; }
+.audit-error button:hover, .audit-pagination button:not(:disabled):hover, .audit-clear:hover { background: #f4f4f5; }
+.audit-panel-title { display: flex; align-items: center; justify-content: space-between; padding: 17px 20px 5px; }
+.audit-panel-title h2 { margin: 0; font-size: .92rem; font-weight: 650; }
+.audit-panel-title span { color: #74777e; font-size: .77rem; }
+.audit-filters { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 10px; padding: 11px 20px 16px; }
+.audit-filters label { display: flex; flex: 1 1 160px; flex-direction: column; gap: 5px; color: #535860; font-size: .73rem; }
+.audit-filters input, .audit-filters select { width: 100%; min-height: 34px; padding: 5px 9px; box-sizing: border-box; border: 1px solid #e6e6e7; border-radius: 5px; background: #f4f4f5; color: #30343a; font: inherit; font-size: .78rem; }
+.audit-page :is(input, select, button, a):focus-visible { outline: 2px solid #164777; outline-offset: 2px; }
+.audit-table-wrap { margin: 0 20px 4px; overflow-x: auto; }
+.audit-table { width: 100%; min-width: 680px; border-collapse: collapse; text-align: left; }
+.audit-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.audit-table th, .audit-table td { padding: 12px 7px; border-bottom: 1px solid #e9e9eb; font-size: .78rem; }
+.audit-table th { color: #444950; font-weight: 600; }
+.audit-table tbody tr:hover { background: #fafafa; }
+.audit-action { font-weight: 550; }
+.audit-empty { padding: 15px 20px; color: #6b7077; font-size: .83rem; }
+.audit-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-top: 1px solid #ededee; color: #676b72; font-size: .78rem; }
+.audit-pagination div { display: flex; gap: 8px; }
+.audit-pagination button:disabled { opacity: .45; cursor: default; }
+@media (max-width: 620px) {
+  .audit-heading { align-items: flex-start; flex-direction: column; }
+  .audit-filters label { flex-basis: 100%; }
+}

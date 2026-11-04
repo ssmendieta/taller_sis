@@ -1,0 +1,13 @@
+{
+  "name": "simulador-inventarios-local",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simulador local de Inventarios para SolicitudMaterialAlmacen.v1",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@google-cloud/pubsub": "5.3.1"
+  }
+}
