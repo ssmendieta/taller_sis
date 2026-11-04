@@ -4,14 +4,16 @@ import { DemandaItem } from './demanda-item.entity';
 export const ORIGENES_DEMANDA = ['VENTAS', 'FACTURACION'] as const;
 export type OrigenDemanda = typeof ORIGENES_DEMANDA[number];
 export const ESTADO_DEMANDA_RECIBIDA = 'RECIBIDA' as const;
-// ABC-130 agregará CONFIRMADA sobre esta misma tabla.
-export type EstadoDemanda = typeof ESTADO_DEMANDA_RECIBIDA;
+export const ESTADO_DEMANDA_CONFIRMADA = 'CONFIRMADA' as const;
+export const ESTADOS_DEMANDA = [ESTADO_DEMANDA_RECIBIDA, ESTADO_DEMANDA_CONFIRMADA] as const;
+export type EstadoDemanda = typeof ESTADOS_DEMANDA[number];
 
 // ABC-355: demanda externa recibida de Ventas o Facturación. No crea órdenes.
+// ABC-364 (ABC-130): la confirmación actualiza la misma demanda a CONFIRMADA con su fecha y correlación.
 @Entity('demandas')
 @Unique('uq_demanda_origen_externa', ['origen', 'demandaExternaId'])
 @Check('ck_demanda_origen', "origen IN ('VENTAS','FACTURACION')")
-@Check('ck_demanda_estado', "estado IN ('RECIBIDA')")
+@Check('ck_demanda_estado', "estado IN ('RECIBIDA', 'CONFIRMADA')")
 @Check('ck_demanda_externa_id', 'LENGTH(BTRIM(demanda_externa_id)) > 0')
 export class Demanda {
   @PrimaryGeneratedColumn('identity', { type: 'bigint', generatedIdentity: 'ALWAYS' })
@@ -44,4 +46,14 @@ export class Demanda {
 
   @CreateDateColumn({ name: 'recibida_en', type: 'timestamptz', default: () => 'NOW()' })
   recibidaEn: Date;
+
+  // ABC-364 (ABC-130): fecha y correlación del evento que confirmó la demanda.
+  @Column({ name: 'confirmada_en', type: 'timestamptz', nullable: true })
+  confirmadaEn: Date | null;
+
+  @Column({ name: 'confirmacion_event_id', type: 'uuid', nullable: true })
+  confirmacionEventId: string | null;
+
+  @Column({ name: 'confirmacion_correlation_id', type: 'uuid', nullable: true })
+  confirmacionCorrelationId: string | null;
 }

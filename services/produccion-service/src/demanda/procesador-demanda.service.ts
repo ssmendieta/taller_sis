@@ -14,7 +14,12 @@ import {
 } from '../integraciones/inbox/entities/evento-inbox.entity';
 import { DemandaItem } from './entities/demanda-item.entity';
 import { DemandaRechazada, MotivoRechazoDemanda } from './entities/demanda-rechazada.entity';
-import { Demanda, ESTADO_DEMANDA_RECIBIDA } from './entities/demanda.entity';
+import {
+  Demanda,
+  ESTADO_DEMANDA_CONFIRMADA,
+  ESTADO_DEMANDA_RECIBIDA,
+  OrigenDemanda,
+} from './entities/demanda.entity';
 import { validarDemandaRegistradaV1 } from './validar-demanda';
 
 export type ResultadoProcesamientoDemanda = 'PROCESADO' | 'DUPLICADO';
@@ -55,6 +60,14 @@ export class ConflictoDemandaContradictoriaError extends Error {
   }
 }
 
+// ABC-364 / ABC-130: error al intentar confirmar una demanda inexistente
+export class DemandaNoEncontradaError extends Error {
+  constructor(readonly origen: string, readonly demandaExternaId: string) {
+    super(`No se encontró la demanda ${origen}/${demandaExternaId}`);
+    this.name = 'DemandaNoEncontradaError';
+  }
+}
+
 /** Errores que no se arreglan reintentando: se confirman (ACK) para no bloquear la suscripción. */
 export function esErrorPermanenteDemanda(error: unknown): boolean {
   return error instanceof SyntaxError
@@ -87,6 +100,48 @@ export class ProcesadorDemandaService {
       if (esErrorPermanenteDemanda(error)) await this.registrarRechazo(payload, error, messageId);
       throw error;
     }
+  }
+
+  // ABC-364 (ABC-130): confirma una demanda existente pasando de RECIBIDA a CONFIRMADA
+  // preservando sus items, su id externo y persistiendo la fecha y datos de correlacion.
+  async confirmarDemanda(
+    origen: OrigenDemanda,
+    demandaExternaId: string,
+    datos: {
+      confirmadaEn?: Date;
+      confirmacionEventId?: string | null;
+      confirmacionCorrelationId?: string | null;
+    } = {},
+    manager?: EntityManager,
+  ): Promise<Demanda> {
+    const operacion = async (em: EntityManager): Promise<Demanda> => {
+      const demanda = await em.findOne(Demanda, {
+        where: { origen, demandaExternaId: demandaExternaId.trim() },
+        relations: ['items'],
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!demanda) {
+        throw new DemandaNoEncontradaError(origen, demandaExternaId);
+      }
+
+      // Idempotencia (CA-03): si ya está confirmada, conservar un único efecto y el primer resultado válido
+      if (demanda.estado === ESTADO_DEMANDA_CONFIRMADA) {
+        return demanda;
+      }
+
+      demanda.estado = ESTADO_DEMANDA_CONFIRMADA;
+      demanda.confirmadaEn = datos.confirmadaEn ?? new Date();
+      demanda.confirmacionEventId = datos.confirmacionEventId ?? null;
+      demanda.confirmacionCorrelationId = datos.confirmacionCorrelationId ?? null;
+
+      return await em.save(Demanda, demanda);
+    };
+
+    if (manager) {
+      return await operacion(manager);
+    }
+    return await this.dataSource.transaction(operacion);
   }
 
   private async procesarValidado(
