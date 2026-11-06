@@ -19,6 +19,7 @@ import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.mo
 import { ObservacionesModule } from './observaciones/observaciones.module';
 import { DemandaModule } from './demanda/demanda.module';
 import { PerdidasMateriaPrimaModule } from './perdidas-materia-prima/perdidas-materia-prima.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -41,7 +42,7 @@ import { PerdidasMateriaPrimaModule } from './perdidas-materia-prima/perdidas-ma
     DemandaModule,
     CalidadModule,
     PubSubModule,
-    CalidadModule,
+    DashboardModule,
   ],
   controllers: [AppController],
 })
