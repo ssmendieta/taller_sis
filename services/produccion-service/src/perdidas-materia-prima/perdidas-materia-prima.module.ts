@@ -1,13 +1,17 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { RecetaMaterial } from '../recetas/entities/receta-material.entity';
 import { PerdidaMateriaPrima } from './entities/perdida-materia-prima.entity';
+import { PerdidasMateriaPrimaController } from './perdidas-materia-prima.controller';
+import { PerdidasMateriaPrimaService } from './perdidas-materia-prima.service';
 
-// ABC-74, subtarea 1: solo persistencia. El registro y la consulta se agregan en
-// las subtareas siguientes usando este repositorio.
 @Module({
-  imports: [TypeOrmModule.forFeature([PerdidaMateriaPrima, OrdenProduccion, Material])],
-  exports: [TypeOrmModule],
+  imports: [TypeOrmModule.forFeature([PerdidaMateriaPrima, OrdenProduccion, Material, RecetaMaterial])],
+  controllers: [PerdidasMateriaPrimaController],
+  providers: [PerdidasMateriaPrimaService, PermisoProduccionGuard],
+  exports: [TypeOrmModule, PerdidasMateriaPrimaService],
 })
 export class PerdidasMateriaPrimaModule {}
