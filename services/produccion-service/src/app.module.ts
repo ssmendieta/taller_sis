@@ -20,6 +20,7 @@ import { ObservacionesModule } from './observaciones/observaciones.module';
 import { DemandaModule } from './demanda/demanda.module';
 import { PerdidasMateriaPrimaModule } from './perdidas-materia-prima/perdidas-materia-prima.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ReprocesosModule } from './reprocesos/reprocesos.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     CalidadModule,
     PubSubModule,
     DashboardModule,
+    ReprocesosModule,
   ],
   controllers: [AppController],
 })
