@@ -8,6 +8,7 @@ import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
+import { PERMISO_CONSULTAR_RECURSOS } from "../services/logisticaService.js";
 import "../styles/layout.css";
 
 const iconos = {
@@ -21,6 +22,7 @@ const iconos = {
   integraciones: <><path d="M4 8h13l-3-3M20 16H7l3 3" /></>,
   boletas: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" /></>,
   demandas: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 13h5l2 3h4l2-3h5" /></>,
+  recursos: <><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="17.5" r="1.5" /><circle cx="17" cy="17.5" r="1.5" /></>,
 };
 
 function IconoNavegacion({ nombre }) {
@@ -42,12 +44,14 @@ export default function MainLayout({ children }) {
   const puedeIntegraciones = tienePermiso(usuario, PERMISO_INTEGRACIONES);
   const puedeBoletas = tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS);
   const puedeRutas = tienePermiso(usuario, PERMISO_CONSULTAR_RUTAS);
+  const puedeRecursos = tienePermiso(usuario, PERMISO_CONSULTAR_RECURSOS);
   const puedeSalidas = tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES);
   const activo = (path) => {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
     if (path === "/demandas") return location.pathname.startsWith("/demandas") ? "active" : "";
     if (path === "/logistica/rutas/historial") return location.pathname.startsWith("/logistica/rutas") ? "active" : "";
     if (path === "/logistica/boletas") return location.pathname.startsWith("/logistica/boletas") ? "active" : "";
+    if (path === "/logistica/recursos") return location.pathname.startsWith("/logistica/recursos") ? "active" : "";
     return location.pathname === path ? "active" : "";
   };
   const nombre = usuario?.nombre_completo ?? usuario?.nombre ?? usuario?.correo ?? "";
@@ -70,6 +74,7 @@ export default function MainLayout({ children }) {
           {puedeSalidas && <Link className={activo("/logistica/inicio")} to="/logistica/inicio" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de salida</Link>}
           {puedeBoletas && <Link className={activo("/logistica/boletas")} to="/logistica/boletas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="boletas" />Boletas</Link>}
           {puedeRutas && <Link className={activo("/logistica/rutas/historial")} to="/logistica/rutas/historial" onClick={() => setAbierto(false)}><IconoNavegacion nombre="rutas" />Historial de rutas</Link>}
+          {puedeRecursos && <Link className={activo("/logistica/recursos")} to="/logistica/recursos" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recursos" />Recursos logísticos</Link>}
           {puedeIntegraciones && <Link className={activo("/integraciones")} to="/integraciones" onClick={() => setAbierto(false)}><IconoNavegacion nombre="integraciones" />Integraciones</Link>}
         </nav>
         {usuario && (
@@ -86,4 +91,3 @@ export default function MainLayout({ children }) {
     </div>
   );
 }
-

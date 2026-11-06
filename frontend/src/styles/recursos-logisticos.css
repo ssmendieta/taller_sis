@@ -1,0 +1,30 @@
+/* ABC-353: consulta de vehículos y choferes del ERP. */
+.recursos-logisticos .ts-filters .ts-btn-group { flex: 0 0 auto; }
+.recursos-nota { margin: 0; padding: 0 20px 16px; max-width: 90ch; }
+.recursos-logisticos > .ts-feedback { margin-bottom: 16px; }
+
+/* Origen y vigencia: verde = ERP, ámbar = copia de respaldo. */
+.recursos-vigencia {
+  display: flex; align-items: flex-start; gap: 10px; margin: 0 0 16px; padding: 10px 12px;
+  border: 1px solid; border-radius: var(--ts-radius-control); font-size: 0.8rem; line-height: 1.5;
+}
+.recursos-vigencia p { margin: 0; }
+.recursos-vigencia .ts-badge { flex: none; }
+.recursos-vigencia--erp { background: var(--ts-success-bg); border-color: var(--ts-success-border); color: var(--ts-success); }
+.recursos-vigencia--respaldo { background: var(--ts-warning-bg); border-color: var(--ts-warning-border); color: var(--ts-warning); }
+
+.recursos-selector { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 0 16px; }
+.recursos-selector .ts-panel { min-width: 0; }
+.recursos-selector .ts-table { min-width: 480px; }
+.recursos-selector input[type="radio"] { width: 16px; height: 16px; margin: 0; accent-color: var(--ts-accent); cursor: pointer; }
+.recursos-selector input[type="radio"]:disabled { cursor: not-allowed; }
+
+.recursos-seleccion dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; padding: 8px 20px; font-size: 0.85rem; }
+.recursos-seleccion dt { color: var(--ts-secondary); }
+.recursos-seleccion dd { margin: 0; overflow-wrap: anywhere; }
+.recursos-seleccion .ts-empty { padding: 8px 20px; }
+.recursos-seleccion .ts-field-help { margin: 0; padding: 0 20px 16px; }
+
+@media (max-width: 767px) {
+  .recursos-vigencia { flex-direction: column; }
+}

@@ -20,12 +20,14 @@ import RutaDetallePage from "../pages/RutaDetallePage.jsx";
 import DemandasPage from "../pages/DemandasPage.jsx";
 import { PERMISO_CONSULTAR_DEMANDAS } from "../services/demandasService.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
+import RecursosLogisticosPage from "../pages/RecursosLogisticosPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
+import { PERMISO_CONSULTAR_RECURSOS } from "../services/logisticaService.js";
 
 const privada = (pagina, permisos) => (
   <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>
@@ -204,6 +206,11 @@ export default function AppRoutes() {
         <Route
           path="/logistica/trazabilidad"
           element={privada(<TrazabilidadPage />, [PERMISO_CONSULTAR_BOLETAS])}
+        />
+        {/* ABC-353: revisar vehículos y choferes del ERP antes de planificar una ruta. */}
+        <Route
+          path="/logistica/recursos"
+          element={privada(<RecursosLogisticosPage />, [PERMISO_CONSULTAR_RECURSOS])}
         />
         <Route
           path="/logistica/rutas/historial"
