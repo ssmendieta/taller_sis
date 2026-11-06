@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventoInbox } from '../integraciones/inbox/entities/evento-inbox.entity';
 import { PubSubModule } from '../integraciones/pubsub/pubsub.module';
+import { DemandaController } from './demanda.controller';
+import { DemandaService } from './demanda.service';
 import { DemandaItem } from './entities/demanda-item.entity';
 import { DemandaRechazada } from './entities/demanda-rechazada.entity';
 import { Demanda } from './entities/demanda.entity';
@@ -10,7 +12,8 @@ import { PubSubDemandaConsumerService } from './pubsub-demanda-consumer.service'
 
 @Module({
   imports: [TypeOrmModule.forFeature([Demanda, DemandaItem, DemandaRechazada, EventoInbox]), PubSubModule],
-  providers: [ProcesadorDemandaService, PubSubDemandaConsumerService],
-  exports: [TypeOrmModule, ProcesadorDemandaService],
+  controllers: [DemandaController],
+  providers: [DemandaService, ProcesadorDemandaService, PubSubDemandaConsumerService],
+  exports: [TypeOrmModule, DemandaService, ProcesadorDemandaService],
 })
 export class DemandaModule {}

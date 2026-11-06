@@ -17,6 +17,8 @@ import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
 import HistorialLogisticoPage from "../pages/HistorialLogisticoPage.jsx";
 import RutaDetallePage from "../pages/RutaDetallePage.jsx";
+import DemandasPage from "../pages/DemandasPage.jsx";
+import { PERMISO_CONSULTAR_DEMANDAS } from "../services/demandasService.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import MainLayout from "../layouts/MainLayout.jsx";
 import ProtectedRoute from "../components/auth/ProtectedRoute.jsx";
@@ -112,6 +114,11 @@ export default function AppRoutes() {
         <Route
           path="/ordenes"
           element={privada(<OrdenesPage />, ["ordenes.consultar"])}
+        />
+
+        <Route
+          path="/demandas"
+          element={privada(<DemandasPage />, [PERMISO_CONSULTAR_DEMANDAS])}
         />
 
         <Route
@@ -213,6 +220,7 @@ export default function AppRoutes() {
 
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
         <Route path="/produccion/ordenes" element={<Navigate to="/ordenes" replace />} />
+        <Route path="/produccion/demandas" element={<Navigate to="/demandas" replace />} />
         <Route path="/produccion/avances" element={<Navigate to="/ordenes" replace />} />
         <Route path="/logistica" element={<Navigate to="/logistica/inicio" replace />} />
       </Route>

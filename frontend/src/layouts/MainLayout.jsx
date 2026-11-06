@@ -20,6 +20,7 @@ const iconos = {
   rutas: <><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M8 18h6a4 4 0 0 0 0-8H10a4 4 0 0 1 0-8h6" /></>,
   integraciones: <><path d="M4 8h13l-3-3M20 16H7l3 3" /></>,
   boletas: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" /></>,
+  demandas: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 13h5l2 3h4l2-3h5" /></>,
 };
 
 function IconoNavegacion({ nombre }) {
@@ -44,6 +45,7 @@ export default function MainLayout({ children }) {
   const puedeSalidas = tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES);
   const activo = (path) => {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
+    if (path === "/demandas") return location.pathname.startsWith("/demandas") ? "active" : "";
     if (path === "/logistica/rutas/historial") return location.pathname.startsWith("/logistica/rutas") ? "active" : "";
     if (path === "/logistica/boletas") return location.pathname.startsWith("/logistica/boletas") ? "active" : "";
     return location.pathname === path ? "active" : "";
@@ -59,6 +61,7 @@ export default function MainLayout({ children }) {
         </div>
         <nav className="navbar" aria-label="Navegación principal">
           {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
+          {puedeOrdenes && <Link className={activo("/demandas")} to="/demandas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="demandas" />Demandas</Link>}
           {puedeRecetas && <Link className={activo("/recetas")} to="/recetas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recetas" />Recetas</Link>}
           {puedeSolicitarMateriales && <Link className={activo("/solicitudes-material")} to="/solicitudes-material" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de materiales</Link>}
           {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios" onClick={() => setAbierto(false)}><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
