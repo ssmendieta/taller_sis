@@ -9,6 +9,7 @@ import { TrazabilidadModule } from './trazabilidad/trazabilidad.module';
 import { RutasModule } from './rutas/rutas.module';
 import { HistorialModule } from './historial/historial.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { RecursosExternosModule } from './recursos-externos/recursos-externos.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     RutasModule,
     HistorialModule,
     DashboardModule,
+    RecursosExternosModule,
   ],
   controllers: [AppController],
 })
