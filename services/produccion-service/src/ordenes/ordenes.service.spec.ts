@@ -242,6 +242,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
           unidad_medida: 'kg',
           cantidad_requerida: 20,
           cantidad_disponible: estado === 'FALTANTE' ? 0 : 8,
+          cantidad_faltante: estado === 'FALTANTE' ? 20 : 12,
           estado: estado as 'FALTANTE' | 'INSUFICIENTE',
         };
         jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
@@ -645,6 +646,86 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
         estado: 'FALTANTE',
       }),
     );
+  });
+
+  it('ABC-311: informa 20 kg faltantes cuando se requieren 50 y existen 30', async () => {
+    findOne.mockResolvedValue(ordenBase('PLANIFICADA'));
+    consultaFindOne.mockResolvedValue({
+      id: '4',
+      consultaId: 'DISP-ORD-1-V1',
+      consultaVersion: 1,
+      requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      estado: 'RESPONDIDA',
+      vigenteEn: new Date('2026-10-17T12:00:00.000Z'),
+    });
+    consultaItemsFind.mockResolvedValue([
+      {
+        materialId: '5',
+        materialCodigo: 'HAR-05',
+        materialNombre: 'Harina',
+        unidad: 'kg',
+        cantidadRequerida: '50.0000',
+        cantidadDisponible: '30.0000',
+        estado: 'INSUFICIENTE',
+      },
+    ]);
+
+    const resultado = await service.compararDisponibilidadMateriales(1);
+
+    expect(resultado.materiales[0]).toEqual(
+      expect.objectContaining({
+        material_id: 5,
+        codigo: 'HAR-05',
+        unidad_medida: 'kg',
+        cantidad_requerida: 50,
+        cantidad_disponible: 30,
+        cantidad_faltante: 20,
+        estado: 'INSUFICIENTE',
+      }),
+    );
+  });
+
+  it('ABC-311: no admite una consulta pendiente como disponibilidad válida al intentar iniciar la orden', async () => {
+    prepararInicio();
+    jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
+      correlation_id: null,
+      respuesta_esperada_hasta: null,
+      error_respuesta: null,
+      publicacion: null,
+      orden_id: 1,
+      orden_codigo: 'OP-001',
+      cantidad_producir: 10,
+      unidad_producto: 'unidad',
+      estado_consulta: 'PENDIENTE',
+      consulta_id: 'DISP-ORD-1-V1',
+      consulta_version: 1,
+      request_event_id: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
+      vigente_en: null,
+      materiales: [
+        {
+          material_id: 5,
+          codigo: 'HAR-05',
+          nombre: 'Harina',
+          unidad_medida: 'kg',
+          cantidad_requerida: 50,
+          cantidad_disponible: null,
+          cantidad_faltante: null,
+          estado: 'PENDIENTE',
+        },
+      ],
+    });
+
+    const error = await service.cambiarEstado(1, {
+      nuevoEstado: EstadoOrden.EN_PRODUCCION,
+      usuarioResponsableId: 7,
+    }, usuarioProduccion).catch((err) => err);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect((error as ConflictException).getResponse()).toMatchObject({
+      message: 'No se puede iniciar la orden sin una disponibilidad externa respondida.',
+      estado_consulta: 'PENDIENTE',
+    });
+    expect(transaction).not.toHaveBeenCalled();
   });
 
   it('ABC-172: devuelve 404 cuando la orden no existe', async () => {
