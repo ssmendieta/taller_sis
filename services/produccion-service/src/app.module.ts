@@ -16,6 +16,9 @@ import { CalidadModule } from './calidad/calidad.module';
 import { LotesModule } from './lotes/lotes.module';
 import { IntegracionesModule } from './integraciones/integraciones.module';
 import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.module';
+import { ObservacionesModule } from './observaciones/observaciones.module';
+import { DemandaModule } from './demanda/demanda.module';
+import { PerdidasMateriaPrimaModule } from './perdidas-materia-prima/perdidas-materia-prima.module';
 
 @Module({
   imports: [
@@ -30,9 +33,12 @@ import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.mo
     UnidadesModule,
     SolicitudesMaterialModule,
     ConsumosMaterialModule,
+    PerdidasMateriaPrimaModule,
     MaterialCalculationModule,
     LotesModule,
     CierreProduccionModule,
+    ObservacionesModule,
+    DemandaModule,
     CalidadModule,
     PubSubModule,
     CalidadModule,

@@ -181,4 +181,85 @@ describeReal('ABC-252: resultado contable atomico en PostgreSQL', () => {
     expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id }))
       .toMatchObject({ estadoContable: 'RECIBIDO', resultadoContableEventId: respuesta.eventId });
   });
+
+  // ABC-349: casos adicionales de reintento y recuperación sobre los mecanismos existentes.
+
+  it('ABC-349: el mismo eventId con contenido contradictorio se rechaza sin cambiar el estado final', async () => {
+    const { cierre, respuesta } = await escenario();
+    await processor.procesar(respuesta, 'original');
+    const contradictorio = structuredClone(respuesta);
+    contradictorio.data.estado = 'RECHAZADO';
+    contradictorio.data.codigoRechazo = 'OTRO';
+    await expect(processor.procesar(contradictorio, 'contradictorio')).rejects.toThrow('contenido diferente');
+    expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id })).toMatchObject({
+      estadoContable: 'RECIBIDO', resultadoContableEventId: respuesta.eventId, codigoRechazoContable: null,
+    });
+    expect(await source.getRepository(EventoInbox).countBy({ eventId: respuesta.eventId })).toBe(1);
+  });
+
+  it('ABC-349: un resultado no correlacionado no altera otro cierre', async () => {
+    const a = await escenario();
+    const b = await escenario();
+    const cruzado = structuredClone(a.respuesta);
+    cruzado.data.cierreId = b.cierre.id;
+    await expect(processor.procesar(cruzado)).rejects.toThrow();
+    for (const cierre of [a.cierre, b.cierre]) {
+      expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id }))
+        .toMatchObject({ estadoContable: 'PENDIENTE', resultadoContableEventId: null });
+    }
+    expect(await source.getRepository(EventoInbox).countBy({ eventId: cruzado.eventId })).toBe(0);
+  });
+
+  it('ABC-349: con la base caída hace NACK sin efectos y la redelivery se aplica una sola vez', async () => {
+    const { cierre, respuesta } = await escenario();
+    let caida = true;
+    const fuenteInestable = new Proxy(source, {
+      get(target, prop, receiver) {
+        if (prop === 'transaction' && caida) {
+          return async () => { throw new Error('Connection terminated unexpectedly'); };
+        }
+        const valor = Reflect.get(target, prop, receiver);
+        return typeof valor === 'function' ? valor.bind(target) : valor;
+      },
+    });
+    const consumer = new PubSubContabilidadConsumerService(
+      new ProcesadorResultadoContableService(fuenteInestable as DataSource),
+      null,
+      { enabled: false, projectId: 'taller-local', topicId: '', subscriptionId: '' },
+    );
+    const mensaje = (id: string) => ({
+      id,
+      data: Buffer.from(JSON.stringify(respuesta)),
+      attributes: { eventId: respuesta.eventId, eventType: respuesta.eventType, correlationId: respuesta.correlationId },
+      ack: jest.fn(),
+      nack: jest.fn(),
+    });
+
+    const durante = mensaje('durante-caida');
+    await (consumer as any).procesarMensaje(durante);
+    expect(durante.nack).toHaveBeenCalledTimes(1);
+    expect(durante.ack).not.toHaveBeenCalled();
+    expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id }))
+      .toMatchObject({ estadoContable: 'PENDIENTE' });
+
+    caida = false;
+    const recuperado = mensaje('tras-recuperar');
+    await (consumer as any).procesarMensaje(recuperado);
+    expect(recuperado.ack).toHaveBeenCalledTimes(1);
+    expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id }))
+      .toMatchObject({ estadoContable: 'RECIBIDO', resultadoContableEventId: respuesta.eventId });
+    expect(await source.getRepository(EventoInbox).countBy({ eventId: respuesta.eventId })).toBe(1);
+  });
+
+  it('ABC-349: dos entregas simultáneas del mismo resultado dejan un solo efecto', async () => {
+    const { cierre, respuesta } = await escenario();
+    const resultados = await Promise.all([
+      processor.procesar(respuesta, 'simultaneo-1'),
+      processor.procesar(respuesta, 'simultaneo-2'),
+    ]);
+    expect(resultados.map((r) => r.resultado).sort()).toEqual(['DUPLICADO', 'PROCESADO']);
+    expect(await source.getRepository(EventoInbox).countBy({ eventId: respuesta.eventId })).toBe(1);
+    expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id }))
+      .toMatchObject({ estadoContable: 'RECIBIDO', resultadoContableEventId: respuesta.eventId });
+  });
 });

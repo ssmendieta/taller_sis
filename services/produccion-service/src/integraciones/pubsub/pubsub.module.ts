@@ -4,18 +4,21 @@ import {
   pubSubContabilidadConsumerConfigProvider,
   pubSubConsumerConfigProvider,
   pubSubConfigProvider,
+  pubSubDemandaConsumerConfigProvider,
 } from './pubsub-client.provider';
 import { PubSubPublisherService } from './pubsub-publisher.service';
 import { PUBSUB_CONFIG } from './pubsub.config';
 import { PUBSUB_CONSUMER_CONFIG } from './pubsub-consumer.config';
 import { PUBSUB_CLIENT } from './pubsub-client.provider';
 import { PUBSUB_CONTABILIDAD_CONSUMER_CONFIG } from './pubsub-contabilidad-consumer.config';
+import { PUBSUB_DEMANDA_CONSUMER_CONFIG } from './pubsub-demanda-consumer.config';
 
 @Module({
   providers: [
     pubSubConfigProvider,
     pubSubConsumerConfigProvider,
     pubSubContabilidadConsumerConfigProvider,
+    pubSubDemandaConsumerConfigProvider,
     pubSubClientProvider,
     PubSubPublisherService,
   ],
@@ -24,6 +27,7 @@ import { PUBSUB_CONTABILIDAD_CONSUMER_CONFIG } from './pubsub-contabilidad-consu
     PUBSUB_CONFIG,
     PUBSUB_CONSUMER_CONFIG,
     PUBSUB_CONTABILIDAD_CONSUMER_CONFIG,
+    PUBSUB_DEMANDA_CONSUMER_CONFIG,
     PUBSUB_CLIENT,
   ],
 })

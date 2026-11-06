@@ -57,7 +57,10 @@ import {
   resumenReporteContable,
 } from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
+import ObservacionesOrden from "../components/ordenes/ObservacionesOrden.jsx";
+import { PERMISO_REGISTRAR_OBSERVACION } from "../services/observacionesService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import PerdidasMateriaPrima from "../components/ordenes/PerdidasMateriaPrima.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import useDisponibilidadOrden from "../hooks/useDisponibilidadOrden.js";
 import "../styles/disponibilidad-orden.css";
@@ -1098,6 +1101,14 @@ export default function OrdenDetallePage() {
         </div>
       </div>
 
+      {/* ABC-74: mermas de materia prima, separadas de la calidad del producto. */}
+      <PerdidasMateriaPrima
+        ordenId={id}
+        materiales={materiales}
+        permiteRegistrar={permiteConsumo}
+        usuario={usuario}
+      />
+
       <div className="ts-panel" style={{ marginBottom: 16 }}>
         <div className="ts-panel-title">
           <h2>Avance</h2>
@@ -1908,6 +1919,11 @@ export default function OrdenDetallePage() {
           </p>
         )}
       </div>
+
+      <ObservacionesOrden
+        ordenId={orden.id}
+        puedeRegistrar={tienePermiso(usuario, PERMISO_REGISTRAR_OBSERVACION)}
+      />
 
       <div className="ts-panel">
         <div className="ts-panel-title">

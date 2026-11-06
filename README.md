@@ -226,6 +226,10 @@ curl http://localhost:3000/api/produccion/health/database # Gateway -> Producci�
 - `port already in use` → cambiar puerto en `.env` o `netstat -ano | findstr :3000`.
 - `SKIP_DB` muestra `skipped` → normal sin PG, con PG debe ser `connected`.
 - `docker compose down -v` borra todo → rehacer Paso 3 y 4.
+- `npm error Exit handler never called!` o `UNABLE_TO_VERIFY_LEAF_SIGNATURE` al construir imágenes → un antivirus o la red inspecciona HTTPS (p. ej. Avast). Producción y Logística aceptan su certificado raíz como secreto de build, sin guardarlo en la imagen:
+  `docker build --secret id=extra_ca,src="C:\ProgramData\Avast Software\Avast\wscert.pem" -t taller_sis-logistica-service services/logistica-service`
+  (igual para `produccion-service`) y luego `docker compose --profile full up -d --no-build`.
+- Las imágenes de Producción y Logística aplican sus migraciones pendientes al arrancar (`migration:run:prod`) y declaran `HEALTHCHECK` sobre `/health`.
 
 ---
 HU ABC-158 completada Fase 1-3. Inicio desde 0 = 5 pasos arriba.
