@@ -18,6 +18,7 @@ import { IntegracionesModule } from './integraciones/integraciones.module';
 import { CierreProduccionModule } from './cierre-produccion/cierre-produccion.module';
 import { ObservacionesModule } from './observaciones/observaciones.module';
 import { DemandaModule } from './demanda/demanda.module';
+import { PerdidasMateriaPrimaModule } from './perdidas-materia-prima/perdidas-materia-prima.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { DemandaModule } from './demanda/demanda.module';
     UnidadesModule,
     SolicitudesMaterialModule,
     ConsumosMaterialModule,
+    PerdidasMateriaPrimaModule,
     MaterialCalculationModule,
     LotesModule,
     CierreProduccionModule,

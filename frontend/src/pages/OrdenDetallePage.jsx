@@ -60,6 +60,7 @@ import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../component
 import ObservacionesOrden from "../components/ordenes/ObservacionesOrden.jsx";
 import { PERMISO_REGISTRAR_OBSERVACION } from "../services/observacionesService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import PerdidasMateriaPrima from "../components/ordenes/PerdidasMateriaPrima.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import useDisponibilidadOrden from "../hooks/useDisponibilidadOrden.js";
 import "../styles/disponibilidad-orden.css";
@@ -1099,6 +1100,14 @@ export default function OrdenDetallePage() {
           </table>
         </div>
       </div>
+
+      {/* ABC-74: mermas de materia prima, separadas de la calidad del producto. */}
+      <PerdidasMateriaPrima
+        ordenId={id}
+        materiales={materiales}
+        permiteRegistrar={permiteConsumo}
+        usuario={usuario}
+      />
 
       <div className="ts-panel" style={{ marginBottom: 16 }}>
         <div className="ts-panel-title">
