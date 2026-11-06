@@ -1,0 +1,26 @@
+/* ABC-382: incidencias y reprogramaciones en el detalle de ruta. */
+.incidencias-formulario { display: flex; flex-direction: column; gap: 12px; padding: 8px 20px 16px; max-width: 760px; }
+.incidencias-formulario :is(.ts-success, .ts-feedback) { margin: 0; }
+.incidencias-formulario .ts-feedback { padding: 12px 14px; }
+.incidencias-formulario .ts-feedback p { margin: 0; }
+.incidencias-formulario .ts-field { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; }
+.incidencias-formulario textarea { min-height: 72px; resize: vertical; }
+.incidencias-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.incidencias-conflictos { margin: 6px 0 0; padding-left: 18px; }
+.incidencias-reprogramar { display: flex; flex-direction: column; gap: 10px; }
+.incidencias-check { display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; cursor: pointer; }
+.incidencias-check input { width: 16px; height: 16px; margin: 0; accent-color: var(--ts-accent); }
+.incidencias-reprogramar input[type="date"] { max-width: 220px; }
+
+.incidencias-historial { padding: 0 0 8px; }
+.incidencias-historial h3 { margin: 16px 20px 6px; font-size: 0.85rem; font-weight: 600; }
+.incidencias-historial .ts-empty { padding: 4px 20px 8px; }
+.incidencias-fechas { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; padding: 12px 20px 0; font-size: 0.85rem; }
+.incidencias-fechas dt { color: var(--ts-secondary); }
+.incidencias-fechas dd { margin: 0; }
+.incidencias-sin-historial { margin: 0 20px 16px; }
+
+@media (max-width: 767px) {
+  .incidencias-formulario { padding: 8px 16px 16px; }
+  .incidencias-fechas { grid-template-columns: 1fr; }
+}

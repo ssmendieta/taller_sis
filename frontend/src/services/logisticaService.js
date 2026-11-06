@@ -37,6 +37,7 @@ async function exigirOk(response, mensaje) {
     error.status = response.status;
     error.codigo = datos?.codigo ?? null;
     error.motivo = datos?.motivo ?? null;
+    error.conflictos = Array.isArray(datos?.conflictos) ? datos.conflictos : [];
     throw error;
   }
   return response;
@@ -104,4 +105,47 @@ export function registrarEntrega(rutaId, paradaId, observacion) {
     `${apiConfig.gatewayUrl}/api/logistica/rutas/${encodeURIComponent(rutaId)}/paradas/${encodeURIComponent(paradaId)}/entrega`,
     rutaId, observacion, "No se pudo registrar la entrega."
   );
+}
+
+// ABC-382: incidencias y reprogramaciones de una ruta con el contrato propuesto
+// para ABC-381 (services/logistica-service/src/incidencias/README.md).
+export const TIPOS_INCIDENCIA = {
+  RETRASO: "Retraso",
+  AVERIA_VEHICULO: "Avería del vehículo",
+  CLIENTE_AUSENTE: "Cliente ausente",
+  DIRECCION_INCORRECTA: "Dirección incorrecta",
+  CARGA_DANADA: "Carga dañada",
+  OTRO: "Otro",
+};
+export const MAX_MOTIVO_INCIDENCIA = 500;
+
+function historialIncidencias(datos, rutaId) {
+  if (String(datos?.rutaId) !== String(rutaId) || !datos.fechaProgramada ||
+      !Array.isArray(datos.incidencias) || !Array.isArray(datos.reprogramaciones)) {
+    throw new Error("El servidor devolvió un historial de incidencias incompleto o inválido.");
+  }
+  return datos;
+}
+
+export async function obtenerHistorialIncidencias(rutaId, { signal } = {}) {
+  const response = await fetch(
+    `${apiConfig.gatewayUrl}/api/logistica/rutas/${encodeURIComponent(rutaId)}/incidencias`,
+    { headers: encabezados(), signal }
+  );
+  await exigirOk(response, "No se pudo cargar el historial de incidencias.");
+  return historialIncidencias(await response.json(), rutaId);
+}
+
+// Registra la incidencia y, si hay nuevaFecha, reprograma la ruta en el mismo paso.
+export async function registrarIncidencia(rutaId, { tipo, motivo, paradaId, nuevaFecha }) {
+  const response = await fetch(
+    `${apiConfig.gatewayUrl}/api/logistica/rutas/${encodeURIComponent(rutaId)}/incidencias`,
+    {
+      method: "POST",
+      headers: { ...encabezados(), "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo, motivo: motivo.trim(), paradaId: paradaId || null, nuevaFecha: nuevaFecha || null }),
+    }
+  );
+  await exigirOk(response, "No se pudo registrar la incidencia.");
+  return historialIncidencias(await response.json(), rutaId);
 }

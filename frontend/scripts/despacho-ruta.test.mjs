@@ -27,6 +27,9 @@ function rutaInicial(estado = 'PLANIFICADA') {
 
 function api(path, metodo, cuerpo) {
   if (metodo === 'GET' && path === '/api/logistica/rutas/9') return json(ruta);
+  if (metodo === 'GET' && path === '/api/logistica/rutas/9/incidencias') {
+    return json({ rutaId: '9', fechaOriginal: ruta.fechaProgramada, fechaProgramada: ruta.fechaProgramada, incidencias: [], reprogramaciones: [] });
+  }
   if (metodo === 'POST' && path === '/api/logistica/rutas/9/despacho') {
     if (ruta.estado !== 'PLANIFICADA') return json({ message: `La ruta ya está en estado ${ruta.estado}` }, 409);
     if (boletasAnuladas.length) return json({ message: `Solo se despachan boletas EMITIDAS: ${boletasAnuladas.map((b) => `${b} (ANULADA)`).join(', ')}` }, 409);
@@ -142,7 +145,7 @@ test('un segundo envío mientras se despacha no repite la petición y el botón 
   let liberar;
   retenerPost = new Promise((resolver) => { liberar = resolver; });
   await montar();
-  const formulario = root.root.find((n) => n.type === 'form');
+  const formulario = root.root.find((n) => n.type === 'form' && n.findAll((h) => h.props.id === 'despacho-observacion').length > 0);
   let primero;
   act(() => { primero = formulario.props.onSubmit(evento); formulario.props.onSubmit(evento); });
   assert.equal(botones('Despachando…')[0].props.disabled, true);
@@ -157,7 +160,7 @@ test('409 por boleta anulada: muestra el motivo, recarga la ruta y permite corre
   await montar();
   await enviarFormulario('despacho-observacion');
   assert.match(texto(), /No se despachó la ruta: Solo se despachan boletas EMITIDAS: 2 \(ANULADA\)/);
-  assert.equal(llamadas.filter((l) => l.metodo === 'GET').length, 2, 'vuelve a consultar el estado real');
+  assert.equal(llamadas.filter((l) => l.metodo === 'GET' && l.path === '/api/logistica/rutas/9').length, 2, 'vuelve a consultar el estado real');
   assert.equal(botones('Despachar ruta')[0].props.disabled, false, 'el botón vuelve a quedar disponible');
 });
 

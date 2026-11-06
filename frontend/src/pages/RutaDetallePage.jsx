@@ -4,13 +4,19 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import { obtenerRuta, PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
-import { despacharRuta, PERMISO_GESTIONAR_RUTAS, registrarEntrega } from "../services/logisticaService.js";
+import {
+  despacharRuta, obtenerHistorialIncidencias, PERMISO_GESTIONAR_RUTAS, registrarEntrega, registrarIncidencia,
+} from "../services/logisticaService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import { BadgeEstadoRuta } from "../components/logistica/historial/TablaHistorialRutas.jsx";
 import FormularioObservacion from "../components/logistica/despacho/FormularioObservacion.jsx";
 import EstadoEntregaParada, { fechaHora } from "../components/logistica/despacho/EstadoEntregaParada.jsx";
+import FormularioIncidencia from "../components/logistica/incidencias/FormularioIncidencia.jsx";
+import HistorialIncidencias from "../components/logistica/incidencias/HistorialIncidencias.jsx";
+import { formatearFecha } from "../utils/format.js";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import "../styles/despacho-ruta.css";
+import "../styles/incidencias-ruta.css";
 
 function mensajeError(fallo) {
   if (fallo?.status === 401) return "Tu sesión expiró. Vuelve a ingresar.";
@@ -26,7 +32,8 @@ function resumenEntregas(paradas) {
 }
 
 // Detalle de una ruta abierta desde el historial (ABC-392). ABC-377 agrega el
-// despacho y la entrega individual de cada parada con la API de ABC-376.
+// despacho y la entrega individual de cada parada con la API de ABC-376, y
+// ABC-382 las incidencias y reprogramaciones con su historial.
 export default function RutaDetallePage() {
   const { id } = useParams();
   const { usuario } = useSesion();
@@ -37,6 +44,8 @@ export default function RutaDetallePage() {
   const [aviso, setAviso] = useState("");
   const [errorAccion, setErrorAccion] = useState("");
   const [paradaAbierta, setParadaAbierta] = useState(null);
+  const [historial, setHistorial] = useState(null);
+  const [errorHistorial, setErrorHistorial] = useState("");
 
   useEffect(() => {
     let vigente = true;
@@ -47,6 +56,22 @@ export default function RutaDetallePage() {
       .then((datos) => { if (vigente) setRuta(datos); })
       .catch((fallo) => { if (vigente) setError(fallo.status === 404 ? "La ruta no existe." : fallo.message); });
     return () => { vigente = false; };
+  }, [id]);
+
+  useEffect(() => {
+    let vigente = true;
+    const controller = new AbortController();
+    setHistorial(null);
+    setErrorHistorial("");
+    obtenerHistorialIncidencias(id, { signal: controller.signal })
+      .then((datos) => { if (vigente) setHistorial(datos); })
+      .catch((fallo) => {
+        if (!vigente || fallo?.name === "AbortError") return;
+        setErrorHistorial(fallo?.status === 404
+          ? "El historial de incidencias todavía no está disponible en el servidor."
+          : fallo?.message || "No se pudo cargar el historial de incidencias.");
+      });
+    return () => { vigente = false; controller.abort(); };
   }, [id]);
 
   // Tras un 409 (otro usuario ya cambió la ruta) se muestra el estado real.
@@ -84,6 +109,17 @@ export default function RutaDetallePage() {
         : `Entrega de la parada ${parada.secuencia} registrada. La ruta sigue en tránsito.`,
       `Parada ${parada.secuencia}: `,
     );
+  }
+
+  // Los errores llegan al formulario, que conserva lo escrito.
+  async function registrar(datos) {
+    const actualizado = await registrarIncidencia(ruta.id, datos);
+    setHistorial(actualizado);
+    setErrorHistorial("");
+    setRuta((actual) => ({ ...actual, fechaProgramada: actualizado.fechaProgramada }));
+    return datos.nuevaFecha
+      ? `Incidencia registrada y ruta reprogramada al ${formatearFecha(actualizado.fechaProgramada)}.`
+      : "Incidencia registrada.";
   }
 
   if (!tienePermiso(usuario, PERMISO_CONSULTAR_RUTAS)) {
@@ -220,6 +256,17 @@ export default function RutaDetallePage() {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="ts-panel" aria-labelledby="ruta-incidencias-titulo">
+        <div className="ts-panel-title">
+          <h2 id="ruta-incidencias-titulo">Incidencias y reprogramaciones</h2>
+          {historial && <span>{historial.incidencias.length} incidencias · {historial.reprogramaciones.length} reprogramaciones</span>}
+        </div>
+        {puedeGestionar && <FormularioIncidencia ruta={ruta} onRegistrar={registrar} />}
+        {errorHistorial && <p className="ts-feedback ts-error incidencias-sin-historial" role="alert">{errorHistorial}</p>}
+        {!historial && !errorHistorial && <p className="ts-empty">Cargando historial…</p>}
+        {historial && <HistorialIncidencias historial={historial} paradas={paradas} />}
       </div>
 
       {/* Separado del tránsito y la entrega: el resultado de Inventarios llegará con ABC-384. */}
