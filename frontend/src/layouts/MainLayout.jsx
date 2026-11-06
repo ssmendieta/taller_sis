@@ -7,6 +7,7 @@ import { cerrarSesionServidor } from "../services/auth.js";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
+import { PERMISO_CONSULTAR_RECURSOS } from "../services/logisticaService.js";
 import "../styles/layout.css";
 
 const iconos = {
@@ -18,6 +19,7 @@ const iconos = {
   usuarios: <><circle cx="9" cy="8" r="3" /><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M17 8a3 3 0 1 1 2 5M21 20c0-2.8-1.9-5.1-4.5-5.8" /></>,
   integraciones: <><path d="M4 8h13l-3-3M20 16H7l3 3" /></>,
   boletas: <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" /></>,
+  recursos: <><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z" /><circle cx="7" cy="17.5" r="1.5" /><circle cx="17" cy="17.5" r="1.5" /></>,
 };
 
 function IconoNavegacion({ nombre }) {
@@ -38,6 +40,7 @@ export default function MainLayout({ children }) {
   const puedeAuditoria = tienePermiso(usuario, "auditoria.consultar");
   const puedeIntegraciones = tienePermiso(usuario, PERMISO_INTEGRACIONES);
   const puedeBoletas = tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS);
+  const puedeRecursos = tienePermiso(usuario, PERMISO_CONSULTAR_RECURSOS);
   const puedeSalidas = tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES);
   const activo = (path) => {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
@@ -62,6 +65,7 @@ export default function MainLayout({ children }) {
           {puedeAuditoria && <Link className={activo("/auditoria")} to="/auditoria" onClick={() => setAbierto(false)}><IconoNavegacion nombre="auditoria" />Auditoría</Link>}
           {puedeSalidas && <Link className={activo("/logistica/inicio")} to="/logistica/inicio" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de salida</Link>}
           {puedeBoletas && <Link className={activo("/logistica/boletas")} to="/logistica/boletas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="boletas" />Boletas</Link>}
+          {puedeRecursos && <Link className={activo("/logistica/recursos")} to="/logistica/recursos" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recursos" />Recursos logísticos</Link>}
           {puedeIntegraciones && <Link className={activo("/integraciones")} to="/integraciones" onClick={() => setAbierto(false)}><IconoNavegacion nombre="integraciones" />Integraciones</Link>}
         </nav>
         {usuario && (

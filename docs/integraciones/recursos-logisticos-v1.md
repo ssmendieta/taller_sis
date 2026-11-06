@@ -149,9 +149,25 @@ código HTTP. Los registros nunca incluyen el token.
 4. Si falla el ERP y existe copia, se muestra con su fecha y un aviso de respaldo.
    Si no existe copia, se informa que los recursos no están disponibles.
 
-La respuesta interna que use la pantalla debe distinguir el origen (`ERP` o
-`RESPALDO`) y la fecha de sincronización. Su forma exacta la define la subtarea
-de la API de Logística.
+La copia se usa a través de la interfaz `RespaldoRecursosLogisticos`
+([`respaldo-recursos.ts`](../../services/logistica-service/src/recursos-externos/respaldo-recursos.ts)).
+Su persistencia corresponde a ABC-352; mientras no exista, no hay copia y un fallo
+del ERP responde 503.
+
+## API interna de Logística (ABC-353)
+
+`GET /api/logistica/recursos-logisticos?fecha=AAAA-MM-DD`, con el permiso
+`logistica.boletas.consultar`. Filtros opcionales: `disponible=true|false` y
+`capacidadMinima` + `unidad` (solo vehículos con capacidad suficiente en la misma
+unidad).
+
+- **200:** `fecha`, `origen` (`ERP` o `RESPALDO`), `generadoEn`, `sincronizadoEn`,
+  `aviso` (motivo y mensaje, solo con `RESPALDO`), `filtros`, `totales`,
+  `vehiculos` y `choferes`.
+- **503 `RECURSOS_NO_DISPONIBLES`:** el ERP falló y no hay copia. No incluye listas,
+  para que no se lean como "sin recursos".
+- Es solo lectura: consultar no reserva recursos. La pantalla está en
+  `/logistica/recursos`.
 
 ## Versionado
 
