@@ -17,6 +17,6 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_DATABASE || process.env.DB_PRODUCCION_DATABASE || process.env.POSTGRES_DB || process.env.PRODUCCION_DB || 'produccion_db',
   synchronize: false,
   logging: false,
-  entities: [],
+  entities: [path.join(__dirname, '../**/*.entity{.ts,.js}')],
   migrations: [path.join(__dirname, 'migrations/*{.ts,.js}')],
 });
