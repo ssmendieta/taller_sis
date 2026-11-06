@@ -321,7 +321,7 @@ export default function OrdenDetallePage() {
   const faltantes = useMemo(
     () =>
       disponibilidad.filter(
-        (m) => m.estado === "INSUFICIENTE" || m.estado === "FALTANTE",
+        (m) => m.estado === "INSUFICIENTE" || m.estado === "FALTANTE" || (m.faltante != null && m.faltante > 0),
       ),
     [disponibilidad],
   );
@@ -339,7 +339,7 @@ export default function OrdenDetallePage() {
       const nombres = faltantes
         .map(
           (m) =>
-            `${m.codigo} (${mostrarCantidad(m.requerida)} ${m.unidad}, disponible ${mostrarCantidad(m.disponible)})`.trim(),
+            `${m.codigo} (faltan ${mostrarCantidad(m.faltante != null ? m.faltante : Math.max(0, m.requerida - (m.disponible ?? 0)))} ${m.unidad}, requerido ${mostrarCantidad(m.requerida)}, disponible ${mostrarCantidad(m.disponible)})`.trim(),
         )
         .join(", ");
 
@@ -856,6 +856,7 @@ export default function OrdenDetallePage() {
                   <th scope="col">Material</th>
                   <th scope="col">Requerido</th>
                   <th scope="col">Disponible</th>
+                  <th scope="col">Faltante</th>
                   <th scope="col">Estado</th>
                 </tr>
               </thead>
@@ -877,6 +878,13 @@ export default function OrdenDetallePage() {
                               disp.disponible,
                               disp.unidad || m.unidad,
                             )}
+                      </td>
+                      <td>
+                        {disp?.faltante == null
+                          ? "—"
+                          : disp.faltante > 0
+                            ? <span className="ts-badge ts-badge--danger" style={{ fontWeight: 600 }}>{mostrarCantidad(disp.faltante)} {disp.unidad || m.unidad}</span>
+                            : "0"}
                       </td>
                       <td>
                         {disp?.estado ? (

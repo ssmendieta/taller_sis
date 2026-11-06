@@ -465,6 +465,7 @@ export class OrdenesService {
         cantidad_disponible: item.cantidadDisponible === null
           ? null
           : Number(item.cantidadDisponible),
+        cantidad_faltante: item.cantidadDisponible === null ? null : Math.max(0, Number((Number(item.cantidadRequerida) - Number(item.cantidadDisponible)).toFixed(4))),
         estado: item.estado ?? ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
       })),
     };
@@ -554,7 +555,7 @@ export class OrdenesService {
         });
       }
       const materialesFaltantes = disponibilidad.materiales.filter(
-        (material) => material.estado === 'INSUFICIENTE' || material.estado === 'FALTANTE',
+        (material) => material.estado === 'INSUFICIENTE' || material.estado === 'FALTANTE' || (material.cantidad_faltante !== null && material.cantidad_faltante > 0),
       );
 
       if (materialesFaltantes.length > 0) {
