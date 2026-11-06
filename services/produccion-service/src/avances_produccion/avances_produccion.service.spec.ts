@@ -209,3 +209,171 @@ describe('AvancesProduccionService.create (ABC-195)', () => {
     expect(save).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('AvancesProduccionService.obtenerResumenPorOrden (ABC-318)', () => {
+  const query = jest.fn();
+  let service: AvancesProduccionService;
+
+  const registro = (
+    id: string,
+    cantidad: string,
+    fecha: string,
+    ordenId = '42',
+  ) => ({
+    id,
+    orden_id: ordenId,
+    cantidad_producida: cantidad,
+    fecha_hora: fecha,
+    usuario_responsable_id: '9',
+    usuario_responsable_nombre: 'Ana',
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new AvancesProduccionService({
+      manager: { query },
+    } as unknown as Repository<OrdenProduccion>);
+  });
+
+  it('devuelve 60 de 100, 40 pendientes y 60 por ciento sin duplicar registros', async () => {
+    query.mockResolvedValue([
+      {
+        orden_id: '42',
+        orden_codigo: 'OP-042',
+        cantidad_solicitada: '100.0000',
+        cantidad_producida: '60.0000',
+        registros: [
+          registro('2', '40.0000', '2026-11-06T11:00:00.000Z'),
+          registro('1', '20.0000', '2026-11-06T10:00:00.000Z'),
+        ],
+      },
+    ]);
+
+    await expect(service.obtenerResumenPorOrden(42)).resolves.toEqual({
+      orden_id: 42,
+      orden_codigo: 'OP-042',
+      cantidad_solicitada: 100,
+      cantidad_producida: 60,
+      cantidad_pendiente: 40,
+      porcentaje_avance: 60,
+      registros: [
+        { ...registro('2', '40.0000', '2026-11-06T11:00:00.000Z'), cantidad_producida: 40 },
+        { ...registro('1', '20.0000', '2026-11-06T10:00:00.000Z'), cantidad_producida: 20 },
+      ],
+    });
+
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('ORDER BY r.fecha_hora DESC, r.id DESC'),
+      [42],
+    );
+  });
+
+  it('devuelve cero y una lista vacia cuando la orden no tiene avances', async () => {
+    query.mockResolvedValue([
+      {
+        orden_id: '42',
+        orden_codigo: 'OP-042',
+        cantidad_solicitada: '100.0000',
+        cantidad_producida: '0',
+        registros: [],
+      },
+    ]);
+
+    const resultado = await service.obtenerResumenPorOrden(42);
+
+    expect(resultado).toMatchObject({
+      cantidad_solicitada: 100,
+      cantidad_producida: 0,
+      cantidad_pendiente: 100,
+      porcentaje_avance: 0,
+      registros: [],
+    });
+  });
+
+  it('responde 404 cuando la orden no existe', async () => {
+    query.mockResolvedValue([]);
+
+    await expect(service.obtenerResumenPorOrden(999)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it.each([
+    ['0', 0],
+    ['-5.0000', 0],
+    ['dato-invalido', 0],
+  ])(
+    'controla el denominador solicitado %s y devuelve porcentaje %s',
+    async (solicitada, porcentaje) => {
+      query.mockResolvedValue([
+        {
+          orden_id: '42',
+          orden_codigo: 'OP-042',
+          cantidad_solicitada: solicitada,
+          cantidad_producida: '0',
+          registros: [],
+        },
+      ]);
+
+      const resultado = await service.obtenerResumenPorOrden(42);
+
+      expect(resultado.porcentaje_avance).toBe(porcentaje);
+      expect(resultado.cantidad_solicitada).toBe(0);
+      expect(resultado.cantidad_pendiente).toBe(0);
+    },
+  );
+
+  it('calcula decimales con precision y limita el porcentaje a cien', async () => {
+    query
+      .mockResolvedValueOnce([
+        {
+          orden_id: '42',
+          orden_codigo: 'OP-042',
+          cantidad_solicitada: '1.0000',
+          cantidad_producida: '0.3000',
+          registros: [],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          orden_id: '42',
+          orden_codigo: 'OP-042',
+          cantidad_solicitada: '100.0000',
+          cantidad_producida: '125.0000',
+          registros: [],
+        },
+      ]);
+
+    await expect(service.obtenerResumenPorOrden(42)).resolves.toMatchObject({
+      cantidad_producida: 0.3,
+      cantidad_pendiente: 0.7,
+      porcentaje_avance: 30,
+    });
+    await expect(service.obtenerResumenPorOrden(42)).resolves.toMatchObject({
+      cantidad_producida: 125,
+      cantidad_pendiente: 0,
+      porcentaje_avance: 100,
+    });
+  });
+
+  it('filtra por la orden solicitada y no ejecuta ninguna escritura', async () => {
+    query.mockResolvedValue([
+      {
+        orden_id: '7',
+        orden_codigo: 'OP-007',
+        cantidad_solicitada: '10.0000',
+        cantidad_producida: '2.0000',
+        registros: [registro('1', '2.0000', '2026-11-06T10:00:00.000Z', '7')],
+      },
+    ]);
+
+    await service.obtenerResumenPorOrden(7);
+
+    const [sql, parametros] = query.mock.calls[0];
+    expect(sql).toContain('WHERE a.orden_id = $1');
+    expect(sql).toContain('WHERE o.id = $1');
+    expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/i);
+    expect(parametros).toEqual([7]);
+  });
+});

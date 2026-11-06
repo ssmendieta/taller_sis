@@ -50,6 +50,14 @@ export class AvancesPantallaController {
     return this.avancesService.listarPorOrden(ordenId);
   }
 
+  // Resumen agregado y registros: GET /avances/:ordenId/resumen (ABC-318)
+  @Get(':ordenId/resumen')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
+  obtenerResumen(@Param('ordenId', ParseIntPipe) ordenId: number) {
+    return this.avancesService.obtenerResumenPorOrden(ordenId);
+  }
+
   // Total producido de una orden: GET /avances/:ordenId/total
   @Get(':ordenId/total')
   @UseGuards(PermisoProduccionGuard)

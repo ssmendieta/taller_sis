@@ -20,6 +20,40 @@ export interface RegistroAvanceResponse {
   cantidad_pendiente: number;
 }
 
+export interface RegistroAvanceConsulta {
+  id: string;
+  orden_id: string;
+  cantidad_producida: number;
+  fecha_hora: Date | string;
+  usuario_responsable_id: string;
+  usuario_responsable_nombre: string;
+}
+
+export interface ResumenAvanceOrdenResponse {
+  orden_id: number;
+  orden_codigo: string;
+  cantidad_solicitada: number;
+  cantidad_producida: number;
+  cantidad_pendiente: number;
+  porcentaje_avance: number;
+  registros: RegistroAvanceConsulta[];
+}
+
+interface ResumenAvanceOrdenFila {
+  orden_id: string | number;
+  orden_codigo: string;
+  cantidad_solicitada: string | number;
+  cantidad_producida: string | number;
+  registros: Array<{
+    id: string;
+    orden_id: string;
+    cantidad_producida: string | number;
+    fecha_hora: Date | string;
+    usuario_responsable_id: string;
+    usuario_responsable_nombre: string;
+  }>;
+}
+
 function aUnidadesEscaladas(valor: number | string): number {
   const texto = typeof valor === 'number' ? valor.toFixed(4) : valor;
   const partes = /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(texto);
@@ -196,5 +230,116 @@ export class AvancesProduccionService {
     )) as Array<{ total: string | number }>;
 
     return Number(fila?.total ?? 0);
+  }
+
+  async obtenerResumenPorOrden(
+    ordenId: number,
+  ): Promise<ResumenAvanceOrdenResponse> {
+    const [fila] = (await this.ordenRepository.manager.query(
+      `
+      WITH registros AS (
+        SELECT
+          a.id,
+          a.orden_id,
+          a.cantidad_producida,
+          a.fecha_hora,
+          a.usuario_responsable_id,
+          COALESCE(
+            a.usuario_responsable_nombre,
+            'Usuario #' || a.usuario_responsable_id
+          ) AS usuario_responsable_nombre
+        FROM avances_produccion a
+        WHERE a.orden_id = $1
+      ), agregado AS (
+        SELECT COALESCE(SUM(r.cantidad_producida), 0)::text AS cantidad_producida
+        FROM registros r
+      )
+      SELECT
+        o.id::text AS orden_id,
+        o.codigo AS orden_codigo,
+        o.cantidad_solicitada::text AS cantidad_solicitada,
+        agregado.cantidad_producida,
+        COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', r.id::text,
+              'orden_id', r.orden_id::text,
+              'cantidad_producida', r.cantidad_producida::text,
+              'fecha_hora', r.fecha_hora,
+              'usuario_responsable_id', r.usuario_responsable_id::text,
+              'usuario_responsable_nombre', r.usuario_responsable_nombre
+            )
+            ORDER BY r.fecha_hora DESC, r.id DESC
+          ) FILTER (WHERE r.id IS NOT NULL),
+          '[]'::jsonb
+        ) AS registros
+      FROM ordenes_produccion o
+      CROSS JOIN agregado
+      LEFT JOIN registros r ON r.orden_id = o.id
+      WHERE o.id = $1
+      GROUP BY
+        o.id,
+        o.codigo,
+        o.cantidad_solicitada,
+        agregado.cantidad_producida
+    `,
+      [ordenId],
+    )) as ResumenAvanceOrdenFila[];
+
+    if (!fila) {
+      throw new NotFoundException(`Orden ${ordenId} no encontrada`);
+    }
+
+    const cantidadProducidaUnidades = aUnidadesEscaladas(
+      fila.cantidad_producida ?? 0,
+    );
+    const cantidadSolicitadaUnidades = this.denominadorSeguro(
+      fila.cantidad_solicitada,
+    );
+    const cantidadProducida = cantidadProducidaUnidades / 10_000;
+    const cantidadSolicitada = cantidadSolicitadaUnidades / 10_000;
+    const cantidadPendiente =
+      Math.max(cantidadSolicitadaUnidades - cantidadProducidaUnidades, 0) /
+      10_000;
+    const porcentajeAvance =
+      cantidadSolicitadaUnidades === 0
+        ? 0
+        : Math.min(
+            100,
+            Math.max(
+              0,
+              Number(
+                (
+                  (cantidadProducidaUnidades * 100) /
+                  cantidadSolicitadaUnidades
+                ).toFixed(2),
+              ),
+            ),
+          );
+
+    return {
+      orden_id: Number(fila.orden_id),
+      orden_codigo: fila.orden_codigo,
+      cantidad_solicitada: cantidadSolicitada,
+      cantidad_producida: cantidadProducida,
+      cantidad_pendiente: cantidadPendiente,
+      porcentaje_avance: porcentajeAvance,
+      registros: (Array.isArray(fila.registros) ? fila.registros : []).map(
+        (registro) => ({
+          ...registro,
+          cantidad_producida:
+            aUnidadesEscaladas(registro.cantidad_producida) / 10_000,
+        }),
+      ),
+    };
+  }
+
+  private denominadorSeguro(valor: string | number): number {
+    try {
+      const unidades = aUnidadesEscaladas(valor);
+      return unidades > 0 ? unidades : 0;
+    } catch {
+      return 0;
+    }
   }
 }
