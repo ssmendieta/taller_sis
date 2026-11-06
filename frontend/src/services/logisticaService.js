@@ -72,3 +72,36 @@ export async function consultarRecursosLogisticos(
   }
   return datos;
 }
+
+// ABC-377: acciones de ABC-376 sobre una ruta. La API devuelve la ruta completa
+// con sus paradas; fecha y autor los registra el servidor.
+export const PERMISO_GESTIONAR_RUTAS = "logistica.rutas.gestionar";
+export const MAX_OBSERVACION_RUTA = 500;
+
+async function accionRuta(url, rutaId, observacion, mensaje) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { ...encabezados(), "Content-Type": "application/json" },
+    body: JSON.stringify({ observacion: observacion?.trim() || null }),
+  });
+  await exigirOk(response, mensaje);
+  const ruta = await response.json();
+  if (String(ruta?.id) !== String(rutaId) || !ruta.estado || !Array.isArray(ruta.paradas)) {
+    throw new Error("El servidor no confirmó el cambio de la ruta.");
+  }
+  return ruta;
+}
+
+export function despacharRuta(rutaId, observacion) {
+  return accionRuta(
+    `${apiConfig.gatewayUrl}/api/logistica/rutas/${encodeURIComponent(rutaId)}/despacho`,
+    rutaId, observacion, "No se pudo despachar la ruta."
+  );
+}
+
+export function registrarEntrega(rutaId, paradaId, observacion) {
+  return accionRuta(
+    `${apiConfig.gatewayUrl}/api/logistica/rutas/${encodeURIComponent(rutaId)}/paradas/${encodeURIComponent(paradaId)}/entrega`,
+    rutaId, observacion, "No se pudo registrar la entrega."
+  );
+}
