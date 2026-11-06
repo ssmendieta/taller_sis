@@ -38,6 +38,7 @@ datos; se guarda su identificador sin una clave foránea entre bases.
 El guard existente valida la sesión y los permisos consultando Auth. La migración
 `CalidadRegistrarConformes1710000000013` crea `calidad.registrar_conformes` en
 Auth y lo asigna a Administrador y Encargado de Producción.
+
 Los permisos de registrar avances no autorizan esta operación.
 
 Body del POST: `{ "ordenId": 1, "cantidad": 10 }`. Responsable y fecha los
