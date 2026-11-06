@@ -7,6 +7,7 @@ import { BoletasModule } from './boletas/boletas.module';
 import { DisponibilidadDocumentalModule } from './disponibilidad-documental/disponibilidad-documental.module';
 import { TrazabilidadModule } from './trazabilidad/trazabilidad.module';
 import { RutasModule } from './rutas/rutas.module';
+import { DespachoModule } from './despacho/despacho.module';
 import { HistorialModule } from './historial/historial.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { RecursosExternosModule } from './recursos-externos/recursos-externos.module';
@@ -20,6 +21,7 @@ import { RecursosExternosModule } from './recursos-externos/recursos-externos.mo
     DisponibilidadDocumentalModule,
     TrazabilidadModule,
     RutasModule,
+    DespachoModule,
     HistorialModule,
     DashboardModule,
     RecursosExternosModule,

@@ -49,6 +49,33 @@ Pendiente en otras subtareas: solapamiento de vehículo/chofer y capacidad de
 carga (ABC-371), verificación del grupo (ABC-362) y validación contra el
 catálogo del ERP (ABC-115).
 
+## Despacho y entrega (ABC-376)
+
+Permiso `logistica.rutas.gestionar`. Cuerpo opcional `{ "observacion": "..." }`
+(hasta 500 caracteres); fecha, autor y estado los fija el servidor, y cualquier
+otro campo devuelve 400.
+
+| Método | Ruta | Efecto |
+| --- | --- | --- |
+| `POST` | `/rutas/:id/despacho` | `PLANIFICADA` → `DESPACHADA` con `despachada_en`, autor y observación |
+| `POST` | `/rutas/:id/paradas/:paradaId/entrega` | parada `PENDIENTE` → `ENTREGADA`; la ruta pasa a `COMPLETADA` al entregar la última parada válida |
+
+Reglas (máquina de estados de ABC-375):
+
+- Despacho: ruta `PLANIFICADA` con vehículo, chofer y al menos una entrega
+  pendiente; todas sus boletas deben seguir `EMITIDA` (una anulada después de
+  planificar devuelve 409).
+- Entrega: solo en ruta `DESPACHADA`; una parada de otra ruta devuelve 409 y una
+  inexistente 404; una boleta anulada en la parada devuelve 409. Las entregas
+  parciales dejan la ruta `DESPACHADA`; las paradas `ANULADA` no cuentan para el cierre.
+- Repetir un despacho o una entrega, o retroceder un estado, devuelve 409 y
+  conserva la fecha y el autor originales. Ruta, paradas y boletas se bloquean
+  con `FOR UPDATE` para que dos envíos simultáneos no se registren dos veces.
+- El despacho llama a `EventosDespacho.registrarDespacho` dentro de su
+  transacción (`despacho/eventos-despacho.ts`). ABC-386 debe implementarlo
+  guardando el evento en el outbox, sin publicar antes del commit; hasta
+  entonces no se genera evento.
+
 ## Historial de rutas (ABC-391)
 
 `GET /historial/rutas` (permiso `logistica.rutas.consultar`), solo lectura.

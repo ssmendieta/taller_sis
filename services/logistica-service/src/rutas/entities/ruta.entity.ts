@@ -22,6 +22,7 @@ import { RutaParada } from './ruta-parada.entity';
 @Check('ck_ruta_despacho_autor', '(despachada_en IS NULL AND despachada_por_usuario_id IS NULL) OR (despachada_en IS NOT NULL AND despachada_por_usuario_id > 0)')
 @Check('ck_ruta_despacho_estado', "estado NOT IN ('DESPACHADA','COMPLETADA') OR despachada_en IS NOT NULL")
 @Check('ck_ruta_completada_fecha', "(estado = 'COMPLETADA') = (completada_en IS NOT NULL)")
+@Check('ck_ruta_despacho_observacion', 'despacho_observacion IS NULL OR (despachada_en IS NOT NULL AND LENGTH(BTRIM(despacho_observacion)) > 0)')
 export class Ruta {
   @PrimaryGeneratedColumn('identity', { type: 'bigint', generatedIdentity: 'ALWAYS' })
   id!: string;
@@ -52,6 +53,9 @@ export class Ruta {
 
   @Column({ name: 'despachada_por_usuario_id', type: 'bigint', nullable: true })
   despachadaPorUsuarioId!: string | null;
+
+  @Column({ name: 'despacho_observacion', type: 'varchar', length: 500, nullable: true })
+  despachoObservacion!: string | null;
 
   @Column({ name: 'completada_en', type: 'timestamptz', nullable: true })
   completadaEn!: Date | null;
