@@ -98,7 +98,14 @@ export function materialesNormalizados(respuesta) {
     nombre: m.nombre ?? m.materialNombre ?? `Material ${m.material_id ?? indice}`,
     unidad: m.unidad_medida ?? m.unidadMedida ?? "",
     requerida: Number(m.cantidad_requerida ?? m.cantidadRequerida ?? m.cantidadTotal ?? m.cantidad_total ?? 0),
-    disponible: m.cantidad_disponible ?? m.cantidadDisponible ?? null,
+    disponible: m.cantidad_disponible != null ? Number(m.cantidad_disponible) : (m.cantidadDisponible != null ? Number(m.cantidadDisponible) : null),
+    faltante: m.cantidad_faltante != null
+      ? Number(m.cantidad_faltante)
+      : (m.cantidadFaltante != null
+        ? Number(m.cantidadFaltante)
+        : ((m.cantidad_disponible != null || m.cantidadDisponible != null)
+          ? Math.max(0, Number((Number(m.cantidad_requerida ?? m.cantidadRequerida ?? m.cantidadTotal ?? m.cantidad_total ?? 0) - Number(m.cantidad_disponible ?? m.cantidadDisponible ?? 0)).toFixed(4)))
+          : null)),
     estado: m.estado ?? null,
   }));
 }

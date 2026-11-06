@@ -124,3 +124,64 @@ test('pantalla sin permiso no ofrece solicitar disponibilidad', async () => {
     React.createElement(Routes, null, React.createElement(Route, { path: '/ordenes/:id', element: React.createElement(Pagina) })))); });
   assert.equal(root.root.findAllByType('button').filter(b => b.children.join('') === 'Solicitar disponibilidad').length, 0);
 });
+
+test('ABC-312: bloquea inicio ante 20 kg faltantes (requiere 50, existen 30) y muestra el faltante', async () => {
+  const fetchOriginal = globalThis.fetch;
+  estado = {
+    orden_id: 15,
+    estado_consulta: 'RESPONDIDA',
+    materiales: [
+      { material_id: 8, codigo: 'HAR-001', nombre: 'Harina', unidad_medida: 'kg', cantidad_requerida: 50, cantidad_disponible: 30, cantidad_faltante: 20, estado: 'INSUFICIENTE' },
+    ],
+  };
+  globalThis.fetch = async (url, opts = {}) => {
+    const path = new URL(url).pathname;
+    if (path.endsWith('/recetas')) return json([{ id: 2, activa: true }]);
+    if (path.endsWith('/materiales')) return json({ materiales: [{ material_id: 8, codigo: 'HAR-001', nombre: 'Harina', unidad_medida: 'kg', cantidad_requerida: 50 }] });
+    return fetchOriginal(url, opts);
+  };
+
+  await act(async () => {
+    root = Renderer.create(
+      React.createElement(MemoryRouter, { initialEntries: ['/ordenes/15'] },
+        React.createElement(Routes, null, React.createElement(Route, { path: '/ordenes/:id', element: React.createElement(Pagina) }))),
+    );
+  });
+
+  const buscar = texto => root.root.findAllByType('button').find(b => b.children.join('') === texto);
+  const botonIniciar = buscar('Iniciar producción');
+  assert.ok(botonIniciar, 'Debe existir el botón de iniciar producción');
+  assert.equal(botonIniciar.props.disabled, true, 'El botón de iniciar debe estar bloqueado');
+  const texto = JSON.stringify(root.toJSON());
+  assert.match(texto, /faltan 20/i, 'Debe indicar que faltan 20 kg');
+  assert.match(texto, /HAR-001/);
+});
+
+test('ABC-312: habilita inicio cuando la disponibilidad es suficiente (requiere 50, existen 50)', async () => {
+  const fetchOriginal = globalThis.fetch;
+  estado = {
+    orden_id: 15,
+    estado_consulta: 'RESPONDIDA',
+    materiales: [
+      { material_id: 8, codigo: 'HAR-001', nombre: 'Harina', unidad_medida: 'kg', cantidad_requerida: 50, cantidad_disponible: 50, cantidad_faltante: 0, estado: 'SUFICIENTE' },
+    ],
+  };
+  globalThis.fetch = async (url, opts = {}) => {
+    const path = new URL(url).pathname;
+    if (path.endsWith('/recetas')) return json([{ id: 2, activa: true }]);
+    if (path.endsWith('/materiales')) return json({ materiales: [{ material_id: 8, codigo: 'HAR-001', nombre: 'Harina', unidad_medida: 'kg', cantidad_requerida: 50 }] });
+    return fetchOriginal(url, opts);
+  };
+
+  await act(async () => {
+    root = Renderer.create(
+      React.createElement(MemoryRouter, { initialEntries: ['/ordenes/15'] },
+        React.createElement(Routes, null, React.createElement(Route, { path: '/ordenes/:id', element: React.createElement(Pagina) }))),
+    );
+  });
+
+  const buscar = texto => root.root.findAllByType('button').find(b => b.children.join('') === texto);
+  const botonIniciar = buscar('Iniciar producción');
+  assert.ok(botonIniciar, 'Debe existir el botón de iniciar producción');
+  assert.equal(botonIniciar.props.disabled, false, 'El botón de iniciar debe estar habilitado con disponibilidad suficiente');
+});
