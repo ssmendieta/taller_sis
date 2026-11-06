@@ -14,6 +14,8 @@ import { RutaParadaBoleta } from './ruta-parada-boleta.entity';
 
 @Entity('rutas_paradas')
 @Unique('uq_ruta_parada_secuencia', ['rutaId', 'secuencia'])
+// ABC-380: destino de la FK compuesta de incidencias_transporte (parada de la misma ruta).
+@Unique('uq_ruta_parada_id_ruta', ['id', 'rutaId'])
 @Check('ck_ruta_parada_secuencia', 'secuencia > 0')
 @Check('ck_ruta_parada_destino', 'LENGTH(BTRIM(destino)) > 0')
 @Check('ck_ruta_parada_estado_entrega', "estado_entrega IN ('PENDIENTE','ENTREGADA','ANULADA')")
