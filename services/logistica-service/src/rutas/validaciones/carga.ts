@@ -12,7 +12,8 @@ export interface ItemCarga {
   unidad: string | null;
 }
 
-function aTexto(total: bigint): string {
+// Diezmilésimas a texto decimal con 4 decimales (15000000 → "1500.0000").
+export function formatearDiezmilesimas(total: bigint): string {
   const texto = total.toString().padStart(5, '0');
   return `${texto.slice(0, -4)}.${texto.slice(-4)}`;
 }
@@ -41,7 +42,7 @@ export function calcularCarga(boletaIds: string[], items: ItemCarga[]): Capacida
     throw new ConflictException(`La carga mezcla unidades (${unidades.join(', ')}) y no se convierten entre sí`);
   }
   const total = items.reduce((suma, item) => suma + diezmilesimas(item.cantidad), BigInt(0));
-  return { valor: aTexto(total), unidad: unidades[0] as UnidadCapacidadV1 };
+  return { valor: formatearDiezmilesimas(total), unidad: unidades[0] as UnidadCapacidadV1 };
 }
 
 /** Rechaza la sobrecarga y la capacidad expresada en otra unidad. */
