@@ -26,15 +26,20 @@ export class RutasController {
   @SetMetadata(PERMISO_LOGISTICA, PERMISO_GESTIONAR_RUTAS)
   create(
     @Body(new ValidarGuardarRutaPipe()) dto: GuardarRutaDto,
-    @Req() request: { usuarioId: string },
+    @Req() request: { usuarioId: string; headers?: { authorization?: string } },
   ) {
-    return this.service.create(dto, request.usuarioId);
+    return this.service.create(dto, request.usuarioId, request.headers?.authorization ?? '');
   }
 
   @Put(':id')
   @SetMetadata(PERMISO_LOGISTICA, PERMISO_GESTIONAR_RUTAS)
-  update(@Param('id') id: string, @Body(new ValidarGuardarRutaPipe()) dto: GuardarRutaDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body(new ValidarGuardarRutaPipe()) dto: GuardarRutaDto,
+    @Req() request: { headers?: { authorization?: string } },
+  ) {
+    // La sesión se reenvía a Producción para conocer la unidad de la carga (ABC-371).
+    return this.service.update(id, dto, request.headers?.authorization ?? '');
   }
 
   @Get()

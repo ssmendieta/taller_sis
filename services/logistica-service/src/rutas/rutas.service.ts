@@ -7,6 +7,7 @@ import { EstadoRuta } from './entities/estado-ruta.enum';
 import { RutaParadaBoleta } from './entities/ruta-parada-boleta.entity';
 import { RutaParada } from './entities/ruta-parada.entity';
 import { Ruta } from './entities/ruta.entity';
+import { ValidacionAsignacionService } from './validaciones/validacion-asignacion.service';
 
 // Una boleta solo puede viajar en una ruta que todavía no terminó.
 const ESTADOS_RUTA_ACTIVOS = [EstadoRuta.PLANIFICADA, EstadoRuta.DESPACHADA];
@@ -22,11 +23,17 @@ export class RutasService {
     @InjectRepository(Ruta)
     private readonly rutas: Repository<Ruta>,
     private readonly dataSource: DataSource,
+    private readonly validacion: ValidacionAsignacionService,
   ) {}
 
-  create(dto: GuardarRutaDto, usuarioId: string): Promise<Ruta> {
+  // ABC-371: recursos y unidades se consultan antes de la transacción; dentro se
+  // bloquean vehículo y chofer del día y se validan solapamientos y capacidad.
+  async create(dto: GuardarRutaDto, usuarioId: string, authorization = ''): Promise<Ruta> {
+    const externos = await this.validacion.consultarDatosExternos(this.dataSource.manager, dto, authorization);
     return this.dataSource.transaction(async (manager) => {
+      await this.validacion.bloquearRecursos(manager, dto);
       await this.validarBoletas(manager, dto, null);
+      await this.validacion.validar(manager, dto, null, externos);
       const ruta = await manager.save(Ruta, {
         grupoId: dto.grupoId,
         fechaProgramada: dto.fechaProgramada,
@@ -40,8 +47,9 @@ export class RutasService {
     });
   }
 
-  async update(id: string, dto: GuardarRutaDto): Promise<Ruta> {
+  async update(id: string, dto: GuardarRutaDto, authorization = ''): Promise<Ruta> {
     if (!idValido(id)) throw new NotFoundException('Ruta no encontrada');
+    const externos = await this.validacion.consultarDatosExternos(this.dataSource.manager, dto, authorization);
     return this.dataSource.transaction(async (manager) => {
       const [actual] = await manager.query(
         'SELECT id, estado FROM rutas WHERE id = $1 FOR UPDATE',
@@ -53,7 +61,9 @@ export class RutasService {
           `Solo se puede editar una ruta PLANIFICADA (estado actual: ${actual.estado})`,
         );
       }
+      await this.validacion.bloquearRecursos(manager, dto);
       await this.validarBoletas(manager, dto, id);
+      await this.validacion.validar(manager, dto, id, externos);
       await manager.update(Ruta, { id }, {
         grupoId: dto.grupoId,
         fechaProgramada: dto.fechaProgramada,

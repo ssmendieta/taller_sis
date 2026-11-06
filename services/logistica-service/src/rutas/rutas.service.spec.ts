@@ -55,7 +55,9 @@ describe('ABC-370: RutasService', () => {
     };
     dataSource = { transaction: jest.fn(async (callback: any) => callback(manager)) };
     rutas = { find: jest.fn(), findOne: jest.fn() };
-    service = new RutasService(rutas as Repository<Ruta>, dataSource as DataSource);
+    // Las validaciones de ABC-371 tienen sus propias pruebas en validaciones/.
+    const validacion = { consultarDatosExternos: jest.fn(async () => ({})), bloquearRecursos: jest.fn(), validar: jest.fn() };
+    service = new RutasService(rutas as Repository<Ruta>, dataSource as DataSource, validacion as any);
   });
 
   it('crea la ruta PLANIFICADA con el responsable de la sesión, paradas numeradas y boletas', async () => {

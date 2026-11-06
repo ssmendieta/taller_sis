@@ -19,6 +19,6 @@ describe('ABC-370: RutasController', () => {
       paradas: [{ destino: 'A', boletaIds: ['1'] }],
     };
     await controller.create(dto, { usuarioId: '7' });
-    expect(service.create).toHaveBeenCalledWith(dto, '7');
+    expect(service.create).toHaveBeenCalledWith(dto, '7', '');
   });
 });
