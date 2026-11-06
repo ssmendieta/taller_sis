@@ -46,7 +46,16 @@ así la copia de una fecha siempre está completa y no hay copias parciales.
 | --- | --- |
 | `ERP_RECURSOS_URL` | URL base del ERP o del simulador. |
 | `ERP_RECURSOS_TOKEN` | Token Bearer. Solo en `.env` o en secretos de Docker; nunca en logs, documentos ni ejemplos. |
-| `ERP_RECURSOS_TIMEOUT_MS` | Tiempo máximo de espera. Valor por defecto: **3000 ms** (`TIMEOUT_ERP_RECURSOS_MS`). |
+| `ERP_RECURSOS_TIMEOUT_MS` | Tiempo máximo de espera por intento (conexión y cuerpo). Valor por defecto: **3000 ms** (`TIMEOUT_ERP_RECURSOS_MS`); entre 100 y 30000. |
+| `ERP_RECURSOS_REINTENTOS` | Reintentos para fallos transitorios. Por defecto 2; entre 0 y 3. |
+| `ERP_RECURSOS_ESPERA_REINTENTO_MS` | Espera antes del primer reintento; se duplica en cada uno (200, 400 ms). Por defecto 200; entre 0 y 5000. |
+
+El cliente
+[`erp-recursos.client.ts`](../../services/logistica-service/src/recursos-externos/clientes/erp-recursos.client.ts)
+(ABC-351) solo reintenta `TIMEOUT` y `NO_DISPONIBLE`. `CREDENCIALES`,
+`SOLICITUD_RECHAZADA` y `RESPUESTA_INVALIDA` fallan en el primer intento. Sin
+`ERP_RECURSOS_URL` responde `NO_DISPONIBLE`, y sin `ERP_RECURSOS_TOKEN` responde
+`CREDENCIALES`, sin llamar al ERP.
 
 ## Respuesta correcta (200)
 
