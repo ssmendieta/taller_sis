@@ -8,6 +8,7 @@ import { DisponibilidadDocumentalModule } from './disponibilidad-documental/disp
 import { TrazabilidadModule } from './trazabilidad/trazabilidad.module';
 import { RutasModule } from './rutas/rutas.module';
 import { HistorialModule } from './historial/historial.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { HistorialModule } from './historial/historial.module';
     TrazabilidadModule,
     RutasModule,
     HistorialModule,
+    DashboardModule,
   ],
   controllers: [AppController],
 })
