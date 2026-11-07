@@ -135,6 +135,31 @@ describeReal('ABC-252: resultado contable atomico en PostgreSQL', () => {
     expect(await source.getRepository(EventoInbox).countBy({ correlationId: respuesta.correlationId })).toBe(2);
   });
 
+  it('ABC-346: conserva estado y motivo contable despues de reiniciar la conexion', async () => {
+    const { cierre, respuesta } = await escenario('RECHAZADO');
+    await expect(processor.procesar(respuesta, 'mensaje-abc-346')).resolves.toMatchObject({
+      resultado: 'PROCESADO',
+      estadoContable: 'RECHAZADO',
+    });
+
+    await source.destroy();
+    source = new DataSource({
+      ...(AppDataSource.options as PostgresConnectionOptions),
+      schema,
+      migrations: [],
+      entities: [CierreProduccion, OrdenProduccion, EventoOutbox, EventoInbox],
+    });
+    await source.initialize();
+    processor = new ProcesadorResultadoContableService(source);
+
+    expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id })).toMatchObject({
+      estadoContable: 'RECHAZADO',
+      resultadoContableEventId: respuesta.eventId,
+      codigoRechazoContable: 'SIN_PRODUCCION_CONFORME',
+      detalleContable: 'No hay unidades conformes',
+    });
+  });
+
   it('revierte todo para mensaje invalido o correlacion inexistente', async () => {
     const { cierre, respuesta } = await escenario();
     const invalido = structuredClone(respuesta) as any;
