@@ -22,6 +22,7 @@ import { PerdidasMateriaPrimaModule } from './perdidas-materia-prima/perdidas-ma
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReprocesosModule } from './reprocesos/reprocesos.module';
 import { HistorialModule } from './historial/historial.module';
+import { ReportesModule } from './reportes/reportes.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { HistorialModule } from './historial/historial.module';
     DashboardModule,
     ReprocesosModule,
     HistorialModule,
+    ReportesModule,
   ],
   controllers: [AppController],
 })
