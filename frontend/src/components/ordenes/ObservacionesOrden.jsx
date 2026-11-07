@@ -65,7 +65,7 @@ export default function ObservacionesOrden({ ordenId, puedeRegistrar }) {
   }
 
   return (
-    <div className="ts-panel">
+    <div className="ts-panel" id="panel-observaciones">
       <div className="ts-panel-title">
         <h2>Observaciones e incidencias</h2>
         <span>{cargando ? "Cargando…" : `${observaciones.length} registros`}</span>

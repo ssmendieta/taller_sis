@@ -207,3 +207,16 @@ export async function obtenerTotalProducido(
 
   return await response.json();
 }
+
+
+// ABC-319: resumen agregado de avance de una orden (cantidades, porcentaje y registros)
+export async function obtenerResumenAvanceOrden(ordenId) {
+  const response = await fetch(
+    `${apiConfig.apiUrl}/api/produccion/avances/${encodeURIComponent(ordenId)}/resumen`,
+    { headers: encabezados() }
+  );
+
+  await exigirOk(response, "Error al obtener el resumen de avance de la orden");
+
+  return await response.json();
+}
