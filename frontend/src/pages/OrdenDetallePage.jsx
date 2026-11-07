@@ -57,6 +57,7 @@ import {
   resumenReporteContable,
 } from "../utils/format.js";
 import { BadgeDisponibilidad, BadgeEstadoOrden, BarraAvance } from "../components/ui/Badges.jsx";
+import AvanceOrden from "../components/ordenes/AvanceOrden.jsx";
 import ObservacionesOrden from "../components/ordenes/ObservacionesOrden.jsx";
 import { PERMISO_REGISTRAR_OBSERVACION } from "../services/observacionesService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
@@ -112,9 +113,6 @@ export default function OrdenDetallePage() {
   const [motivo, setMotivo] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [errorAccion, setErrorAccion] = useState("");
-  const [cantidadAvance, setCantidadAvance] = useState("");
-  const [errorAvance, setErrorAvance] = useState("");
-  const [guardandoAvance, setGuardandoAvance] = useState(false);
 
   // ABC: captura y consulta del consumo real de materiales.
   const [consumos, setConsumos] = useState([]);
@@ -397,42 +395,6 @@ export default function OrdenDetallePage() {
       );
     } finally {
       setGuardando(false);
-    }
-  }
-
-  async function guardarAvance(evento) {
-    evento.preventDefault();
-
-    if (guardandoAvance) return;
-
-    setErrorAvance("");
-    const cantidad = Number(cantidadAvance);
-
-    if (!cantidadAvance || !Number.isFinite(cantidad) || cantidad <= 0) {
-      setErrorAvance("Ingresa una cantidad mayor a cero.");
-      return;
-    }
-
-    const restante = Number(solicitada) - Number(total);
-
-    if (Number.isFinite(restante) && cantidad > restante) {
-      setErrorAvance(
-        `La cantidad supera lo solicitado. Restan ${formatearCantidad(restante, unidad)}.`,
-      );
-      return;
-    }
-
-    setGuardandoAvance(true);
-
-    try {
-      await registrarAvance(id, cantidad);
-      setCantidadAvance("");
-      setAviso("Avance registrado.");
-      await cargar();
-    } catch (fallo) {
-      setErrorAvance(fallo.message || "No se pudo registrar el avance.");
-    } finally {
-      setGuardandoAvance(false);
     }
   }
 
@@ -1117,132 +1079,15 @@ export default function OrdenDetallePage() {
         usuario={usuario}
       />
 
-      <div className="ts-panel" style={{ marginBottom: 16 }}>
-        <div className="ts-panel-title">
-          <h2>Avance</h2>
-          <span>
-            {formatearCantidad(total, unidad)} de{" "}
-            {formatearCantidad(solicitada, unidad)}
-          </span>
-        </div>
-
-        <div style={{ padding: "4px 20px 16px" }}>
-          <BarraAvance
-            acumulado={total}
-            solicitada={Number(solicitada) || 0}
-          />
-
-          {enProduccion && permiteAvance ? (
-            <form onSubmit={guardarAvance} style={{ marginTop: 12 }}>
-              <label
-                htmlFor="avance-cantidad"
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 5,
-                  maxWidth: 320,
-                  color: "#535860",
-                  fontSize: ".76rem",
-                }}
-              >
-                Cantidad producida{unidad ? ` (en ${unidad})` : ""}
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <input
-                    id="avance-cantidad"
-                    type="number"
-                    min="0.0001"
-                    step="0.0001"
-                    max={Math.max(Number(solicitada) - Number(total), 0) || undefined}
-                    value={cantidadAvance}
-                    onChange={(e) => setCantidadAvance(e.target.value)}
-                    disabled={guardandoAvance}
-                    style={{
-                      minHeight: 36,
-                      padding: "7px 10px",
-                      border: "1px solid #e0e0e2",
-                      borderRadius: 5,
-                      background: "#f4f4f5",
-                      flex: 1,
-                    }}
-                  />
-                  {unidad && <span aria-hidden="true">{unidad}</span>}
-                </div>
-              </label>
-
-              {errorAvance && (
-                <p className="ts-modal-error" role="alert">{errorAvance}</p>
-              )}
-
-              <div className="ts-btn-group" style={{ marginTop: 10 }}>
-                <button
-                  type="submit"
-                  className="ts-btn ts-btn-primary"
-                  disabled={guardandoAvance}
-                >
-                  {guardandoAvance ? "Registrando…" : "Registrar avance"}
-                </button>
-
-                <button
-                  type="button"
-                  className="ts-btn"
-                  disabled={
-                    guardandoAvance ||
-                    !(Number(solicitada) - Number(total) > 0)
-                  }
-                  onClick={() =>
-                    setCantidadAvance(
-                      String(Math.max(Number(solicitada) - Number(total), 0)),
-                    )
-                  }
-                >
-                  Completar restante
-                </button>
-              </div>
-            </form>
-          ) : (
-            <p className="ts-empty">
-              {enProduccion
-                ? "Sin permiso para registrar avances."
-                : `Solo se registra en estado En producción (actual: ${mostrarEstadoOrden(orden.estado)}).`}
-            </p>
-          )}
-
-          {Array.isArray(avances) && avances.length > 0 && (
-            <div className="ts-table-wrap" style={{ margin: "12px 0 0" }}>
-              <table className="ts-table">
-                <caption>Avances registrados</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Cantidad</th>
-                    <th scope="col">Fecha</th>
-                    <th scope="col">Hora</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {avances.map((a, i) => {
-                    const { fecha, hora } = mostrarFechaHora(
-                      a.fecha_hora ?? a.fechaHora ?? a.creado_en ?? a.createdAt,
-                    );
-
-                    return (
-                      <tr key={a.id ?? i}>
-                        <td>
-                          {formatearCantidad(
-                            a.cantidad ?? a.cantidad_producida ?? a.cantidadProducida,
-                            unidad,
-                          )}
-                        </td>
-                        <td>{fecha}</td>
-                        <td>{hora}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ABC-319 y ABC-320: Indicador de avance y detalle de registros por orden (ABC-105) */}
+      <AvanceOrden
+        ordenId={orden.id}
+        unidad={unidad}
+        enProduccion={enProduccion}
+        permiteRegistrar={permiteAvance}
+        estadoOrden={orden.estado}
+        onAvanceRegistrado={cargar}
+      />
 
       {/* ABC-82 y ABC-83: conformes y defectuosas se muestran por separado. */}
       <div className="ts-panel" style={{ marginBottom: 16 }}>
