@@ -3,6 +3,7 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import {
   listarDemandas,
+  listarDemandasPlanificables,
   PERMISO_CONSULTAR_DEMANDAS,
 } from "../services/demandasService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
@@ -26,6 +27,7 @@ export default function DemandasPage() {
   const { usuario } = useSesion();
   const puedeConsultar = tienePermiso(usuario, PERMISO_CONSULTAR_DEMANDAS);
   const [resultado, setResultado] = useState(RESULTADO_VACIO);
+  const [vista, setVista] = useState("recibidas");
   const [filtros, setFiltros] = useState(FILTROS_DEMANDAS_INICIALES);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -38,7 +40,10 @@ export default function DemandasPage() {
       setCargando(true);
       setError("");
       try {
-        const respuesta = await listarDemandas({ ...aplicados, page: pagina });
+        const consultar = vista === "planificables"
+          ? listarDemandasPlanificables
+          : listarDemandas;
+        const respuesta = await consultar({ ...aplicados, page: pagina });
         if (!Array.isArray(respuesta?.items)) {
           throw new Error("El servidor devolvió un listado de demandas inválido.");
         }
@@ -51,16 +56,25 @@ export default function DemandasPage() {
         if (carga === ultimaCarga.current) setCargando(false);
       }
     },
-    [puedeConsultar],
+    [puedeConsultar, vista],
   );
 
   useEffect(() => {
-    document.title = FORMATO_TITULO("Demandas recibidas");
+    document.title = FORMATO_TITULO(
+      vista === "planificables" ? "Demandas planificables" : "Demandas recibidas",
+    );
     cargar(FILTROS_DEMANDAS_INICIALES, 1);
     return () => {
       ultimaCarga.current += 1;
     };
-  }, [cargar]);
+  }, [cargar, vista]);
+
+  function cambiarVista(nuevaVista) {
+    if (nuevaVista === vista) return;
+    setResultado(RESULTADO_VACIO);
+    setFiltros(FILTROS_DEMANDAS_INICIALES);
+    setVista(nuevaVista);
+  }
 
   function aplicarFiltros(nuevos) {
     setFiltros(nuevos);
@@ -80,23 +94,48 @@ export default function DemandasPage() {
   return (
     <div className="demandas-page">
       <PageHeader
-        titulo="Demandas recibidas"
-        descripcion="Consulta y seguimiento de demandas externas recibidas por integración asíncrona de Ventas y Facturación."
+        titulo="Demandas de producción"
+        descripcion="Consulta separada de demandas recibidas y demandas confirmadas disponibles para planificación."
       />
+
+      <div className="ts-btn-group" role="tablist" aria-label="Tipo de demandas" style={{ marginBottom: 16 }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={vista === "recibidas"}
+          className={`ts-btn ${vista === "recibidas" ? "ts-btn-primary" : ""}`}
+          onClick={() => cambiarVista("recibidas")}
+        >
+          Recibidas
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={vista === "planificables"}
+          className={`ts-btn ${vista === "planificables" ? "ts-btn-primary" : ""}`}
+          onClick={() => cambiarVista("planificables")}
+        >
+          Planificables
+        </button>
+      </div>
 
       <div className="ts-panel" style={{ marginBottom: 16 }}>
         <FiltrosDemandas
+          key={vista}
           iniciales={filtros}
           alAplicar={aplicarFiltros}
           deshabilitado={cargando}
+          mostrarEstado={vista === "recibidas"}
         />
       </div>
 
       <div className="ts-panel">
         <div className="ts-panel-header" style={{ padding: "16px 20px 8px" }}>
-          <h2>{`Listado de demandas (${resultado.total})`}</h2>
+          <h2>{`${vista === "planificables" ? "Demandas planificables" : "Listado de demandas"} (${resultado.total})`}</h2>
           <span style={{ fontSize: "0.85rem", color: "#666" }}>
-            Las demandas son informativas; no se crean órdenes automáticamente sin intervención.
+            {vista === "planificables"
+              ? "Solo se muestran demandas confirmadas; consultarlas no crea órdenes automáticamente."
+              : "Las demandas son informativas; no se crean órdenes automáticamente sin intervención."}
           </span>
         </div>
 
@@ -124,7 +163,9 @@ export default function DemandasPage() {
         {!cargando && !error && resultado.items.length === 0 && (
           <div style={{ padding: 32, textAlign: "center" }} role="status">
             <p style={{ color: "#666" }}>
-              No se encontraron demandas con los filtros seleccionados.
+              {vista === "planificables"
+                ? "No se encontraron demandas confirmadas disponibles para planificar."
+                : "No se encontraron demandas con los filtros seleccionados."}
             </p>
           </div>
         )}

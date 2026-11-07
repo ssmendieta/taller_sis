@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Demanda } from './entities/demanda.entity';
+import { Demanda, ESTADO_DEMANDA_CONFIRMADA } from './entities/demanda.entity';
 import { ListarDemandasDto, PaginatedDemandasDto } from './dto/listar-demandas.dto';
+import { ListarDemandasPlanificablesDto } from './dto/listar-demandas-planificables.dto';
 
 @Injectable()
 export class DemandaService {
@@ -12,13 +13,28 @@ export class DemandaService {
   ) {}
 
   async listar(dto: ListarDemandasDto): Promise<PaginatedDemandasDto> {
+    return this.consultar(dto);
+  }
+
+  async listarPlanificables(
+    dto: ListarDemandasPlanificablesDto,
+  ): Promise<PaginatedDemandasDto> {
+    return this.consultar({ ...dto, estado: ESTADO_DEMANDA_CONFIRMADA }, true);
+  }
+
+  private async consultar(
+    dto: ListarDemandasDto,
+    soloPlanificables = false,
+  ): Promise<PaginatedDemandasDto> {
     const page = Math.max(1, Number(dto.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(dto.limit) || 10));
     const skip = (page - 1) * limit;
 
     const qb = this.demandaRepository
       .createQueryBuilder('demanda')
-      .leftJoinAndSelect('demanda.items', 'item');
+      .leftJoinAndSelect('demanda.items', 'item')
+      // Un JOIN por cada producto no debe duplicar demandas ni alterar el total.
+      .distinct(true);
 
     if (dto.origen) {
       qb.andWhere('demanda.origen = :origen', { origen: dto.origen });
@@ -28,7 +44,10 @@ export class DemandaService {
       qb.andWhere('demanda.estado = :estado', { estado: dto.estado });
     }
 
-    qb.orderBy('demanda.recibidaEn', 'DESC')
+    qb.orderBy(
+      soloPlanificables ? 'demanda.confirmadaEn' : 'demanda.recibidaEn',
+      'DESC',
+    )
       .addOrderBy('demanda.id', 'DESC')
       .skip(skip)
       .take(limit);

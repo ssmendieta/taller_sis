@@ -5,7 +5,7 @@ import Renderer, { act } from "react-test-renderer";
 import { MemoryRouter } from "react-router-dom";
 import { createServer } from "vite";
 
-// ABC-358: consulta de demandas recibidas desde frontend.
+// ABC-358/ABC-366: consulta separada de demandas recibidas y planificables.
 let vite, Pagina, root, llamadas, respuesta;
 const originales = Object.fromEntries(
   ["fetch", "document", "sessionStorage", "localStorage"].map((k) => [k, globalThis[k]]),
@@ -84,7 +84,7 @@ beforeEach(() => {
       params: u.searchParams,
       auth: opts.headers?.Authorization,
     });
-    return respuesta(u.searchParams);
+    return respuesta(u.searchParams, u.pathname);
   };
 });
 
@@ -196,4 +196,63 @@ test("sin permiso no consulta y muestra aviso de restricción", async () => {
   await montar();
   assert.equal(llamadas.length, 0);
   assert.match(texto(), /No tienes permiso para consultar demandas/);
+});
+
+test("ABC-366 separa planificables y consume el endpoint que fuerza CONFIRMADA", async () => {
+  respuesta = (params, path) => {
+    if (path === "/api/produccion/demandas/planificables") {
+      return json({
+        items: [demandaPrueba(7, {
+          estado: "CONFIRMADA",
+          demandaExternaId: "PED-CONFIRMADA-7",
+          confirmadaEn: "2026-11-07T10:00:00.000Z",
+        })],
+        total: 1,
+        page: Number(params.get("page") || 1),
+        limit: Number(params.get("limit") || 10),
+        totalPages: 1,
+      });
+    }
+    return json({ items: [demandaPrueba(1)], total: 1, page: 1, limit: 10, totalPages: 1 });
+  };
+
+  await montar();
+  await act(async () => boton("Planificables").props.onClick());
+
+  assert.equal(llamadas.at(-1).path, "/api/produccion/demandas/planificables");
+  assert.deepEqual(ultima(), { page: "1", limit: "10" });
+  assert.match(texto(), /Demandas planificables \(1\)/);
+  assert.match(texto(), /PED-CONFIRMADA-7/);
+  assert.match(texto(), /Solo se muestran demandas confirmadas/);
+  assert.equal(root.root.findAllByProps({ id: "filtro-demanda-estado" }).length, 0);
+});
+
+test("ABC-366 filtra planificables por origen y conserva la paginación", async () => {
+  respuesta = (params, path) => json({
+    items: [demandaPrueba(8, { estado: "CONFIRMADA", confirmadaEn: "2026-11-07T11:00:00.000Z" })],
+    total: path.endsWith("/planificables") ? 12 : 1,
+    page: Number(params.get("page") || 1),
+    limit: Number(params.get("limit") || 10),
+    totalPages: path.endsWith("/planificables") ? 2 : 1,
+  });
+
+  await montar();
+  await act(async () => boton("Planificables").props.onClick());
+  await cambiar("filtro-demanda-origen", "FACTURACION");
+  await aplicar();
+  assert.deepEqual(ultima(), { page: "1", limit: "10", origen: "FACTURACION" });
+  assert.equal(ultima().estado, undefined);
+
+  await act(async () => boton("Siguiente").props.onClick());
+  assert.deepEqual(ultima(), { page: "2", limit: "10", origen: "FACTURACION" });
+});
+
+test("ABC-366 muestra un vacío específico cuando no existen confirmadas", async () => {
+  respuesta = (_params, path) => path.endsWith("/planificables")
+    ? json({ items: [], total: 0, page: 1, limit: 10, totalPages: 0 })
+    : json({ items: [demandaPrueba(1)], total: 1, page: 1, limit: 10, totalPages: 1 });
+
+  await montar();
+  await act(async () => boton("Planificables").props.onClick());
+  assert.match(texto(), /No se encontraron demandas confirmadas disponibles para planificar/);
 });

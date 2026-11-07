@@ -36,3 +36,14 @@ export async function listarDemandas({ origen, estado, page = 1, limit = 10 } = 
   const response = await fetch(`${BASE}/demandas?${params}`, { headers: encabezados() });
   return leer(response, "No se pudieron cargar las demandas.");
 }
+
+// ABC-366: el estado se decide en el servidor para impedir que una demanda RECIBIDA
+// sea tratada como planificable por manipulación de parámetros en el cliente.
+export async function listarDemandasPlanificables({ origen, page = 1, limit = 10 } = {}) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (origen) params.set("origen", origen);
+  const response = await fetch(`${BASE}/demandas/planificables?${params}`, {
+    headers: encabezados(),
+  });
+  return leer(response, "No se pudieron cargar las demandas planificables.");
+}

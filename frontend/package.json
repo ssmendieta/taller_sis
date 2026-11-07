@@ -14,6 +14,7 @@
     "test:disponibilidad": "node --test scripts/disponibilidad-orden.test.mjs",
     "test:observaciones": "node --test scripts/observaciones-orden.test.mjs",
     "test:historial-rutas": "node --test scripts/historial-rutas.test.mjs",
+    "test:demandas": "node --test scripts/demandas.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {

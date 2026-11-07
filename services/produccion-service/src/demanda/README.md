@@ -49,3 +49,10 @@ Las cantidades se normalizan (`"40"` = `"40.0000"`) antes de comparar contenidos
 Entregas simultáneas de la misma demanda: la demanda existente se bloquea y la
 restricción `uq_demanda_origen_externa` garantiza una sola fila; la entrega que
 pierde se reintenta una vez y responde `DUPLICADO`.
+
+## Consultas HTTP
+
+- `GET /demandas`: bandeja general de demandas recibidas, con filtros por origen y estado.
+- `GET /demandas/planificables`: bandeja exclusiva de demandas `CONFIRMADA`, con filtro por
+  origen y paginación. El estado no es un parámetro permitido y la consulta es de solo lectura:
+  no crea órdenes ni modifica demandas (ABC-366).

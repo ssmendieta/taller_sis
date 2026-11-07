@@ -115,6 +115,7 @@ describe('ABC-358: DemandaService', () => {
 
     const qbMock: any = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
+      distinct: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       addOrderBy: jest.fn().mockReturnThis(),
@@ -132,6 +133,7 @@ describe('ABC-358: DemandaService', () => {
 
     expect(repoMock.createQueryBuilder).toHaveBeenCalledWith('demanda');
     expect(qbMock.leftJoinAndSelect).toHaveBeenCalledWith('demanda.items', 'item');
+    expect(qbMock.distinct).toHaveBeenCalledWith(true);
     expect(qbMock.andWhere).toHaveBeenCalledWith('demanda.origen = :origen', { origen: 'VENTAS' });
     expect(qbMock.andWhere).toHaveBeenCalledWith('demanda.estado = :estado', { estado: 'RECIBIDA' });
     expect(qbMock.skip).toHaveBeenCalledWith(5);

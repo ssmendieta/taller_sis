@@ -14,6 +14,7 @@ export default function FiltrosDemandas({
   iniciales = FILTROS_DEMANDAS_INICIALES,
   alAplicar,
   deshabilitado,
+  mostrarEstado = true,
 }) {
   const [filtros, setFiltros] = useState(iniciales);
 
@@ -36,7 +37,7 @@ export default function FiltrosDemandas({
   return (
     <form
       onSubmit={aplicar}
-      aria-label="Filtros de demandas recibidas"
+      aria-label={mostrarEstado ? "Filtros de demandas recibidas" : "Filtros de demandas planificables"}
       style={{ padding: "12px 20px" }}
     >
       <div className="ts-filters">
@@ -56,21 +57,23 @@ export default function FiltrosDemandas({
           </select>
         </label>
 
-        <label htmlFor="filtro-demanda-estado">
-          Estado
-          <select
-            id="filtro-demanda-estado"
-            value={filtros.estado}
-            onChange={cambiar("estado")}
-          >
-            <option value="">Todos los estados</option>
-            {Object.entries(ESTADOS_DEMANDA).map(([valor, { texto }]) => (
-              <option key={valor} value={valor}>
-                {texto}
-              </option>
-            ))}
-          </select>
-        </label>
+        {mostrarEstado && (
+          <label htmlFor="filtro-demanda-estado">
+            Estado
+            <select
+              id="filtro-demanda-estado"
+              value={filtros.estado}
+              onChange={cambiar("estado")}
+            >
+              <option value="">Todos los estados</option>
+              {Object.entries(ESTADOS_DEMANDA).map(([valor, { texto }]) => (
+                <option key={valor} value={valor}>
+                  {texto}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label htmlFor="filtro-demanda-limite">
           Registros por página
