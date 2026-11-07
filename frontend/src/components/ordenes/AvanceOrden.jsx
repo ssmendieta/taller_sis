@@ -251,9 +251,26 @@ export default function AvanceOrden({
 
         {/* Detalle cronológico de registros de avance (ABC-320 / CA-03, CA-05) */}
         <div style={{ marginTop: 14 }}>
-          <h3 style={{ fontSize: ".88rem", margin: "0 0 8px", color: "#323539" }}>
-            Historial de avances registrados
-          </h3>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <h3 style={{ fontSize: ".88rem", margin: 0, color: "#323539" }}>
+              Historial de avances registrados
+            </h3>
+            <a
+              href="#panel-observaciones"
+              style={{ fontSize: ".76rem", color: "#0d6efd", textDecoration: "none" }}
+            >
+              Ver observaciones de la orden &darr;
+            </a>
+          </div>
 
           {registros.length > 0 ? (
             <div className="ts-table-wrap">
@@ -265,6 +282,7 @@ export default function AvanceOrden({
                     <th scope="col">Fecha</th>
                     <th scope="col">Hora</th>
                     <th scope="col">Responsable</th>
+                    <th scope="col">Observaciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -278,6 +296,7 @@ export default function AvanceOrden({
                         <td>{fecha}</td>
                         <td>{hora}</td>
                         <td>{registro.usuario_responsable_nombre ?? "—"}</td>
+                        <td>{registro.observaciones ?? registro.nota ?? "—"}</td>
                       </tr>
                     );
                   })}

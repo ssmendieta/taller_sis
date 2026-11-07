@@ -24,6 +24,7 @@ const mockResumen = (cambios = {}) => ({
       fecha_hora: '2026-11-06T11:00:00.000Z',
       usuario_responsable_id: '9',
       usuario_responsable_nombre: 'Operario A',
+      observaciones: 'Lote intermedio sin defectos',
     },
     {
       id: '1',
@@ -134,8 +135,16 @@ test('ABC-319 CA-02: sin avances muestra 0 % y previene divisiones entre cero o 
   assert.equal(progressbar.props['aria-valuenow'], 0);
 });
 
-test('ABC-319 y ABC-320 CA-03: muestra detalle cronológico con cantidad, fecha, hora y usuario', async () => {
+test('ABC-319 y ABC-320 CA-03: muestra detalle cronológico con cantidad, fecha, hora, usuario y observaciones', async () => {
   await montar();
+
+  // Encabezados de la tabla
+  const encabezados = root.root.findAllByType('th').map((th) => th.children?.join(''));
+  assert.ok(encabezados.includes('Cantidad'));
+  assert.ok(encabezados.includes('Fecha'));
+  assert.ok(encabezados.includes('Hora'));
+  assert.ok(encabezados.includes('Responsable'));
+  assert.ok(encabezados.includes('Observaciones'));
 
   const filas = root.root.findAllByType('tr').slice(1);
   assert.equal(filas.length, 2);
@@ -143,6 +152,11 @@ test('ABC-319 y ABC-320 CA-03: muestra detalle cronológico con cantidad, fecha,
   const contenido = texto();
   assert.match(contenido, /Operario A/);
   assert.match(contenido, /Supervisor B/);
+  assert.match(contenido, /Lote intermedio sin defectos/);
+
+  // Enlace coordinado a observaciones de la orden (ABC-320 / ABC-323)
+  const enlaceObservaciones = root.root.findByProps({ href: '#panel-observaciones' });
+  assert.ok(enlaceObservaciones);
 });
 
 test('ABC-319 CA-05: informa error de carga y permite reintentar', async () => {
