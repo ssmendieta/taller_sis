@@ -24,7 +24,7 @@ const COPIA_ANTERIOR: CopiaRecursosLogisticos = {
 
 type PasoErp = { status?: number; cuerpo?: unknown; demoraMs?: number };
 
-describe('ABC-353: GET /recursos-logisticos con filtros, origen y vigencia', () => {
+describe('ABC-353 / ABC-354: GET /recursos-logisticos con ERP simulado, filtros, origen y vigencia', () => {
   const servidores: Server[] = [];
   const temporizadores = new Set<NodeJS.Timeout>();
   const authOriginal = process.env.AUTH_SERVICE_URL;
@@ -171,6 +171,46 @@ describe('ABC-353: GET /recursos-logisticos con filtros, origen y vigencia', () 
     const { status, body } = await consultar(`?fecha=${FECHA}`);
     expect(status).toBe(200);
     expect(body).toMatchObject({ origen: 'RESPALDO', aviso: { motivo: 'RESPUESTA_INVALIDA' } });
+    expect(copias.get(FECHA)).toBe(COPIA_ANTERIOR);
+  });
+
+  it('error del ERP conserva el respaldo y nunca lo presenta como una sincronización reciente', async () => {
+    copias.set(FECHA, COPIA_ANTERIOR);
+    erp = { status: 503 };
+    const { status, body } = await consultar(`?fecha=${FECHA}&disponible=true`);
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      origen: 'RESPALDO',
+      generadoEn: COPIA_ANTERIOR.respuesta.generadoEn,
+      sincronizadoEn: COPIA_ANTERIOR.sincronizadoEn,
+      aviso: { motivo: 'NO_DISPONIBLE', mensaje: expect.stringContaining('copia de respaldo') },
+      vehiculos: [{ placa: '9999-OLD', disponible: true }],
+      choferes: [{ idExterno: 'CHO-12', disponible: true }],
+    });
+    expect(body.sincronizadoEn).toBe(COPIA_ANTERIOR.sincronizadoEn);
+    expect(copias.get(FECHA)).toBe(COPIA_ANTERIOR);
+  });
+
+  it('recurso duplicado del ERP se rechaza y no reemplaza el respaldo anterior', async () => {
+    copias.set(FECHA, COPIA_ANTERIOR);
+    erp = {
+      cuerpo: {
+        ...EJEMPLO_RESPUESTA_RECURSOS_V1,
+        vehiculos: [
+          EJEMPLO_RESPUESTA_RECURSOS_V1.vehiculos[0],
+          EJEMPLO_RESPUESTA_RECURSOS_V1.vehiculos[0],
+        ],
+      },
+    };
+    const { status, body } = await consultar(`?fecha=${FECHA}`);
+    expect(status).toBe(200);
+    expect(body).toMatchObject({
+      origen: 'RESPALDO',
+      sincronizadoEn: COPIA_ANTERIOR.sincronizadoEn,
+      aviso: { motivo: 'RESPUESTA_INVALIDA' },
+      vehiculos: [{ placa: '9999-OLD' }],
+    });
+    expect(body.vehiculos).toHaveLength(1);
     expect(copias.get(FECHA)).toBe(COPIA_ANTERIOR);
   });
 
