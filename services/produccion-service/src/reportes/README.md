@@ -147,6 +147,25 @@ Sin coincidencias se conserva la estructura:
 }
 ```
 
+## Exportaciones ABC-338
+
+Las exportaciones reutilizan exactamente el resultado normalizado del endpoint
+anterior, incluidos filtros, cantidades con cuatro decimales, unidades y
+totales. No vuelven a consultar ni recalculan los datos por separado.
+
+```http
+GET /api/produccion/reportes/produccion/exportar/pdf?fechaDesde=2026-11-01&fechaHasta=2026-11-07&producto=pan
+GET /api/produccion/reportes/produccion/exportar/xlsx?fechaDesde=2026-11-01&fechaHasta=2026-11-07&producto=pan
+Authorization: Bearer <token>
+```
+
+Ambas rutas exigen `ordenes.consultar` y aceptan las mismas reglas de filtros
+que la vista previa. El PDF usa formato A4 horizontal, repite los encabezados
+al paginar e incluye detalle y totales. El libro Excel contiene las hojas
+`Resumen`, `Ordenes` y `Materiales por orden`, con filtros de tabla y paneles
+inmovilizados. Las respuestas usan `Content-Disposition: attachment`, el MIME
+del formato y `Cache-Control: no-store`. Solo se admiten `pdf` y `xlsx`.
+
 ## Validación local
 
 Desde `services/produccion-service`:
@@ -155,6 +174,9 @@ Desde `services/produccion-service`:
 $env:REPORTES_DB_REAL='1'; npm test -- --runInBand src/reportes
 npm run build
 ```
+
+Las pruebas de ABC-338 abren el XLSX con ExcelJS y cargan el PDF con un parser
+independiente; además comprueban paginación real con un reporte extenso.
 
 Las pruebas PostgreSQL usan tablas temporales de una conexión exclusiva, sin
 modificar datos ni secuencias reales ni aplicar migraciones. Tras preparar los

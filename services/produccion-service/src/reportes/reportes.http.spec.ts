@@ -1,6 +1,7 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
+import { ExportacionReportesService } from './exportacion-reportes.service';
 import { ReportesController } from './reportes.controller';
 import { ReportesService } from './reportes.service';
 
@@ -9,12 +10,17 @@ describe('ABC-336: HTTP, validacion y acceso', () => {
   let base: string;
   const httpFetch = global.fetch;
   const produccion = jest.fn();
+  const exportar = jest.fn();
   const vacio = { filtros: { fechaDesde: null, fechaHasta: null, producto: null, campoFecha: 'fecha_programada' },
     ordenes: [], totales: { ordenes: 0, productos: [], consumos: [], perdidas: [] } };
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [ReportesController],
-      providers: [PermisoProduccionGuard, { provide: ReportesService, useValue: { produccion } }],
+      providers: [
+        PermisoProduccionGuard,
+        { provide: ReportesService, useValue: { produccion } },
+        { provide: ExportacionReportesService, useValue: { exportar } },
+      ],
     }).compile();
     app = module.createNestApplication();
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
@@ -24,6 +30,9 @@ describe('ABC-336: HTTP, validacion y acceso', () => {
   afterAll(async () => { await app?.close(); });
   beforeEach(() => {
     produccion.mockReset().mockResolvedValue(vacio);
+    exportar.mockReset().mockResolvedValue({
+      contenido: Buffer.from('archivo'), nombre: 'reporte-produccion_todos_a_todos.pdf', mime: 'application/pdf',
+    });
     jest.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify({
       id: '7', rol: 'Personalizado', permisos: ['ordenes.consultar'],
     })));
@@ -64,5 +73,20 @@ describe('ABC-336: HTTP, validacion y acceso', () => {
   ])('rechaza parametros invalidos: %s', async (query) => {
     expect((await consultar(query)).status).toBe(400);
     expect(produccion).not.toHaveBeenCalled();
+  });
+  it('descarga con los mismos filtros, permiso y cabeceras del reporte', async () => {
+    const response = await httpFetch(`${base}/reportes/produccion/exportar/pdf?fechaDesde=2026-11-01&producto=Pan`, {
+      headers: { Authorization: 'Bearer token' },
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/pdf');
+    expect(response.headers.get('content-disposition')).toContain('reporte-produccion_todos_a_todos.pdf');
+    expect(Buffer.from(await response.arrayBuffer()).toString()).toBe('archivo');
+    expect(exportar).toHaveBeenCalledWith({ fechaDesde: '2026-11-01', producto: 'Pan' }, 'pdf');
+  });
+  it.each(['csv', 'PDF', 'xls'])('rechaza formato de exportacion no soportado: %s', async (formato) => {
+    const response = await httpFetch(`${base}/reportes/produccion/exportar/${formato}`, { headers: { Authorization: 'Bearer token' } });
+    expect(response.status).toBe(400);
+    expect(exportar).not.toHaveBeenCalled();
   });
 });
