@@ -3,7 +3,10 @@ import { PubSubEvent } from '../../pubsub/pubsub.types';
 
 export const ESTADO_INBOX_PROCESADO = 'PROCESADO' as const;
 export const ESTADO_INBOX_IGNORADO = 'IGNORADO' as const;
-export type EstadoInbox = typeof ESTADO_INBOX_PROCESADO | typeof ESTADO_INBOX_IGNORADO;
+export const ESTADO_INBOX_PENDIENTE = 'PENDIENTE' as const;
+export type EstadoInbox = typeof ESTADO_INBOX_PROCESADO
+  | typeof ESTADO_INBOX_IGNORADO
+  | typeof ESTADO_INBOX_PENDIENTE;
 
 @Entity('eventos_inbox')
 @Index('uq_eventos_inbox_event_id', ['eventId'], { unique: true })
@@ -35,6 +38,15 @@ export class EventoInbox {
 
   @Column({ type: 'varchar', length: 500, nullable: true })
   detalle: string | null;
+
+  @Column({ type: 'smallint', default: 0 })
+  intentos: number;
+
+  @Column({ name: 'proximo_intento_en', type: 'timestamptz', nullable: true })
+  proximoIntentoEn: Date | null;
+
+  @Column({ name: 'ultimo_error', type: 'varchar', length: 500, nullable: true })
+  ultimoError: string | null;
 
   @CreateDateColumn({ name: 'recibido_en', type: 'timestamptz', default: () => 'NOW()' })
   recibidoEn: Date;

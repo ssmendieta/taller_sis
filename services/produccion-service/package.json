@@ -20,6 +20,7 @@
     "seed:demo": "ts-node --transpile-only src/seeds/seed-demo.ts",
     "seed:contabilidad-demo": "ts-node --transpile-only src/seeds/seed-contabilidad-demo.ts",
     "verify:contabilidad-demo": "ts-node --transpile-only src/seeds/verificar-contabilidad-demo.ts",
+    "verify:demanda-confirmacion-local": "ts-node --transpile-only src/seeds/verificar-confirmacion-demanda-local.ts",
     "publish:contabilidad-duplicate": "ts-node --transpile-only src/seeds/publicar-duplicado-contabilidad-demo.ts",
     "publish:contabilidad-response-duplicate": "ts-node --transpile-only src/seeds/publicar-respuesta-duplicada-contabilidad-demo.ts"
   },

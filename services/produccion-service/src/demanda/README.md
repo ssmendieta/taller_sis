@@ -1,7 +1,7 @@
 # Demanda de Ventas / Facturación (ABC-122)
 
 Producción recibe pedidos por Google Cloud Pub/Sub y los guarda como demandas
-`RECIBIDA`. No crea órdenes automáticamente; la confirmación es ABC-130.
+`RECIBIDA`. No crea órdenes automáticamente; ABC-365 recibe su confirmación.
 
 ## Contrato `DemandaRegistrada.v1` (propuesto, a confirmar con Ventas)
 
@@ -27,6 +27,26 @@ Ejemplo completo en `integraciones/contratos/ventas-demanda-v1.ts`.
 | `PUBSUB_DEMANDA_CONSUMER_ENABLED` | `true` activa el consumidor (por defecto `false`) |
 | `PUBSUB_DEMANDA_SUBSCRIPTION_ID` | suscripción de Producción al topic de Ventas |
 | `GCP_PROJECT_ID` | proyecto de Pub/Sub |
+| `PUBSUB_DEMANDA_CONFIRMACION_CONSUMER_ENABLED` | `true` activa el consumidor de `DemandaConfirmada.v1` |
+| `PUBSUB_DEMANDA_CONFIRMACION_SUBSCRIPTION_ID` | suscripción existente para confirmaciones |
+| `PUBSUB_DEMANDA_CONFIRMACION_RETRY_MAX_ATTEMPTS` | máximo de intentos persistentes de correlación (por defecto 5) |
+| `PUBSUB_DEMANDA_CONFIRMACION_RETRY_INTERVAL_MS` | intervalo local entre intentos (por defecto 5000 ms) |
+
+## Confirmación `DemandaConfirmada.v1` (ABC-365)
+
+```json
+{
+  "eventId": "<uuid>", "eventType": "DemandaConfirmada.v1", "occurredAt": "<ISO 8601>",
+  "source": "ventas-service", "correlationId": "<uuid>",
+  "data": { "origen": "VENTAS", "demandaExternaId": "PED-2026-0042" }
+}
+```
+
+La confirmación y el inbox se guardan en una transacción. Una redelivery con el
+mismo `eventId` no repite el efecto. Si la demanda aún no existe, el inbox queda
+`PENDIENTE`, se reintenta de forma acotada y permanece trazable incluso al agotar
+los intentos. La aplicación consume una suscripción existente; no crea recursos
+de Google Cloud.
 
 ## Comportamiento
 
