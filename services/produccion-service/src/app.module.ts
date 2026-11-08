@@ -21,6 +21,8 @@ import { DemandaModule } from './demanda/demanda.module';
 import { PerdidasMateriaPrimaModule } from './perdidas-materia-prima/perdidas-materia-prima.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ReprocesosModule } from './reprocesos/reprocesos.module';
+import { HistorialModule } from './historial/historial.module';
+import { ReportesModule } from './reportes/reportes.module';
 
 @Module({
   imports: [
@@ -45,6 +47,8 @@ import { ReprocesosModule } from './reprocesos/reprocesos.module';
     PubSubModule,
     DashboardModule,
     ReprocesosModule,
+    HistorialModule,
+    ReportesModule,
   ],
   controllers: [AppController],
 })
