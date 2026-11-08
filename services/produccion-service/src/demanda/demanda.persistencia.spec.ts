@@ -144,6 +144,7 @@ describe('ABC-364: transición de demanda de RECIBIDA a CONFIRMADA', () => {
       estado: ESTADO_DEMANDA_CONFIRMADA,
       confirmadaEn: fechaConf,
     }));
+    expect(findOne).toHaveBeenCalledWith(Demanda, expect.not.objectContaining({ relations: expect.anything() }));
   });
 
   it('idempotencia: una confirmación repetida conserva el estado CONFIRMADA sin reescribir', async () => {

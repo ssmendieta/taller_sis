@@ -20,6 +20,11 @@ import {
   PUBSUB_DEMANDA_CONSUMER_CONFIG,
   PubSubDemandaConsumerConfig,
 } from './pubsub-demanda-consumer.config';
+import {
+  loadPubSubDemandaConfirmacionConsumerConfig,
+  PUBSUB_DEMANDA_CONFIRMACION_CONSUMER_CONFIG,
+  PubSubDemandaConfirmacionConsumerConfig,
+} from './pubsub-demanda-confirmacion-consumer.config';
 
 export const PUBSUB_CLIENT = Symbol('PUBSUB_CLIENT');
 
@@ -43,20 +48,34 @@ export const pubSubDemandaConsumerConfigProvider: Provider = {
   useFactory: loadPubSubDemandaConsumerConfig,
 };
 
+export const pubSubDemandaConfirmacionConsumerConfigProvider: Provider = {
+  provide: PUBSUB_DEMANDA_CONFIRMACION_CONSUMER_CONFIG,
+  useFactory: loadPubSubDemandaConfirmacionConsumerConfig,
+};
+
 export const pubSubClientProvider: Provider = {
   provide: PUBSUB_CLIENT,
-  inject: [PUBSUB_CONFIG, PUBSUB_CONSUMER_CONFIG, PUBSUB_CONTABILIDAD_CONSUMER_CONFIG, PUBSUB_DEMANDA_CONSUMER_CONFIG],
+  inject: [
+    PUBSUB_CONFIG,
+    PUBSUB_CONSUMER_CONFIG,
+    PUBSUB_CONTABILIDAD_CONSUMER_CONFIG,
+    PUBSUB_DEMANDA_CONSUMER_CONFIG,
+    PUBSUB_DEMANDA_CONFIRMACION_CONSUMER_CONFIG,
+  ],
   useFactory: (
     config: PubSubConfig,
     consumer: PubSubConsumerConfig,
     contabilidad: PubSubContabilidadConsumerConfig,
     demanda: PubSubDemandaConsumerConfig,
+    confirmacion: PubSubDemandaConfirmacionConsumerConfig,
   ): PubSub | null => {
-    if (!config.enabled && !consumer.enabled && !contabilidad.enabled && !demanda.enabled) {
+    if (!config.enabled && !consumer.enabled && !contabilidad.enabled && !demanda.enabled && !confirmacion.enabled) {
       return null;
     }
 
     // Application Default Credentials lee GOOGLE_APPLICATION_CREDENTIALS.
-    return new PubSub({ projectId: demanda.projectId || contabilidad.projectId || consumer.projectId || config.projectId });
+    return new PubSub({
+      projectId: confirmacion.projectId || demanda.projectId || contabilidad.projectId || consumer.projectId || config.projectId,
+    });
   },
 };

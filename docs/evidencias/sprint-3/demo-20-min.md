@@ -36,13 +36,17 @@ ejemplos, `2026-11-12` es la fecha de la demo: reemplazarla en todos los pasos.
    $emu = 'http://localhost:8085/v1/projects/taller-local'
    Invoke-RestMethod -Method Put -Uri "$emu/topics/taller-ventas-demanda-local"
    Invoke-RestMethod -Method Put -Uri "$emu/subscriptions/taller-produccion-demanda-local" -ContentType 'application/json' -Body '{"topic":"projects/taller-local/topics/taller-ventas-demanda-local"}'
+   Invoke-RestMethod -Method Put -Uri "$emu/topics/taller-ventas-demanda-confirmacion-local"
+   Invoke-RestMethod -Method Put -Uri "$emu/subscriptions/taller-produccion-demanda-confirmacion-local" -ContentType 'application/json' -Body '{"topic":"projects/taller-local/topics/taller-ventas-demanda-confirmacion-local"}'
    ```
 
 3. En `.env`, activar el consumidor de demanda contra el emulador (detalle en
    [pubsub-entorno.md](../../integraciones/pubsub-entorno.md)):
    `GCP_PROJECT_ID=taller-local`, `PUBSUB_EMULATOR_HOST=pubsub-emulator:8085`,
    `PUBSUB_DEMANDA_CONSUMER_ENABLED=true` y
-   `PUBSUB_DEMANDA_SUBSCRIPTION_ID=taller-produccion-demanda-local`.
+   `PUBSUB_DEMANDA_SUBSCRIPTION_ID=taller-produccion-demanda-local`. Para ABC-365,
+   activar además `PUBSUB_DEMANDA_CONFIRMACION_CONSUMER_ENABLED=true` y
+   `PUBSUB_DEMANDA_CONFIRMACION_SUBSCRIPTION_ID=taller-produccion-demanda-confirmacion-local`.
 4. Levantar todo y comprobar la salud:
 
    ```powershell

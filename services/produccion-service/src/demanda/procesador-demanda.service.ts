@@ -117,7 +117,6 @@ export class ProcesadorDemandaService {
     const operacion = async (em: EntityManager): Promise<Demanda> => {
       const demanda = await em.findOne(Demanda, {
         where: { origen, demandaExternaId: demandaExternaId.trim() },
-        relations: ['items'],
         lock: { mode: 'pessimistic_write' },
       });
 
