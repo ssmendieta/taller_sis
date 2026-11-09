@@ -4,7 +4,7 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
-import { consultarReporteLogistico, FILTROS_REPORTE_LOGISTICO, parametrosReporteLogistico } from "../services/reportesLogisticosService.js";
+import { consultarReporteLogistico, descargarReporteLogistico, FILTROS_REPORTE_LOGISTICO, parametrosReporteLogistico } from "../services/reportesLogisticosService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import FiltrosReporteLogistico from "../components/logistica/reportes/FiltrosReporteLogistico.jsx";
 import VistaPreviaReporteLogistico from "../components/logistica/reportes/VistaPreviaReporteLogistico.jsx";
@@ -17,18 +17,28 @@ function ConsultaReporteLogistico() {
   const [errorFiltros, setErrorFiltros] = useState("");
   const [error, setError] = useState(null);
   const [cargando, setCargando] = useState(false);
+  const [descargando, setDescargando] = useState(false);
+  const [errorDescarga, setErrorDescarga] = useState(null);
   const solicitud = useRef(null);
+  const solicitudDescarga = useRef(null);
 
   useEffect(() => {
     document.title = FORMATO_TITULO("Reportes logísticos");
-    return () => solicitud.current?.abort();
+    return () => { solicitud.current?.abort(); solicitudDescarga.current?.abort(); };
   }, []);
+
+  function cancelarDescarga() {
+    solicitudDescarga.current?.abort();
+    setDescargando(false);
+    setErrorDescarga(null);
+  }
 
   async function consultar(nuevos) {
     try { parametrosReporteLogistico(nuevos); }
     catch (fallo) { setErrorFiltros(fallo.message); return; }
 
     solicitud.current?.abort();
+    cancelarDescarga();
     const controlador = new AbortController();
     solicitud.current = controlador;
     setAplicados(nuevos);
@@ -49,12 +59,33 @@ function ConsultaReporteLogistico() {
 
   function limpiar() {
     solicitud.current?.abort();
+    cancelarDescarga();
     setFiltros(FILTROS_REPORTE_LOGISTICO);
     setAplicados(null);
     setReporte(null);
     setErrorFiltros("");
     setError(null);
     setCargando(false);
+  }
+
+  async function exportar(formato) {
+    if (!reporte || cargando || (solicitudDescarga.current && !solicitudDescarga.current.signal.aborted)) return;
+    const controlador = new AbortController();
+    solicitudDescarga.current = controlador;
+    setDescargando(true);
+    setErrorDescarga(null);
+    try {
+      await descargarReporteLogistico(reporte.filtros, formato, { signal: controlador.signal });
+    } catch (fallo) {
+      if (controlador.signal.aborted) return;
+      if (fallo.status === 401 || fallo.status === 403) setReporte(null);
+      setErrorDescarga(fallo);
+    } finally {
+      if (!controlador.signal.aborted) {
+        solicitudDescarga.current = null;
+        setDescargando(false);
+      }
+    }
   }
 
   const filtrosEditados = reporte && Object.keys(FILTROS_REPORTE_LOGISTICO).some((campo) =>
@@ -79,6 +110,17 @@ function ConsultaReporteLogistico() {
         <button type="button" className="ts-btn" onClick={() => consultar(aplicados)}>Reintentar</button>}
     </div>}
     {filtrosEditados && <p role="status">La vista previa corresponde a los filtros aplicados anteriormente. Consulta de nuevo para actualizarla.</p>}
+    {reporte && <div className="ts-btn-group reporte-logistico-exportar" aria-label="Descargar vista previa">
+      <button type="button" className="ts-btn" disabled={cargando || descargando} onClick={() => exportar("pdf")}>Descargar PDF</button>
+      <button type="button" className="ts-btn" disabled={cargando || descargando} onClick={() => exportar("xlsx")}>Descargar Excel</button>
+    </div>}
+    {descargando && <p role="status">Preparando archivo…</p>}
+    {errorDescarga && <div className="ts-feedback reporte-logistico-nota" role="alert">
+      <p>{errorDescarga.status === 401 ? "Tu sesión expiró. Vuelve a ingresar para descargar el reporte."
+        : errorDescarga.status === 403 ? "No tienes permiso para descargar reportes logísticos."
+        : `No se pudo descargar el reporte. ${errorDescarga.message}`}</p>
+      {errorDescarga.status === 401 && <Link className="ts-btn" to="/login">Volver a ingresar</Link>}
+    </div>}
     {reporte && <VistaPreviaReporteLogistico reporte={reporte} />}
     {!aplicados && <p className="ts-empty">Elige un período y pulsa Consultar reporte.</p>}
   </section>;

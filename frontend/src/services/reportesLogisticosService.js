@@ -27,19 +27,25 @@ export function parametrosReporteLogistico({ fechaDesde, fechaHasta, estadoRuta,
   return parametros;
 }
 
-export async function consultarReporteLogistico(filtros, { signal } = {}) {
+async function solicitarReporte(ruta, filtros, signal) {
   const parametros = parametrosReporteLogistico(filtros);
   const token = sessionStorage.getItem("accessToken") || localStorage.getItem("accessToken");
-  const respuesta = await fetch(`${apiConfig.gatewayUrl}/api/logistica/reportes/logistica?${parametros}`, {
+  const respuesta = await fetch(`${apiConfig.gatewayUrl}/api/logistica/reportes/logistica${ruta}?${parametros}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {}, signal,
   });
-  const datos = await respuesta.json().catch(() => null);
   if (!respuesta.ok) {
+    const datos = await respuesta.json().catch(() => null);
     const mensaje = datos?.message;
-    const error = new Error((Array.isArray(mensaje) ? mensaje.join(". ") : mensaje) || "No se pudo consultar el reporte logístico.");
+    const error = new Error((Array.isArray(mensaje) ? mensaje.join(". ") : mensaje) || "No se pudo obtener el reporte logístico.");
     error.status = respuesta.status;
     throw error;
   }
+  return { respuesta, parametros };
+}
+
+export async function consultarReporteLogistico(filtros, { signal } = {}) {
+  const { respuesta, parametros } = await solicitarReporte("", filtros, signal);
+  const datos = await respuesta.json().catch(() => null);
   const efectivos = datos?.filtros;
   if (!efectivos || !Object.keys(FILTROS_REPORTE_LOGISTICO).every((campo) =>
     (efectivos[campo] ?? "") === (parametros.get(campo) ?? "")) ||
@@ -51,4 +57,29 @@ export async function consultarReporteLogistico(filtros, { signal } = {}) {
     throw new Error("El servidor devolvió un reporte logístico incompleto o con filtros distintos.");
   }
   return datos;
+}
+
+const TIPOS_ARCHIVO = {
+  pdf: "application/pdf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+export async function descargarReporteLogistico(filtros, formato, { signal } = {}) {
+  if (!Object.hasOwn(TIPOS_ARCHIVO, formato)) throw new Error("Elige PDF o Excel.");
+  const { respuesta } = await solicitarReporte(`/exportar/${formato}`, filtros, signal);
+  const archivo = await respuesta.blob();
+  if (signal?.aborted) return;
+  if (archivo.type.split(";")[0] !== TIPOS_ARCHIVO[formato] || !archivo.size) {
+    throw new Error("El servidor no devolvió un archivo válido.");
+  }
+  const url = URL.createObjectURL(archivo);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = `reporte-logistico_${filtros.fechaDesde}_a_${filtros.fechaHasta}.${formato}`;
+  document.body.append(enlace);
+  try { enlace.click(); }
+  finally {
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
 }
