@@ -143,7 +143,7 @@ export class ProcesadorResultadoContableService {
       resultado,
       eventId: evento.eventId,
       cierreId: evento.data.cierreId,
-      estadoContable: evento.data.estado,
+      estadoContable: cierre.estadoContable,
     };
   }
 }

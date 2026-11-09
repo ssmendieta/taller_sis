@@ -47,7 +47,13 @@ export class PubSubContabilidadConsumerService implements OnModuleInit, OnModule
 
   private async procesarMensaje(message: Message): Promise<void> {
     try {
-      const payload = JSON.parse(message.data.toString('utf8')) as Record<string, unknown>;
+      const json: unknown = JSON.parse(message.data.toString('utf8'));
+      if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+        throw new EventoContabilidadV1InvalidoError(undefined, undefined, [
+          { campo: 'evento', motivo: 'debe ser un objeto JSON' },
+        ]);
+      }
+      const payload = json as Record<string, unknown>;
       this.validarAtributos(message, payload);
       const resultado = await this.processor.procesar(payload, message.id);
       message.ack();
@@ -57,6 +63,7 @@ export class PubSubContabilidadConsumerService implements OnModuleInit, OnModule
         eventId: resultado.eventId,
         cierreId: resultado.cierreId,
         resultado: resultado.resultado,
+        estadoContable: resultado.estadoContable,
         correlationId: payload.correlationId,
         requestEventId: (payload.data as Record<string, unknown>)?.requestEventId,
       }));

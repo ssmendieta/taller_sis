@@ -10,6 +10,7 @@ import { EventosOutbox1710000000017 } from '../../database/migrations/1710000000
 import { CierresProduccion1710000000018 } from '../../database/migrations/1710000000018-CierresProduccion';
 import { EventosInbox1710000000019 } from '../../database/migrations/1710000000019-EventosInbox';
 import { ResultadoContableCierre1710000000021 } from '../../database/migrations/1710000000021-ResultadoContableCierre';
+import { ConfirmacionesDemandaPendientes1710000000028 } from '../../database/migrations/1710000000028-ConfirmacionesDemandaPendientes';
 import { OrdenProduccion } from '../../ordenes/entities/orden-produccion.entity';
 import { REGISTRO_CONTABLE_RESULTADO_V1_EJEMPLO } from '../contratos/contabilidad-v1';
 import { crearEventoProduccionCerrada } from '../outbox/crear-evento-produccion-cerrada';
@@ -45,6 +46,7 @@ describeReal('ABC-252: resultado contable atomico en PostgreSQL', () => {
       await new CierresProduccion1710000000018().up(runner);
       await new EventosInbox1710000000019().up(runner);
       await new ResultadoContableCierre1710000000021().up(runner);
+      await new ConfirmacionesDemandaPendientes1710000000028().up(runner);
       await runner.query("INSERT INTO recetas (producto_codigo, producto_nombre) VALUES ('ABC252', 'Producto contable')");
       await runner.commitTransaction();
     } catch (error) {
@@ -127,7 +129,7 @@ describeReal('ABC-252: resultado contable atomico en PostgreSQL', () => {
     tardio.data.estado = 'RECIBIDO';
     delete tardio.data.codigoRechazo;
     delete tardio.data.detalle;
-    await expect(processor.procesar(tardio, 'mensaje-tardio')).resolves.toMatchObject({ resultado: 'IGNORADO' });
+    await expect(processor.procesar(tardio, 'mensaje-tardio')).resolves.toMatchObject({ resultado: 'IGNORADO', estadoContable: 'RECHAZADO' });
     expect(await source.getRepository(CierreProduccion).findOneByOrFail({ id: cierre.id })).toMatchObject({
       estadoContable: 'RECHAZADO', resultadoContableEventId: respuesta.eventId,
       codigoRechazoContable: 'SIN_PRODUCCION_CONFORME',
