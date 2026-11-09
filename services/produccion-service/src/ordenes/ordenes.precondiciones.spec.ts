@@ -16,6 +16,9 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
   let historial: Array<Record<string, unknown>>;
   let recetaActiva: boolean;
   let disponible: number | null;
+  let estadoConsulta: 'RESPONDIDA' | 'PENDIENTE' | null;
+  let errorRespuesta: string | null;
+  let estadoAlBloquear: EstadoOrden | null;
   let transacciones: number;
   let service: OrdenesService;
 
@@ -24,6 +27,9 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
     historial = [];
     recetaActiva = true;
     disponible = 25;
+    estadoConsulta = 'RESPONDIDA';
+    errorRespuesta = null;
+    estadoAlBloquear = null;
     transacciones = 0;
     const manager = {
       create: (_tipo: unknown, valor: Record<string, unknown>) => valor,
@@ -32,16 +38,21 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
         if (tipo === HistorialEstadoOrden) historial.push(valor);
         return valor;
       },
-      findOne: async () => ({ ...actual }),
+      findOne: async (_entidad: unknown, opciones: { lock?: { mode: string } }) => ({
+        ...actual,
+        estado: opciones.lock?.mode === 'pessimistic_write' && estadoAlBloquear !== null
+          ? estadoAlBloquear : actual.estado,
+      }),
     };
     const ordenRepo = {
       findOne: async () => ({ ...actual }),
       manager: {
         getRepository: (entity: unknown) => entity === ConsultaDisponibilidad
-          ? { findOne: async () => ({
+          ? { findOne: async () => estadoConsulta === null ? null : ({
             id: '1', consultaId: 'DISP-ORD-12-V1', consultaVersion: 1,
             requestEventId: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
-            estado: 'RESPONDIDA', vigenteEn: new Date('2026-10-17T12:00:00.000Z'),
+            estado: estadoConsulta, errorRespuesta,
+            vigenteEn: estadoConsulta === 'RESPONDIDA' ? new Date('2026-10-17T12:00:00.000Z') : null,
           }) }
           : entity === EventoOutbox ? { findOne: async () => null } : { find: async () => [{
             materialId: '3', materialCodigo: 'MAT-3', materialNombre: 'Harina',
@@ -92,6 +103,27 @@ describe('ABC-190: precondiciones de inicio de orden', () => {
     recetaActiva = false;
     await expect(service.cambiarEstado(12, dto, actor)).rejects.toBeInstanceOf(ConflictException);
     sinCambios();
+  });
+
+  it.each([
+    [null, null, 'SIN_CONSULTA'],
+    ['PENDIENTE', null, 'PENDIENTE'],
+    ['PENDIENTE', 'Inventarios no pudo responder', 'PENDIENTE'],
+  ] as const)('ABC-313: bloquea el inicio con consulta %s y error %s', async (estado, error, esperado) => {
+    estadoConsulta = estado;
+    errorRespuesta = error;
+    const rechazo = await service.cambiarEstado(12, dto, actor).catch((e: unknown) => e);
+    expect(rechazo).toBeInstanceOf(ConflictException);
+    expect((rechazo as ConflictException).getResponse()).toMatchObject({ estado_consulta: esperado });
+    sinCambios();
+  });
+
+  it('ABC-313: una solicitud que perdió la carrera no duplica el historial', async () => {
+    // La lectura inicial aún ve PLANIFICADA. Otra solicitud cambia el estado antes del bloqueo.
+    estadoAlBloquear = EstadoOrden.EN_PRODUCCION;
+    await expect(service.cambiarEstado(12, dto, actor)).rejects.toBeInstanceOf(ConflictException);
+    expect(transacciones).toBe(1);
+    expect(historial).toHaveLength(0);
   });
 
   it.each([[null, 'FALTANTE'], [15, 'INSUFICIENTE']] as const)(
