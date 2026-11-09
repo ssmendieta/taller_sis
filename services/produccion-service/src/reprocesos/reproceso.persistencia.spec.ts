@@ -12,6 +12,7 @@ import { TipoResultadoCalidad1710000000015 } from '../database/migrations/171000
 import { Reprocesos1710000000027 } from '../database/migrations/1710000000027-Reprocesos';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { Reproceso } from './entities/reproceso.entity';
+import { ReprocesosService } from './reprocesos.service';
 
 describe('ABC-395: entidad y migracion de reprocesos', () => {
   it('modela cantidades, autor, fecha y relaciones con orden y calidad', async () => {
@@ -84,6 +85,9 @@ describeReal('ABC-395: persistencia real de reprocesos', () => {
       await new ResultadosConformes1710000000014().up(runner);
       await new TipoResultadoCalidad1710000000015().up(runner);
       await new Reprocesos1710000000027().up(runner);
+      // El trigger busca su tabla de calidad en el esquema de esta prueba.
+      await runner.query(`ALTER FUNCTION "${schema}".validar_reproceso_resultado_calidad()
+        SET search_path TO "${schema}"`);
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.query(`
         INSERT INTO ordenes_produccion
@@ -153,6 +157,30 @@ describeReal('ABC-395: persistencia real de reprocesos', () => {
     expect(guardado.orden.codigo).toBe('O1');
     expect(guardado.resultadoCalidad.tipo).toBe(TipoResultadoCalidad.DEFECTUOSO);
     expect(await source.getRepository(AvancesProduccion).find()).toEqual(avancesAntes);
+  });
+
+  it('ABC-396: serializa reprocesos concurrentes y conserva el resultado de calidad original', async () => {
+    const servicio = new ReprocesosService(source);
+    const dto = {
+      resultadoCalidadId: '3', cantidadProcesada: 3, cantidadRecuperada: 2, cantidadDescartada: 1,
+    };
+    const resultados = await Promise.allSettled([
+      servicio.registrar(2, dto, 43),
+      servicio.registrar(2, dto, 44),
+    ]);
+    const registrados = resultados.filter((resultado) => resultado.status === 'fulfilled');
+    expect(registrados).toHaveLength(1);
+    expect(resultados.find((resultado) => resultado.status === 'rejected')).toMatchObject({
+      reason: { status: 409 },
+    });
+    const { items, totales } = await servicio.consultar(2);
+    expect(items).toHaveLength(1);
+    expect(totales).toEqual({
+      conformes: '2.0000', defectuosas: '2.0000', procesadas: '3.0000',
+      recuperadas: '2.0000', descartadas: '1.0000',
+    });
+    expect(await source.getRepository(ResultadoConforme).findOneByOrFail({ id: '3' }))
+      .toMatchObject({ cantidad: '5.0000', tipo: TipoResultadoCalidad.DEFECTUOSO });
   });
 
   it.each([
