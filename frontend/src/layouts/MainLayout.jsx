@@ -75,6 +75,7 @@ export default function MainLayout({ children }) {
           {puedeSalidas && <Link className={activo("/logistica/inicio")} to="/logistica/inicio" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de salida</Link>}
           {puedeBoletas && <Link className={activo("/logistica/boletas")} to="/logistica/boletas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="boletas" />Boletas</Link>}
           {puedeRutas && <Link className={activo("/logistica/rutas/historial")} to="/logistica/rutas/historial" onClick={() => setAbierto(false)}><IconoNavegacion nombre="rutas" />Historial de rutas</Link>}
+          {puedeRutas && <Link className={activo("/logistica/reportes")} to="/logistica/reportes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="boletas" />Reportes logísticos</Link>}
           {puedeRecursos && <Link className={activo("/logistica/recursos")} to="/logistica/recursos" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recursos" />Recursos logísticos</Link>}
           {puedeIntegraciones && <Link className={activo("/integraciones")} to="/integraciones" onClick={() => setAbierto(false)}><IconoNavegacion nombre="integraciones" />Integraciones</Link>}
         </nav>

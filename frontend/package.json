@@ -16,6 +16,7 @@
     "test:historial-rutas": "node --test scripts/historial-rutas.test.mjs",
     "test:demandas": "node --test scripts/demandas.test.mjs",
     "test:reportes-produccion": "node --test scripts/reportes-produccion.test.mjs",
+    "test:reportes-logisticos": "node --test scripts/reportes-logisticos.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {

@@ -1,0 +1,5 @@
+.reporte-logistico-nota { padding: 0 20px 12px; }
+.ts-feedback.reporte-logistico-nota { padding: 12px 20px; margin-bottom: 16px; }
+.reporte-logistico-totales { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.reporte-logistico-totales dt { font-weight: 600; }
+.reporte-logistico-totales dd { margin: 4px 0 0; overflow-wrap: anywhere; }
