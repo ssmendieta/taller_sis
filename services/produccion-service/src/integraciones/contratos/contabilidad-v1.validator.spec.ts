@@ -19,4 +19,14 @@ describe('RegistroContableResultado.v1', () => {
     invalido.data.estado = 'APROBADO';
     expect(() => validarRegistroContableResultadoV1(invalido)).toThrow(EventoContabilidadV1InvalidoError);
   });
+  it.each([
+    [{ estado: ['RECIBIDO'] }, 'estado'],
+    [{ estado: 'RECHAZADO', codigoRechazo: 'x'.repeat(101) }, 'codigoRechazo'],
+    [{ detalle: 'x'.repeat(501) }, 'detalle'],
+  ])('ABC-348: rechaza el campo incompatible con el cierre %j', (datos, campo) => {
+    const evento = REGISTRO_CONTABLE_RESULTADO_V1_EJEMPLO;
+    expect(() => validarRegistroContableResultadoV1({ ...evento, data: { ...evento.data, ...datos } }))
+      .toThrow(`data.${campo}`);
+  });
+
 });

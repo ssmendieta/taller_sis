@@ -111,15 +111,22 @@ export function validarRegistroContableResultadoV1(value: unknown): RegistroCont
     validarEnteroPositivo(value.data.ordenId, 'data.ordenId', errores);
     validarUuid(value.data.requestEventId, 'data.requestEventId', errores);
     validarFechaHora(value.data.procesadoAt, 'data.procesadoAt', errores);
-    if (!['RECIBIDO', 'RECHAZADO'].includes(String(value.data.estado))) {
+    if (value.data.estado !== 'RECIBIDO' && value.data.estado !== 'RECHAZADO') {
       errores.push({ campo: 'data.estado', motivo: 'debe ser RECIBIDO o RECHAZADO' });
     }
     if (value.data.estado === 'RECHAZADO') {
-      validarTexto(value.data.codigoRechazo, 'data.codigoRechazo', errores);
+      if (validarTexto(value.data.codigoRechazo, 'data.codigoRechazo', errores) &&
+          [...value.data.codigoRechazo.trim()].length > 100) {
+        errores.push({ campo: 'data.codigoRechazo', motivo: 'admite hasta 100 caracteres' });
+      }
     } else if (value.data.codigoRechazo !== undefined) {
       errores.push({ campo: 'data.codigoRechazo', motivo: 'solo corresponde a RECHAZADO' });
     }
-    if (value.data.detalle !== undefined) validarTexto(value.data.detalle, 'data.detalle', errores);
+    if (value.data.detalle !== undefined &&
+        validarTexto(value.data.detalle, 'data.detalle', errores) &&
+        [...value.data.detalle.trim()].length > 500) {
+      errores.push({ campo: 'data.detalle', motivo: 'admite hasta 500 caracteres' });
+    }
   }
 
   if (errores.length) throw error(value, errores);

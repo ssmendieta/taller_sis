@@ -73,7 +73,8 @@ el resultado sobre el cierre en una sola transacción.
 ```
 
 Los estados permitidos son `RECIBIDO` y `RECHAZADO`. Un rechazo debe incluir
-`codigoRechazo` y puede incluir `detalle`. `RECIBIDO` solo significa recepción
+`codigoRechazo` (hasta 100 caracteres) y puede incluir `detalle` (hasta 500).
+`RECIBIDO` solo significa recepción
 administrativa; no representa la aprobación de un asiento contable.
 
 ## Estado y transiciones en Producción

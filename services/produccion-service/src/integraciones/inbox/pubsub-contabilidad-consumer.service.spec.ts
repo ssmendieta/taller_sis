@@ -78,6 +78,19 @@ describe('ABC-252: ACK/NACK del resultado contable', () => {
     await transitorio.service.onModuleDestroy();
   });
 
+  it.each([[null], [[]], [12]])('ABC-348: descarta JSON válido que no es un objeto (%j)', async (payload) => {
+    const procesar = jest.fn();
+    const { service, subscription } = crear(procesar);
+    const msg = mensaje(payload, false);
+    msg.attributes = mensaje(REGISTRO_CONTABLE_RESULTADO_V1_EJEMPLO).attributes;
+    subscription.emit('message', msg);
+    await turno();
+    expect(msg.ack).toHaveBeenCalledTimes(1);
+    expect(msg.nack).not.toHaveBeenCalled();
+    expect(procesar).not.toHaveBeenCalled();
+    await service.onModuleDestroy();
+  });
+
   it('tolera interrupcion despues del commit y confirma la redelivery duplicada', async () => {
     const procesar = jest.fn()
       .mockResolvedValueOnce({ resultado: 'PROCESADO', eventId: REGISTRO_CONTABLE_RESULTADO_V1_EJEMPLO.eventId, cierreId: '1' })
