@@ -125,8 +125,10 @@ describeReal('ABC-74: persistencia real de la pérdida de materia prima', () => 
     const leida = await source.getRepository(PerdidaMateriaPrima).findOneOrFail({
       where: { id: guardada.id }, relations: { orden: true, material: true },
     });
+    expect(String(leida.ordenId)).toBe('1');
+    expect(String(leida.materialId)).toBe('1');
     expect(leida).toMatchObject({
-      ordenId: '1', materialId: '1', cantidad: '2.1250', unidad: 'kg', motivo: 'Derrame en mezcladora', autorUsuarioId: '42',
+      cantidad: '2.1250', unidad: 'kg', motivo: 'Derrame en mezcladora', autorUsuarioId: '42',
     });
     expect(leida.fechaHora).toBeInstanceOf(Date);
     expect(leida.fechaHora.getTime()).toBe(guardada.fechaHora.getTime());
@@ -162,10 +164,19 @@ describeReal('ABC-74: persistencia real de la pérdida de materia prima', () => 
   });
 
   it('no permite borrar la orden ni el material que tienen mermas', async () => {
-    await expect(source.query(`DELETE FROM "${schema}".ordenes_produccion WHERE id = 1`))
-      .rejects.toMatchObject({ driverError: { code: '23503' } });
+    // Esta orden tiene una merma y ningún resultado de calidad que pueda impedir su eliminación.
+    const [{ id: ordenId }] = await source.query(`INSERT INTO "${schema}".ordenes_produccion
+      (codigo,receta_id,cantidad_solicitada,fecha_programada,responsable_usuario_id)
+      VALUES ('O-MERMA-RESTRICT',1,100,CURRENT_DATE,42) RETURNING id`);
+    await source.getRepository(PerdidaMateriaPrima).save({
+      ordenId: String(ordenId), materialId: '1', cantidad: '1.0000', unidad: 'kg',
+      motivo: 'Derrame', autorUsuarioId: '42',
+    });
+    const codigoRestriccion = expect.stringMatching(/^(23503|23001)$/);
+    await expect(source.query(`DELETE FROM "${schema}".ordenes_produccion WHERE id = $1`, [ordenId]))
+      .rejects.toMatchObject({ driverError: { code: codigoRestriccion, constraint: 'fk_perdida_mp_orden' } });
     await expect(source.query(`DELETE FROM "${schema}".materiales WHERE id = 1`))
-      .rejects.toMatchObject({ driverError: { code: '23503' } });
+      .rejects.toMatchObject({ driverError: { code: codigoRestriccion, constraint: 'fk_perdida_mp_material' } });
   });
 
   it('la migración se revierte y se reaplica sin tocar la calidad', async () => {
