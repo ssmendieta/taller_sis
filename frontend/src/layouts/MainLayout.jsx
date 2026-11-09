@@ -66,6 +66,7 @@ export default function MainLayout({ children }) {
         <nav className="navbar" aria-label="Navegación principal">
           {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
           {puedeOrdenes && <Link className={activo("/demandas")} to="/demandas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="demandas" />Demandas</Link>}
+          {puedeOrdenes && <Link className={activo("/produccion/reportes")} to="/produccion/reportes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Reportes de producción</Link>}
           {puedeRecetas && <Link className={activo("/recetas")} to="/recetas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recetas" />Recetas</Link>}
           {puedeSolicitarMateriales && <Link className={activo("/solicitudes-material")} to="/solicitudes-material" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de materiales</Link>}
           {puedeUsuarios && <Link className={activo("/usuarios")} to="/usuarios" onClick={() => setAbierto(false)}><IconoNavegacion nombre="usuarios" />Usuarios</Link>}
