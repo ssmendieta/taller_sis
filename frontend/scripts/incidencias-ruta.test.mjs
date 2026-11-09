@@ -236,16 +236,23 @@ test('un segundo envío mientras se registra no repite la petición', async () =
 });
 
 for (const estado of ['COMPLETADA', 'CANCELADA']) {
-  test(`una ruta ${estado} registra incidencias pero no ofrece reprogramar`, async () => {
+  test(`una ruta ${estado} permite consultar el historial sin registrar incidencias`, async () => {
     ruta = rutaInicial(estado);
     await montar();
-    assert.equal(root.root.findAll((n) => n.props?.id === 'incidencia-reprogramar').length, 0);
-    assert.match(texto(), new RegExp(`Una ruta ${estado === 'COMPLETADA' ? 'completada' : 'cancelada'} no se puede reprogramar`));
-    await completar({ tipo: 'OTRO', motivo: 'Reclamo posterior' });
-    await enviar();
-    assert.equal(posts()[0].cuerpo.nuevaFecha, null);
+    assert.equal(root.root.findAll((n) => n.type === 'form').length, 0);
+    assert.match(texto(), /Solo se registran incidencias en rutas activas/);
+    assert.match(texto(), /Cliente ausente/);
+    assert.equal(posts().length, 0);
   });
 }
+
+test('el selector ofrece únicamente las entregas pendientes de una ruta activa', async () => {
+  ruta = rutaInicial('DESPACHADA');
+  ruta.paradas[1].estadoEntrega = 'ENTREGADA';
+  await montar();
+  const opciones = campo('incidencia-parada').findAllByType('option');
+  assert.deepEqual(opciones.map((opcion) => opcion.props.value), ['', '10']);
+});
 
 test('con solo permiso de consulta ve el historial pero no el formulario', async () => {
   globalThis.__usuarioIncidencias = { id: '5', permisos: ['logistica.rutas.consultar'] };

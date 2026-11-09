@@ -17,6 +17,16 @@ export interface DatosExternosAsignacion {
   unidadesPorOrden: Map<string, string | null>;
 }
 
+interface ConflictoRecurso {
+  recurso: 'VEHICULO' | 'CHOFER';
+  idExterno: string;
+  motivo: string;
+}
+
+function conflictoRecursos(message: string, conflictos: ConflictoRecurso[]) {
+  return new ConflictException({ statusCode: 409, codigo: 'CONFLICTO_RECURSOS', message, conflictos });
+}
+
 const boletasDe = (dto: GuardarRutaDto) => [...new Set(dto.paradas.flatMap((parada) => parada.boletaIds))];
 
 // Claves de bloqueo por recurso y día; se toman en orden para evitar interbloqueos.
@@ -63,8 +73,8 @@ export class ValidacionAsignacionService {
   }
 
   async validar(manager: EntityManager, dto: GuardarRutaDto, rutaId: string | null, externos: DatosExternosAsignacion): Promise<void> {
-    const vehiculo = this.recurso<VehiculoErpV1>(externos.recursos.vehiculos, dto.vehiculoExternoId, 'vehículo', externos.recursos);
-    this.recurso<ChoferErpV1>(externos.recursos.choferes, dto.choferExternoId, 'chofer', externos.recursos);
+    const vehiculo = this.recurso<VehiculoErpV1>(externos.recursos.vehiculos, dto.vehiculoExternoId, 'VEHICULO', externos.recursos);
+    this.recurso<ChoferErpV1>(externos.recursos.choferes, dto.choferExternoId, 'CHOFER', externos.recursos);
     await this.validarSolapamientos(manager, dto, rutaId);
 
     const boletaIds = boletasDe(dto);
@@ -85,11 +95,22 @@ export class ValidacionAsignacionService {
     validarCapacidad(vehiculo, carga);
   }
 
-  private recurso<T extends VehiculoErpV1 | ChoferErpV1>(lista: T[], id: string, nombre: string, recursos: ConsultaRecursosRespuesta): T {
+  private recurso<T extends VehiculoErpV1 | ChoferErpV1>(lista: T[], id: string, tipo: ConflictoRecurso['recurso'], recursos: ConsultaRecursosRespuesta): T {
     const fuente = recursos.origen === 'ERP' ? 'el ERP' : `la copia de respaldo del ERP (${recursos.sincronizadoEn})`;
     const recurso = lista.find((fila) => fila.idExterno === id);
-    if (!recurso) throw new ConflictException(`El ${nombre} ${id} no figura en ${fuente} para ${recursos.fecha}`);
-    if (!recurso.disponible) throw new ConflictException(`El ${nombre} ${id} no está disponible el ${recursos.fecha} según ${fuente}`);
+    const nombre = tipo === 'VEHICULO' ? 'vehículo' : 'chofer';
+    if (!recurso) {
+      const motivo = `No figura en ${fuente} para ${recursos.fecha}`;
+      throw conflictoRecursos(`El ${nombre} ${id} no figura en ${fuente} para ${recursos.fecha}`, [
+        { recurso: tipo, idExterno: id, motivo },
+      ]);
+    }
+    if (!recurso.disponible) {
+      const motivo = `No está disponible el ${recursos.fecha} según ${fuente}`;
+      throw conflictoRecursos(`El ${nombre} ${id} no está disponible el ${recursos.fecha} según ${fuente}`, [
+        { recurso: tipo, idExterno: id, motivo },
+      ]);
+    }
     return recurso;
   }
 
@@ -104,12 +125,15 @@ export class ValidacionAsignacionService {
         ORDER BY id`,
       [dto.fechaProgramada, ESTADOS_ACTIVOS, rutaId, dto.vehiculoExternoId, dto.choferExternoId],
     ) as Array<{ id: string; vehiculo_externo_id: string; chofer_externo_id: string }>;
-    const conflictos = otras.flatMap((ruta) => [
-      ...(ruta.vehiculo_externo_id === dto.vehiculoExternoId ? [`vehículo ${dto.vehiculoExternoId} (ruta ${ruta.id})`] : []),
-      ...(ruta.chofer_externo_id === dto.choferExternoId ? [`chofer ${dto.choferExternoId} (ruta ${ruta.id})`] : []),
+    const conflictos = otras.flatMap<ConflictoRecurso>((ruta) => [
+      ...(ruta.vehiculo_externo_id === dto.vehiculoExternoId ? [{ recurso: 'VEHICULO' as const, idExterno: dto.vehiculoExternoId, motivo: `ruta ${ruta.id}` }] : []),
+      ...(ruta.chofer_externo_id === dto.choferExternoId ? [{ recurso: 'CHOFER' as const, idExterno: dto.choferExternoId, motivo: `ruta ${ruta.id}` }] : []),
     ]);
     if (conflictos.length > 0) {
-      throw new ConflictException(`Recursos ya asignados el ${dto.fechaProgramada}: ${conflictos.join(', ')}`);
+      const detalle = conflictos.map(({ recurso, idExterno, motivo }) =>
+        `${recurso === 'VEHICULO' ? 'vehículo' : 'chofer'} ${idExterno} (${motivo})`,
+      ).join(', ');
+      throw conflictoRecursos(`Recursos ya asignados el ${dto.fechaProgramada}: ${detalle}`, conflictos);
     }
   }
 

@@ -4,13 +4,13 @@ import { formatearFecha } from "../../../utils/format.js";
 
 const RECURSOS = { VEHICULO: "Vehículo", CHOFER: "Chofer" };
 const VACIO = { tipo: "", paradaId: "", motivo: "", reprogramar: false, nuevaFecha: "" };
-// CA-03: una ruta completada o cancelada no se reprograma.
-const REPROGRAMABLES = ["PLANIFICADA", "DESPACHADA"];
+const RUTAS_ACTIVAS = ["PLANIFICADA", "DESPACHADA"];
+const FORMATO_DIA_BOLIVIA = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/La_Paz", year: "numeric", month: "2-digit", day: "2-digit",
+});
 
 function diaLocal(desplazamiento = 0) {
-  const fecha = new Date();
-  fecha.setDate(fecha.getDate() + desplazamiento);
-  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+  return FORMATO_DIA_BOLIVIA.format(new Date(Date.now() + desplazamiento * 86_400_000));
 }
 
 export function validarIncidencia(datos, fechaProgramada, hoy = diaLocal()) {
@@ -43,9 +43,13 @@ export default function FormularioIncidencia({ ruta, onRegistrar }) {
   const [exito, setExito] = useState("");
   const [enviando, setEnviando] = useState(false);
   const enCurso = useRef(false);
-  const reprogramable = REPROGRAMABLES.includes(ruta.estado);
-  const reprogramar = reprogramable && datos.reprogramar;
-  const paradas = [...(ruta.paradas ?? [])].sort((a, b) => a.secuencia - b.secuencia);
+  const reprogramar = datos.reprogramar;
+  const paradas = (ruta.paradas ?? []).filter((parada) => parada.estadoEntrega === "PENDIENTE")
+    .sort((a, b) => a.secuencia - b.secuencia);
+
+  if (!RUTAS_ACTIVAS.includes(ruta.estado)) {
+    return <p className="ts-field-help">El historial de incidencias está disponible para consulta. Solo se registran incidencias en rutas activas.</p>;
+  }
 
   function cambiar(campo, valor) {
     setDatos((actuales) => ({ ...actuales, [campo]: valor }));
@@ -125,28 +129,24 @@ export default function FormularioIncidencia({ ruta, onRegistrar }) {
         <p className="ts-field-help">{datos.motivo.length}/{MAX_MOTIVO_INCIDENCIA} caracteres.</p>
       </div>
 
-      {reprogramable ? (
-        <div className="incidencias-reprogramar">
-          <label className="incidencias-check" htmlFor="incidencia-reprogramar">
-            <input id="incidencia-reprogramar" type="checkbox" checked={datos.reprogramar} disabled={enviando}
-              onChange={(evento) => cambiar("reprogramar", evento.target.checked)} />
-            Reprogramar la entrega a otra fecha
-          </label>
-          {datos.reprogramar && (
-            <div className="ts-field">
-              <label htmlFor="incidencia-fecha">Nueva fecha de entrega</label>
-              <input id="incidencia-fecha" type="date" min={diaLocal(1)} value={datos.nuevaFecha} disabled={enviando}
-                onChange={(evento) => cambiar("nuevaFecha", evento.target.value)} />
-              <p className="ts-field-help">
-                Fecha programada actual: {formatearFecha(ruta.fechaProgramada)}. Al reprogramar se vuelven a validar el
-                vehículo y el chofer para la nueva fecha.
-              </p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <p className="ts-field-help">Una ruta {ruta.estado === "COMPLETADA" ? "completada" : "cancelada"} no se puede reprogramar.</p>
-      )}
+      <div className="incidencias-reprogramar">
+        <label className="incidencias-check" htmlFor="incidencia-reprogramar">
+          <input id="incidencia-reprogramar" type="checkbox" checked={datos.reprogramar} disabled={enviando}
+            onChange={(evento) => cambiar("reprogramar", evento.target.checked)} />
+          Reprogramar la entrega a otra fecha
+        </label>
+        {datos.reprogramar && (
+          <div className="ts-field">
+            <label htmlFor="incidencia-fecha">Nueva fecha de entrega</label>
+            <input id="incidencia-fecha" type="date" min={diaLocal(1)} value={datos.nuevaFecha} disabled={enviando}
+              onChange={(evento) => cambiar("nuevaFecha", evento.target.value)} />
+            <p className="ts-field-help">
+              Fecha programada actual: {formatearFecha(ruta.fechaProgramada)}. Al reprogramar se vuelven a validar el
+              vehículo y el chofer para la nueva fecha.
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="ts-btn-group">
         <button type="submit" className="ts-btn ts-btn-primary" disabled={enviando}>
