@@ -12,6 +12,7 @@ import { ValidacionAsignacionService } from './validaciones/validacion-asignacio
 
 @Module({
   imports: [TypeOrmModule.forFeature([Ruta, RutaParada, RutaParadaBoleta]), RecursosExternosModule],
+  exports: [ValidacionAsignacionService],
   controllers: [RutasController],
   providers: [PermisoLogisticaGuard, RutasService, ValidacionAsignacionService, LotesProduccionClient],
 })
