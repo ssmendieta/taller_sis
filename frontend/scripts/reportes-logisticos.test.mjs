@@ -198,3 +198,49 @@ test('sin el permiso de rutas no muestra el menú ni consulta el reporte', async
   assert.equal(raiz.root.findAllByProps({ to: '/logistica/reportes' }).length, 0);
   assert.equal(llamadas.length, 0);
 });
+
+test('PDF y Excel usan el período y estados de la vista, aunque se edite el formulario', async () => {
+  const archivos = [];
+  globalThis.document.body = { append() {} };
+  globalThis.document.createElement = () => ({ click() { archivos.push(this.download); }, remove() {} });
+  await montar();
+  assert.equal(raiz.root.findAllByProps({ 'aria-label': 'Descargar vista previa' }).length, 0);
+  await llenarPeriodo();
+  await cambiar('ruta', 'COMPLETADA');
+  await cambiar('boleta', 'ANULADA');
+  await consultar();
+  const consulta = parametros();
+  await cambiar('desde', '2026-11-15');
+  await cambiar('boleta', 'EMITIDA');
+  for (const [formato, etiqueta, tipo] of [
+    ['pdf', 'PDF', 'application/pdf'], ['xlsx', 'Excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  ]) {
+    responder = () => new Response('archivo-de-prueba', { headers: { 'Content-Type': tipo } });
+    await act(async () => boton(`Descargar ${etiqueta}`).props.onClick());
+    assert.equal(llamadas.at(-1).destino.pathname, `/api/logistica/reportes/logistica/exportar/${formato}`);
+    assert.equal(llamadas.at(-1).opciones.headers.Authorization, 'Bearer token-logistico-prueba');
+    assert.deepEqual(parametros(), consulta);
+    assert.equal(archivos.at(-1), `reporte-logistico_2026-11-01_a_2026-11-30.${formato}`);
+  }
+  assert.equal(archivos.length, 2);
+});
+
+test('una descarga con tipo inválido informa el fallo y conserva la vista', async () => {
+  await montar();
+  await llenarPeriodo();
+  await consultar();
+  responder = () => new Response('<html>Error</html>', { headers: { 'Content-Type': 'text/html' } });
+  await act(async () => boton('Descargar PDF').props.onClick());
+  assert.match(texto(), /archivo válido/);
+  assert.match(texto(), /BE-EMITIDA/);
+});
+
+test('un 403 al descargar elimina la vista previa y sus botones', async () => {
+  await montar();
+  await llenarPeriodo();
+  await consultar();
+  responder = () => json({}, 403);
+  await act(async () => boton('Descargar Excel').props.onClick());
+  assert.match(texto(), /No tienes permiso para descargar/);
+  assert.doesNotMatch(texto(), /BE-EMITIDA|Descargar PDF/);
+});

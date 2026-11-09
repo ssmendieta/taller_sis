@@ -3,3 +3,4 @@
 .reporte-logistico-totales { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
 .reporte-logistico-totales dt { font-weight: 600; }
 .reporte-logistico-totales dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.reporte-logistico-exportar { margin-bottom: 12px; flex-wrap: wrap; }
