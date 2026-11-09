@@ -577,22 +577,30 @@ export class OrdenesService {
     const nombre = nombreVisible(usuarioAutenticado?.nombre, responsableId);
     const actualizada = await this.ordenRepository.manager.transaction(
       async (manager) => {
+        // Dos solicitudes pueden haber leído PLANIFICADA antes de iniciar la transacción.
+        const ordenVigente = esInicio
+          ? await manager.findOne(OrdenProduccion, { where: { id }, lock: { mode: 'pessimistic_write' } })
+          : orden;
+        if (!ordenVigente) throw new NotFoundException(`Orden con id ${id} no encontrada`);
+        if (esInicio && ordenVigente.estado !== estadoActual) {
+          throw new ConflictException('La orden cambió de estado mientras se intentaba iniciar.');
+        }
 
-        orden.estado = dto.nuevoEstado;
+        ordenVigente.estado = dto.nuevoEstado;
 
         if (dto.nuevoEstado === EstadoOrden.EN_PRODUCCION) {
-          orden.iniciada_en = new Date();
+          ordenVigente.iniciada_en = new Date();
         }
 
         if (dto.nuevoEstado === EstadoOrden.FINALIZADA) {
-          orden.finalizada_en = new Date();
+          ordenVigente.finalizada_en = new Date();
         }
 
         if (dto.nuevoEstado === EstadoOrden.CANCELADA) {
-          orden.cancelada_en = new Date();
+          ordenVigente.cancelada_en = new Date();
         }
 
-        await manager.save(OrdenProduccion, orden);
+        await manager.save(OrdenProduccion, ordenVigente);
 
         await manager.save(
           HistorialEstadoOrden,

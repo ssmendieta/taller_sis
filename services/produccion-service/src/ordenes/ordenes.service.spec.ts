@@ -108,7 +108,8 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
       vigente_en: '2026-10-17T12:00:00.000Z',
       materiales: [],
     });
-    managerFindOne.mockResolvedValue({ ...ordenBase(EstadoOrden.EN_PRODUCCION) });
+    managerFindOne.mockImplementation(async (_entity, opciones) =>
+      ordenBase(opciones?.lock ? estado : EstadoOrden.EN_PRODUCCION));
   }
 
   it('aplica una transición válida y registra el historial en la misma transacción', async () => {
@@ -138,22 +139,7 @@ describe('OrdenesService.cambiarEstado (ABC-148)', () => {
   });
 
   it('marca iniciada_en al pasar a EN_PRODUCCION', async () => {
-    findOne.mockResolvedValue(ordenBase('PLANIFICADA'));
-    recetaFindOne.mockResolvedValue({ id: 1, activa: true });
-    jest.spyOn(service, 'compararDisponibilidadMateriales').mockResolvedValue({
-      correlation_id: null, respuesta_esperada_hasta: null, error_respuesta: null, publicacion: null,
-      orden_id: 1,
-      orden_codigo: 'OP-001',
-      cantidad_producir: 10,
-      unidad_producto: 'unidad',
-      estado_consulta: 'RESPONDIDA',
-      consulta_id: 'DISP-ORD-1-V1',
-      consulta_version: 1,
-      request_event_id: 'd59541e7-d44c-4138-92e1-3432310cd1aa',
-      vigente_en: '2026-10-17T12:00:00.000Z',
-      materiales: [],
-    });
-    managerFindOne.mockResolvedValue({});
+    prepararInicio();
 
     await service.cambiarEstado(1, {
       nuevoEstado: EstadoOrden.EN_PRODUCCION,
