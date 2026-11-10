@@ -11,6 +11,7 @@ import { obtenerOrdenes } from "../services/ordenesService.js";
 import { listarLotesOrden } from "../services/lotesService.js";
 import { datosSolicitudSalida, mensajeErrorSalida } from "../services/solicitudesSalidaFormulario.js";
 import { FORMATO_TITULO } from "../constants/marca.js";
+import AgrupacionSolicitudes from "../components/logistica/AgrupacionSolicitudes.jsx";
 import CrearBoletaDesdeSolicitud from "../components/logistica/CrearBoletaDesdeSolicitud.jsx";
 import "../styles/solicitudes-salida.css";
 
@@ -233,6 +234,9 @@ export default function LogisticaPage() {
             </tr>)}</tbody>
           </table></div>}
       </div>
+      {puedeConsultar && (
+        <AgrupacionSolicitudes solicitudes={solicitudes} puedeAgrupar={puedeCrear && puedeOrdenes} puedeDeshacer={puedeCrear} />
+      )}
     </section>
   );
 }

@@ -149,3 +149,31 @@ export async function registrarIncidencia(rutaId, { tipo, motivo, paradaId, nuev
   await exigirOk(response, "No se pudo registrar la incidencia.");
   return historialIncidencias(await response.json(), rutaId);
 }
+
+// ABC-362: cada agrupación conserva sus solicitudes y la trazabilidad del deshacer.
+async function solicitarAgrupaciones(ruta, mensaje, opciones = {}) {
+  const response = await fetch(`${apiConfig.gatewayUrl}/api/logistica/agrupaciones${ruta}`, {
+    ...opciones,
+    headers: { ...encabezados(), ...opciones.headers },
+  });
+  await exigirOk(response, mensaje);
+  return response.json();
+}
+
+export function listarAgrupaciones({ signal } = {}) {
+  return solicitarAgrupaciones("", "No se pudieron cargar los grupos.", { signal });
+}
+
+export function agruparSolicitudes(solicitudes) {
+  return solicitarAgrupaciones("", "No se pudieron agrupar las solicitudes.", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ solicitudes }),
+  });
+}
+
+export function deshacerAgrupacion(id) {
+  return solicitarAgrupaciones(`/${encodeURIComponent(id)}/deshacer`, "No se pudo deshacer el grupo.", {
+    method: "POST",
+  });
+}

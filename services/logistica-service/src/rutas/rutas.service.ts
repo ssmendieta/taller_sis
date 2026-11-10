@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { GrupoSalida } from '../agrupacion/entities/grupo-salida.entity';
 import { EstadoBoleta } from '../boletas/entities/estado-boleta.enum';
 import { GuardarRutaDto } from './dto/guardar-ruta.dto';
 import { EstadoRuta } from './entities/estado-ruta.enum';
@@ -31,6 +32,7 @@ export class RutasService {
   async create(dto: GuardarRutaDto, usuarioId: string, authorization = ''): Promise<Ruta> {
     const externos = await this.validacion.consultarDatosExternos(this.dataSource.manager, dto, authorization);
     return this.dataSource.transaction(async (manager) => {
+      await this.bloquearGrupoActivo(manager, dto.grupoId);
       await this.validacion.bloquearRecursos(manager, dto);
       await this.validarBoletas(manager, dto, null);
       await this.validacion.validar(manager, dto, null, externos);
@@ -51,6 +53,7 @@ export class RutasService {
     if (!idValido(id)) throw new NotFoundException('Ruta no encontrada');
     const externos = await this.validacion.consultarDatosExternos(this.dataSource.manager, dto, authorization);
     return this.dataSource.transaction(async (manager) => {
+      await this.bloquearGrupoActivo(manager, dto.grupoId);
       const [actual] = await manager.query(
         'SELECT id, estado FROM rutas WHERE id = $1 FOR UPDATE',
         [id],
@@ -93,6 +96,14 @@ export class RutasService {
     });
     if (!ruta) throw new NotFoundException('Ruta no encontrada');
     return ruta;
+  }
+
+  private async bloquearGrupoActivo(manager: EntityManager, id: string | null): Promise<void> {
+    if (id === null) return;
+    const grupo = await manager.findOne(GrupoSalida, {
+      where: { id, deshechoEn: IsNull() }, lock: { mode: 'pessimistic_write' },
+    });
+    if (!grupo) throw new ConflictException('El grupo no existe o fue deshecho');
   }
 
   // Bloquea las boletas para que dos rutas guardadas a la vez no puedan tomar la misma.

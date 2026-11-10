@@ -9,6 +9,7 @@ import { TrazabilidadModule } from './trazabilidad/trazabilidad.module';
 import { RutasModule } from './rutas/rutas.module';
 import { DespachoModule } from './despacho/despacho.module';
 import { IncidenciasModule } from './incidencias/incidencias.module';
+import { AgrupacionModule } from './agrupacion/agrupacion.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { HistorialModule } from './historial/historial.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -25,6 +26,7 @@ import { RecursosExternosModule } from './recursos-externos/recursos-externos.mo
     RutasModule,
     DespachoModule,
     IncidenciasModule,
+    AgrupacionModule,
     ReportesModule,
     HistorialModule,
     DashboardModule,

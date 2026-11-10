@@ -27,7 +27,7 @@ export class Ruta {
   @PrimaryGeneratedColumn('identity', { type: 'bigint', generatedIdentity: 'ALWAYS' })
   id!: string;
 
-  // Grupo de solicitudes de ABC-362; su tabla todavía no existe, por eso no hay FK.
+  // El servicio valida grupos activos. El campo conserva los ids históricos.
   @Index('ix_rutas_grupo')
   @Column({ name: 'grupo_id', type: 'bigint', nullable: true })
   grupoId!: string | null;
