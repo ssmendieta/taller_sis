@@ -1,3 +1,4 @@
+import { PRODUCCION_CERRADA_V1_EJEMPLO } from '../contratos/contabilidad-v1';
 import { PubSubPublisherService } from '../pubsub/pubsub-publisher.service';
 import {
   ESTADO_OUTBOX_PENDIENTE,
@@ -141,6 +142,49 @@ describe('ABC-242/275: publicación durable y reintentos desde outbox', () => {
 
     await jest.advanceTimersByTimeAsync(1);
     await expect(service.procesarPendientes()).resolves.toMatchObject({ publicados: 1 });
+    expect(publishMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('ABC-347: reintenta un cierre con el mismo mensaje lógico y guarda una confirmación', async () => {
+    const payload = PRODUCCION_CERRADA_V1_EJEMPLO;
+    const evento = {
+      ...eventoPendiente(),
+      eventId: payload.eventId,
+      eventType: payload.eventType,
+      correlationId: payload.correlationId,
+      aggregateType: 'CierreProduccion',
+      aggregateId: payload.data.cierreId,
+      payload,
+    };
+    const store = new OutboxEnMemoria([evento]);
+    const publishMessage = jest.fn()
+      .mockRejectedValueOnce(new Error('Se perdió la confirmación del broker'))
+      .mockResolvedValueOnce('message-id-qa-347');
+    const publisher = new PubSubPublisherService(
+      { enabled: true, projectId: 'proyecto', topicId: 'produccion-cerrada' },
+      { topic: () => ({ publishMessage }) } as any,
+    );
+    const service = new OutboxPublicadorService(store, publisher, {
+      enabled: false,
+      batchSize: 10,
+      pollIntervalMs: 5000,
+      leaseMs: 30000,
+      retryBaseMs: 1000,
+      retryMaxMs: 60000,
+    });
+
+    await expect(service.procesarPendientes()).resolves.toMatchObject({ fallidos: 1 });
+    expect(evento).toMatchObject({ estado: ESTADO_OUTBOX_PENDIENTE, messageId: null });
+    await jest.advanceTimersByTimeAsync(1000);
+    await expect(service.procesarPendientes()).resolves.toMatchObject({ publicados: 1 });
+    expect(evento).toMatchObject({ estado: ESTADO_OUTBOX_PUBLICADO, messageId: 'message-id-qa-347', intentos: 2 });
+    const [primero, reintento] = publishMessage.mock.calls.map(([mensaje]) => mensaje);
+    expect(reintento).toEqual(primero);
+    expect(JSON.parse(reintento.data.toString('utf8'))).toEqual(payload);
+    expect(reintento.attributes).toMatchObject({
+      eventId: payload.eventId, eventType: payload.eventType, correlationId: payload.correlationId,
+    });
+    await expect(service.procesarPendientes()).resolves.toMatchObject({ reclamados: 0 });
     expect(publishMessage).toHaveBeenCalledTimes(2);
   });
 
