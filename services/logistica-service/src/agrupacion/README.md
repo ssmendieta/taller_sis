@@ -75,12 +75,14 @@ grupo seleccionado exista y esté activo.
 
 ### Verificación
 
-- Compilación de Logística y frontend. 152 pruebas aprobadas de Agrupación,
-  Rutas y Despacho.
-- Integración HTTP por el gateway con Auth, Logística, Producción y migraciones
-  en PGlite. Se verificaron permisos, destino, fecha, tipo, unidad, concurrencia
-  (201 y 409), deshacer, reasignación y protección de grupos despachados.
-  Para crear la ruta del escenario se usó un ERP de prueba.
-- Componente React montado contra el gateway para seleccionar dos solicitudes,
-  completar sus datos, agrupar y deshacer. Validación funcional con React Test
-  Renderer.
+- ABC-363 agrega una suite con PostgreSQL real habilitada mediante
+  `RUN_DB_INTEGRATION=true`. Verifica persistencia, trazabilidad, liberación,
+  reagrupación, rechazo sin datos parciales, concurrencia y grupo despachado.
+- Las cuatro suites de Agrupación aprueban 27 pruebas con la integración real
+  habilitada. La regresión completa de Logística aprueba 538 pruebas.
+- El componente React real se prueba con una API simulada en
+  `frontend/scripts/agrupacion-solicitudes.test.mjs`: agrupar, presentar
+  conflictos, deshacer, ocultar cambios de grupos despachados y respetar el
+  modo de solo consulta.
+- La ejecución y la distinción entre evidencia real y simulada están en
+  `docs/evidencias/sprint-3/ABC-363.md`.

@@ -17,6 +17,7 @@
     "test:demandas": "node --test scripts/demandas.test.mjs",
     "test:reportes-produccion": "node --test scripts/reportes-produccion.test.mjs",
     "test:reportes-logisticos": "node --test scripts/reportes-logisticos.test.mjs",
+    "test:agrupacion": "node --test scripts/agrupacion-solicitudes.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {
