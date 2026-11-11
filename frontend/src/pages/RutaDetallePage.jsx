@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
-import { obtenerRuta, PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
+import { obtenerDetalleHistorialRuta, obtenerRuta, PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 import {
   despacharRuta, obtenerHistorialIncidencias, PERMISO_GESTIONAR_RUTAS, registrarEntrega, registrarIncidencia,
@@ -13,6 +13,7 @@ import FormularioObservacion from "../components/logistica/despacho/FormularioOb
 import EstadoEntregaParada, { fechaHora } from "../components/logistica/despacho/EstadoEntregaParada.jsx";
 import FormularioIncidencia from "../components/logistica/incidencias/FormularioIncidencia.jsx";
 import HistorialIncidencias from "../components/logistica/incidencias/HistorialIncidencias.jsx";
+import BoletasLotesRuta, { etiquetaBoleta } from "../components/logistica/historial/BoletasLotesRuta.jsx";
 import { formatearFecha } from "../utils/format.js";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import "../styles/despacho-ruta.css";
@@ -46,6 +47,27 @@ export default function RutaDetallePage() {
   const [paradaAbierta, setParadaAbierta] = useState(null);
   const [historial, setHistorial] = useState(null);
   const [errorHistorial, setErrorHistorial] = useState("");
+  const [detalle, setDetalle] = useState(null);
+  const [errorDetalle, setErrorDetalle] = useState("");
+  const [versionDetalle, setVersionDetalle] = useState(0);
+
+  // ABC-393: boletas y lotes de la ruta; se vuelve a leer tras cada cambio.
+  useEffect(() => {
+    let vigente = true;
+    const controller = new AbortController();
+    setErrorDetalle("");
+    obtenerDetalleHistorialRuta(id, { signal: controller.signal })
+      .then((datos) => { if (vigente) setDetalle(datos); })
+      .catch((fallo) => {
+        if (!vigente || fallo?.name === "AbortError") return;
+        setDetalle(null);
+        setErrorDetalle(fallo?.message || "No se pudo cargar el detalle de boletas y lotes.");
+      });
+    return () => { vigente = false; controller.abort(); };
+  }, [id, versionDetalle]);
+
+  useEffect(() => { setDetalle(null); }, [id]);
+  const refrescarDetalle = () => setVersionDetalle((v) => v + 1);
 
   useEffect(() => {
     let vigente = true;
@@ -87,6 +109,7 @@ export default function RutaDetallePage() {
       setRuta(actualizada);
       setParadaAbierta(null);
       setAviso(exito(actualizada));
+      refrescarDetalle();
     } catch (fallo) {
       setErrorAccion(`${contexto}${mensajeError(fallo)}`);
       if (fallo?.status === 409 || fallo?.status === 404) await recargar();
@@ -117,6 +140,7 @@ export default function RutaDetallePage() {
     setHistorial(actualizado);
     setErrorHistorial("");
     setRuta((actual) => ({ ...actual, fechaProgramada: actualizado.fechaProgramada }));
+    refrescarDetalle();
     return datos.nuevaFecha
       ? `Incidencia registrada y ruta reprogramada al ${formatearFecha(actualizado.fechaProgramada)}.`
       : "Incidencia registrada.";
@@ -138,6 +162,7 @@ export default function RutaDetallePage() {
   if (!ruta) return <p className="ts-empty">Cargando ruta…</p>;
 
   const paradas = [...(ruta.paradas ?? [])].sort((a, b) => a.secuencia - b.secuencia);
+  const boletasDetalle = new Map((detalle?.paradas ?? []).flatMap((p) => p.boletas.map((b) => [String(b.id), b])));
   const enTransito = ruta.estado === "DESPACHADA";
   const puedeEntregar = puedeGestionar && enTransito;
   return (
@@ -212,14 +237,18 @@ export default function RutaDetallePage() {
                         <td>{parada.secuencia}</td>
                         <td>{parada.destino}</td>
                         <td>
-                          {(parada.boletas ?? []).map((documento, indice) => (
-                            <span key={documento.id}>
-                              {indice > 0 && ", "}
-                              {puedeVerBoletas
-                                ? <Link to={`/logistica/boletas/${documento.boletaId}`}>Boleta {documento.boletaId}</Link>
-                                : `Boleta ${documento.boletaId}`}
-                            </span>
-                          ))}
+                          {(parada.boletas ?? []).map((documento, indice) => {
+                            const datos = boletasDetalle.get(String(documento.boletaId));
+                            const texto = datos ? etiquetaBoleta(datos) : `Boleta ${documento.boletaId}`;
+                            return (
+                              <span key={documento.id}>
+                                {indice > 0 && ", "}
+                                {puedeVerBoletas
+                                  ? <Link to={`/logistica/boletas/${documento.boletaId}`}>{texto}</Link>
+                                  : texto}
+                              </span>
+                            );
+                          })}
                         </td>
                         <td><EstadoEntregaParada parada={parada} /></td>
                         {puedeEntregar && (
@@ -256,6 +285,16 @@ export default function RutaDetallePage() {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="ts-panel" aria-labelledby="ruta-boletas-titulo">
+        <div className="ts-panel-title">
+          <h2 id="ruta-boletas-titulo">Boletas y lotes</h2>
+          {detalle && <span>{detalle.paradas.reduce((n, p) => n + p.boletas.length, 0)} boletas · {detalle.lotes.length} lotes</span>}
+        </div>
+        {errorDetalle && <p className="ts-feedback ts-error" role="alert">{errorDetalle}</p>}
+        {!detalle && !errorDetalle && <p className="ts-empty">Cargando boletas y lotes…</p>}
+        {detalle && <BoletasLotesRuta detalle={detalle} puedeVerBoletas={puedeVerBoletas} />}
       </div>
 
       <div className="ts-panel" aria-labelledby="ruta-incidencias-titulo">

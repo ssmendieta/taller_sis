@@ -40,6 +40,12 @@ export async function listarHistorialRutas({ fechaDesde, fechaHasta, estado, cho
   return leer(response, "No se pudo cargar el historial de rutas.");
 }
 
+// ABC-393: detalle de solo lectura con boletas, lotes, entregas e incidencias de la ruta.
+export async function obtenerDetalleHistorialRuta(id, { signal } = {}) {
+  const response = await fetch(`${BASE}/historial/rutas/${encodeURIComponent(id)}`, { headers: encabezados(), signal });
+  return leer(response, "No se pudo cargar el detalle de la ruta.");
+}
+
 export async function obtenerRuta(id) {
   const response = await fetch(`${BASE}/rutas/${encodeURIComponent(id)}`, { headers: encabezados() });
   return leer(response, "No se pudo cargar la ruta.");
