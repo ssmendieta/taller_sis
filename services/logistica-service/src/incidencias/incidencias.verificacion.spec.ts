@@ -12,6 +12,8 @@ import { CrearRutas1710000000005 } from '../database/migrations/1710000000005-Cr
 import { EstadosDespachoEntrega1710000000006 } from '../database/migrations/1710000000006-EstadosDespachoEntrega';
 import { ObservacionesDespachoEntrega1710000000008 } from '../database/migrations/1710000000008-ObservacionesDespachoEntrega';
 import { CrearIncidenciasTransporte1710000000009 } from '../database/migrations/1710000000009-CrearIncidenciasTransporte';
+import { EventosOutboxLogistica1710000000011 } from '../database/migrations/1710000000011-EventosOutboxLogistica';
+import { ResultadoInventarioRuta1710000000012 } from '../database/migrations/1710000000012-ResultadoInventarioRuta';
 import { Ruta } from '../rutas/entities/ruta.entity';
 import { ValidacionAsignacionService } from '../rutas/validaciones/validacion-asignacion.service';
 import { ValidarIncidenciaPipe } from './dto/validar-incidencia.pipe';
@@ -87,6 +89,7 @@ describeReal('ABC-383: incidencias y reprogramaciones contra PostgreSQL', () => 
         new ReglaConcurrenciaDocumental1710000000003(), new HistorialBoletasEnvio1710000000004(),
         new CrearRutas1710000000005(), new EstadosDespachoEntrega1710000000006(),
         new ObservacionesDespachoEntrega1710000000008(), new CrearIncidenciasTransporte1710000000009(),
+        new EventosOutboxLogistica1710000000011(), new ResultadoInventarioRuta1710000000012(),
       ]) {
         await migracion.up(runner);
       }

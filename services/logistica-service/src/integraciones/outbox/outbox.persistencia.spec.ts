@@ -10,6 +10,7 @@ import { CrearRutas1710000000005 } from '../../database/migrations/1710000000005
 import { EstadosDespachoEntrega1710000000006 } from '../../database/migrations/1710000000006-EstadosDespachoEntrega';
 import { ObservacionesDespachoEntrega1710000000008 } from '../../database/migrations/1710000000008-ObservacionesDespachoEntrega';
 import { EventosOutboxLogistica1710000000011 } from '../../database/migrations/1710000000011-EventosOutboxLogistica';
+import { ResultadoInventarioRuta1710000000012 } from '../../database/migrations/1710000000012-ResultadoInventarioRuta';
 import { DespachoService } from '../../despacho/despacho.service';
 import { validarDespachoRutaRegistradoV1 } from '../contratos/inventarios-salida-v1.validator';
 import { loadPubSubLogisticaConfig } from '../pubsub/pubsub-logistica.config';
@@ -66,6 +67,7 @@ describeReal('ABC-386: despacho con outbox y publicación confiable en PostgreSQ
         new ReglaConcurrenciaDocumental1710000000003(), new HistorialBoletasEnvio1710000000004(),
         new CrearRutas1710000000005(), new EstadosDespachoEntrega1710000000006(),
         new ObservacionesDespachoEntrega1710000000008(), new EventosOutboxLogistica1710000000011(),
+        new ResultadoInventarioRuta1710000000012(),
       ]) {
         await migracion.up(runner);
       }
