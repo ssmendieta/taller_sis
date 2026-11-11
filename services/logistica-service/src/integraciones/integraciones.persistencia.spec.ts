@@ -82,10 +82,12 @@ describeReal('ABC-388: pendientes y reintentos de Logística en PostgreSQL', () 
   }
   const servicio = () => new IntegracionesLogisticaService(source, config);
   const caido = { publicar: async () => { throw new Error('UNAVAILABLE: Pub/Sub no responde'); } };
+  // El reloj de PostgreSQL (Docker) puede ir unos ms adelantado: se reclama con un margen.
+  const enUnSegundo = () => new Date(Date.now() + 1000);
 
   it('un fallo de publicación es visible con intentos y último error, y sobrevive al reinicio', async () => {
     const creado = await evento();
-    await new OutboxPublicadorService(new OutboxStore(source), caido as any, config).procesarPendientes();
+    await new OutboxPublicadorService(new OutboxStore(source), caido as any, config).procesarPendientes(enUnSegundo());
 
     await source.destroy();
     await conectar();
@@ -102,7 +104,7 @@ describeReal('ABC-388: pendientes y reintentos de Logística en PostgreSQL', () 
 
   it('el reintento adelanta el MISMO evento y al publicarse no crea otro evento lógico', async () => {
     const creado = await evento();
-    await new OutboxPublicadorService(new OutboxStore(source), caido as any, config).procesarPendientes();
+    await new OutboxPublicadorService(new OutboxStore(source), caido as any, config).procesarPendientes(enUnSegundo());
 
     const { evento: reprogramado } = await servicio().reintentar(creado.id);
     expect(reprogramado).toMatchObject({ id: creado.id, eventId: creado.eventId, intentos: 1, estado: 'PENDIENTE' });
@@ -110,7 +112,7 @@ describeReal('ABC-388: pendientes y reintentos de Logística en PostgreSQL', () 
 
     const enviados: any[] = [];
     const ok = { publicar: async (e: any) => { enviados.push(e); return { messageId: 'msg-388', topicId: 't' }; } };
-    await new OutboxPublicadorService(new OutboxStore(source), ok as any, config).procesarPendientes();
+    await new OutboxPublicadorService(new OutboxStore(source), ok as any, config).procesarPendientes(enUnSegundo());
 
     const filas = await source.getRepository(EventoOutbox).find();
     expect(filas).toHaveLength(1);
@@ -124,7 +126,7 @@ describeReal('ABC-388: pendientes y reintentos de Logística en PostgreSQL', () 
     await expect(servicio().reintentar(publicado.id)).rejects.toBeInstanceOf(ConflictException);
 
     const enCurso = await evento();
-    await new OutboxStore(source).reclamarPendientes({ ahora: new Date(), limite: 10, leaseMs: 60000 });
+    await new OutboxStore(source).reclamarPendientes({ ahora: enUnSegundo(), limite: 10, leaseMs: 60000 });
     await expect(servicio().reintentar(enCurso.id)).rejects.toBeInstanceOf(ConflictException);
   });
 
