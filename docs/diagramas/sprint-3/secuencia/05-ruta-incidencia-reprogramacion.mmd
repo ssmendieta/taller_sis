@@ -1,0 +1,39 @@
+%% ABC-407 · ABC-379 (S3-15) — Incidencia y reprogramación de la entrega (ABC-380/381/382/383)
+sequenceDiagram
+  autonumber
+  actor L as Encargado de Logística
+  participant F as Frontend (FormularioIncidencia)
+  participant LG as logistica-service
+  participant ERP as ERP de recursos (o respaldo)
+  participant PR as produccion-service
+  participant DB as logistica_db
+
+  L->>F: tipo, motivo, parada opcional y nueva fecha opcional
+  F->>LG: POST /api/logistica/rutas/:id/incidencias
+  LG->>LG: ValidarIncidenciaPipe (tipo, motivo 1-500, fecha válida) o 400
+  opt con nueva fecha
+    Note over LG,PR: Preparación FUERA de la transacción
+    LG->>DB: lee la ruta y sus paradas pendientes
+    LG->>LG: fecha futura (día de Bolivia) y distinta de la actual
+    LG->>ERP: recursos de la nueva fecha
+    LG->>PR: unidad de carga por orden
+  end
+  LG->>DB: BEGIN · ruta FOR UPDATE
+  LG->>LG: ruta PLANIFICADA o DESPACHADA · parada de la ruta y PENDIENTE
+  opt con nueva fecha
+    LG->>LG: la ruta no cambió desde la preparación
+    LG->>DB: advisory locks de vehículo y chofer en la nueva fecha
+    LG->>LG: sin solapamientos, disponible en ERP y con capacidad
+  end
+  alt alguna regla falla
+    LG->>DB: ROLLBACK (ni incidencia ni reprogramación)
+    LG-->>F: 404 o 409 (CONFLICTO_RECURSOS, entrega resuelta, fecha inválida)
+  else válido
+    LG->>DB: INSERT incidencias_transporte
+    opt con nueva fecha
+      LG->>DB: INSERT rutas_reprogramaciones (fecha anterior → nueva)
+      LG->>DB: UPDATE rutas.fecha_programada
+    end
+    LG->>DB: COMMIT
+    LG-->>F: 201 historial (la fecha original es la primera fecha anterior)
+  end
