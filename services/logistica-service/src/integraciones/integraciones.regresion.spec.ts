@@ -86,8 +86,8 @@ describe('ABC-389: Regresión y Criterios de Aceptación (ABC-384: Integración 
         if (sql.includes('FROM boletas_envio')) {
           // Devuelve boletas y sus ítems para el outbox
           return [
-            { boleta_id: '1', numero: 'BOL-001', orden_id: '100', referencia: 'LOT-A', cantidad: '12.0000' },
-            { boleta_id: '2', numero: 'BOL-002', orden_id: '100', referencia: 'LOT-B', cantidad: '5.5000' },
+            { boleta_id: '1', numero: 'BOL-001', orden_id: '100', producto_codigo: 'GAL-001', unidad: 'unidad', referencia: 'LOT-A', cantidad: '12.0000' },
+            { boleta_id: '2', numero: 'BOL-002', orden_id: '100', producto_codigo: 'GAL-001', unidad: 'unidad', referencia: 'LOT-B', cantidad: '5.5000' },
           ];
         }
         return [];

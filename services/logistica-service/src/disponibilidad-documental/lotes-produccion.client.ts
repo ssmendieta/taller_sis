@@ -4,7 +4,8 @@ export interface OrdenProduccionDto {
   id: string | number;
   codigo: string;
   producto_id: string | number;
-  producto?: unknown;
+  producto?: { codigo?: unknown; unidad_producto?: unknown } | null;
+  unidad_producto?: unknown;
 }
 
 export interface ResultadoConformeProduccionDto {

@@ -14,6 +14,17 @@ import { SolicitudSalida } from '../solicitudes-salida/entities/solicitud-salida
 import { LotesProduccionClient } from '../disponibilidad-documental/lotes-produccion.client';
 
 const ESCALA_CANTIDAD = BigInt('10000');
+const UNIDADES_PRODUCTO = new Set(['kg', 'g', 'l', 'ml', 'm', 'cm', 'unidad', 'docena', 'caja', 'paquete']);
+
+function snapshotProducto(orden: { producto?: { codigo?: unknown; unidad_producto?: unknown } | null; unidad_producto?: unknown }) {
+  const codigo = typeof orden.producto?.codigo === 'string' ? orden.producto.codigo.trim() : '';
+  const unidadCruda = orden.producto?.unidad_producto ?? orden.unidad_producto ?? 'unidad';
+  const unidad = typeof unidadCruda === 'string' ? unidadCruda.trim() : '';
+  if (!codigo || codigo.length > 80 || !UNIDADES_PRODUCTO.has(unidad)) {
+    throw new BadGatewayException('Producción devolvió producto o unidad incompletos');
+  }
+  return { productoCodigo: codigo, unidad };
+}
 
 function cantidadEscalada(cantidad: string): bigint {
   if (!/^\d+(?:\.\d{1,4})?$/.test(cantidad)) {
@@ -45,6 +56,7 @@ export class BoletasService {
         !orden.producto || typeof orden.producto !== 'object') {
       throw new BadGatewayException('Producción devolvió una relación orden-producto incompleta');
     }
+    const producto = snapshotProducto(orden);
     const solicitudReferencias = new Set((solicitud.items ?? []).map((item) => item.referencia));
     if (dto.items.some((item) => !solicitudReferencias.has(item.referencia))) {
       throw new NotFoundException('Uno o más ítems no pertenecen a la solicitud de salida');
@@ -67,6 +79,7 @@ export class BoletasService {
         solicitudSalidaId: solicitud.id,
         responsableUsuarioId: usuarioId,
         estado: EstadoBoleta.BORRADOR,
+        ...producto,
       }));
       const items = dto.items.map((item) => manager.create(BoletaEnvioItem, {
         boletaId: boleta.id,
@@ -149,6 +162,7 @@ export class BoletasService {
         !orden.producto || typeof orden.producto !== 'object') {
       throw new BadGatewayException('Producción devolvió una relación orden-producto incompleta');
     }
+    const producto = snapshotProducto(orden);
     const ordenId = String(orden.id);
     const productoId = String(orden.producto_id);
 
@@ -204,6 +218,8 @@ export class BoletasService {
 
       actual.estado = EstadoBoleta.EMITIDA;
       actual.responsableUsuarioId = usuarioId;
+      actual.productoCodigo = producto.productoCodigo;
+      actual.unidad = producto.unidad;
       return manager.save(BoletaEnvio, actual);
     });
   }

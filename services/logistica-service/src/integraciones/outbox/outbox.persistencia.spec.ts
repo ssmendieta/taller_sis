@@ -11,6 +11,7 @@ import { EstadosDespachoEntrega1710000000006 } from '../../database/migrations/1
 import { ObservacionesDespachoEntrega1710000000008 } from '../../database/migrations/1710000000008-ObservacionesDespachoEntrega';
 import { EventosOutboxLogistica1710000000011 } from '../../database/migrations/1710000000011-EventosOutboxLogistica';
 import { ResultadoInventarioRuta1710000000012 } from '../../database/migrations/1710000000012-ResultadoInventarioRuta';
+import { ProductoUnidadBoleta1710000000013 } from '../../database/migrations/1710000000013-ProductoUnidadBoleta';
 import { DespachoService } from '../../despacho/despacho.service';
 import { validarDespachoRutaRegistradoV1 } from '../contratos/inventarios-salida-v1.validator';
 import { loadPubSubLogisticaConfig } from '../pubsub/pubsub-logistica.config';
@@ -67,7 +68,7 @@ describeReal('ABC-386: despacho con outbox y publicación confiable en PostgreSQ
         new ReglaConcurrenciaDocumental1710000000003(), new HistorialBoletasEnvio1710000000004(),
         new CrearRutas1710000000005(), new EstadosDespachoEntrega1710000000006(),
         new ObservacionesDespachoEntrega1710000000008(), new EventosOutboxLogistica1710000000011(),
-        new ResultadoInventarioRuta1710000000012(),
+        new ResultadoInventarioRuta1710000000012(), new ProductoUnidadBoleta1710000000013(),
       ]) {
         await migracion.up(runner);
       }
@@ -100,8 +101,10 @@ describeReal('ABC-386: despacho con outbox y publicación confiable en PostgreSQ
       `INSERT INTO solicitudes_salida (orden_id, destino_documental, motivo, responsable_usuario_id)
        VALUES (2, 'Tienda', 'Envío', 4) RETURNING id::text AS id`);
     const [boleta] = await source.query(
-      `INSERT INTO boletas_envio (solicitud_salida_id, numero, estado, responsable_usuario_id)
-       VALUES ($1, $2, 'EMITIDA', 4) RETURNING id::text AS id`, [solicitud.id, `BOL-386-${++numero}`]);
+      `INSERT INTO boletas_envio
+         (solicitud_salida_id, numero, estado, responsable_usuario_id, producto_codigo, unidad)
+       VALUES ($1, $2, 'EMITIDA', 4, 'GAL-001', 'unidad') RETURNING id::text AS id`,
+      [solicitud.id, `BOL-386-${++numero}`]);
     for (const [referencia, cantidad] of items) {
       await source.query('INSERT INTO boletas_envio_items (boleta_id, referencia, cantidad) VALUES ($1, $2, $3)', [boleta.id, referencia, cantidad]);
     }
@@ -126,7 +129,7 @@ describeReal('ABC-386: despacho con outbox y publicación confiable en PostgreSQ
     const payload = validarDespachoRutaRegistradoV1(evento.payload);
     expect(payload.data).toMatchObject({
       rutaId, fechaProgramada: '2026-11-12', despachadaPorUsuarioId: '4', vehiculoExternoId: 'VEH-01', choferExternoId: 'CHO-07',
-      boletas: [{ boletaId, ordenId: '2', items: [
+      boletas: [{ boletaId, ordenId: '2', productoCodigo: 'GAL-001', unidad: 'unidad', items: [
         { loteReferencia: 'LOT-GAL-001', cantidad: '6.0000' }, { loteReferencia: 'LOT-GAL-002', cantidad: '2.5000' },
       ] }],
     });
