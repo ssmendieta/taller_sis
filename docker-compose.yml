@@ -140,6 +140,16 @@
       # no localhost (el contenedor solo escucha en su propio puerto).
       - AUTH_SERVICE_URL=http://auth-service:3001
       - PRODUCCION_SERVICE_URL=http://produccion-service:3002
+      # ABC-386/387: evento de despacho a Inventarios y su respuesta (desactivado por defecto).
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-}
+      - LOGISTICA_PUBSUB_ENABLED=${LOGISTICA_PUBSUB_ENABLED:-false}
+      - LOGISTICA_PUBSUB_SALIDA_TOPIC_ID=${LOGISTICA_PUBSUB_SALIDA_TOPIC_ID:-}
+      - LOGISTICA_PUBSUB_RESULTADO_CONSUMER_ENABLED=${LOGISTICA_PUBSUB_RESULTADO_CONSUMER_ENABLED:-false}
+      - LOGISTICA_PUBSUB_RESULTADO_SUBSCRIPTION_ID=${LOGISTICA_PUBSUB_RESULTADO_SUBSCRIPTION_ID:-}
+      - PUBSUB_EMULATOR_HOST=${PUBSUB_EMULATOR_HOST:-}
+      - OUTBOX_POLL_INTERVAL_MS=${OUTBOX_POLL_INTERVAL_MS:-5000}
+      - OUTBOX_RETRY_BASE_MS=${OUTBOX_RETRY_BASE_MS:-5000}
+      - OUTBOX_RETRY_MAX_MS=${OUTBOX_RETRY_MAX_MS:-300000}
     depends_on:
       postgres:
         condition: service_healthy
