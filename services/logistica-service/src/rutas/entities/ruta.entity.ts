@@ -60,6 +60,22 @@ export class Ruta {
   @Column({ name: 'completada_en', type: 'timestamptz', nullable: true })
   completadaEn!: Date | null;
 
+  // ABC-387: resultado de Inventarios sobre la salida; null mientras no responde.
+  @Column({ name: 'inventario_estado', type: 'varchar', length: 20, nullable: true })
+  inventarioEstado!: 'ACEPTADA' | 'RECHAZADA' | null;
+
+  @Column({ name: 'inventario_resultado_event_id', type: 'uuid', nullable: true })
+  inventarioResultadoEventId!: string | null;
+
+  @Column({ name: 'inventario_resultado_en', type: 'timestamptz', nullable: true })
+  inventarioResultadoEn!: Date | null;
+
+  @Column({ name: 'inventario_codigo_rechazo', type: 'varchar', length: 100, nullable: true })
+  inventarioCodigoRechazo!: string | null;
+
+  @Column({ name: 'inventario_detalle', type: 'varchar', length: 500, nullable: true })
+  inventarioDetalle!: string | null;
+
   @OneToMany(() => RutaParada, (parada) => parada.ruta, { cascade: false })
   paradas!: RutaParada[];
 
