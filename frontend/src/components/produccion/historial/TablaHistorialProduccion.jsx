@@ -66,6 +66,11 @@ export default function TablaHistorialProduccion({
                   >
                     Ver detalle
                   </Link>
+                  {" "}
+                  <Link to={`/produccion/historial/ordenes/${orden.id}`} className="ts-btn ts-btn--sm"
+                    title={`Ver cronología de la orden ${orden.codigo || orden.id}`}>
+                    Ver cronología
+                  </Link>
                 </td>
               </tr>
             );
