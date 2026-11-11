@@ -8,8 +8,10 @@
 | `rutas_paradas` | parada numerada (`secuencia`) con su destino |
 | `rutas_paradas_boletas` | boletas que se entregan en cada parada (FK a `boletas_envio`) |
 
-Vehículo, chofer y grupo se guardan como identificadores sin clave foránea:
-el ERP es otra base y la tabla de grupos (ABC-362) todavía no existe.
+Vehículo y chofer se guardan como identificadores externos sin clave foránea:
+el ERP es otra base. El grupo es local (ABC-362); el servicio comprueba y
+bloquea el grupo activo antes de guardar la asignación. El identificador se
+conserva para las rutas históricas.
 
 ## API (ABC-370)
 
@@ -45,7 +47,7 @@ Reglas aplicadas:
 - Solo se edita una ruta `PLANIFICADA`; despachada, completada o cancelada devuelve 409.
 - `PUT` reemplaza las paradas completas, dentro de la misma transacción.
 
-Pendiente en otras subtareas: verificación del grupo (ABC-362).
+Un grupo inexistente o deshecho devuelve 409 antes de guardar la ruta.
 
 ## Disponibilidad y capacidad (ABC-371)
 
@@ -95,9 +97,9 @@ Reglas (máquina de estados de ABC-375):
   conserva la fecha y el autor originales. Ruta, paradas y boletas se bloquean
   con `FOR UPDATE` para que dos envíos simultáneos no se registren dos veces.
 - El despacho llama a `EventosDespacho.registrarDespacho` dentro de su
-  transacción (`despacho/eventos-despacho.ts`). ABC-386 debe implementarlo
-  guardando el evento en el outbox, sin publicar antes del commit; hasta
-  entonces no se genera evento.
+  transacción (`despacho/eventos-despacho.ts`). `OutboxEventosDespacho` (ABC-386)
+  guarda el evento en el outbox en ese mismo commit; el publicador lo envía
+  después. Planificar una ruta no genera todavía el evento de despacho.
 
 ## Historial de rutas (ABC-391)
 
@@ -113,3 +115,30 @@ Reglas (máquina de estados de ABC-375):
 Los filtros se combinan con AND. Orden estable: fecha programada descendente y
 luego id descendente. Respuesta `{ items, total, page, limit, totalPages }` con
 `totalParadas` y `totalBoletas` por ruta, calculados sin duplicar filas.
+
+## Aceptación y regresión (ABC-373)
+
+`rutas.aceptacion.spec.ts` ejecuta peticiones HTTP contra `RutasModule`, su
+guard y sus validadores reales, con las migraciones del proyecto en un esquema
+PostgreSQL temporal. Comprueba persistencia tras reiniciar la aplicación,
+conflictos concurrentes de recursos observando bloqueos reales en `pg_locks`,
+precisión de capacidad, unidades, boletas, permisos y rollback completo de una
+edición ante un fallo SQL.
+
+Auth, ERP y Producción son **simuladores HTTP locales** en esta suite. No
+demuestra conexión con sistemas externos reales, Docker ni Google Pub/Sub.
+Las filas y restricciones auxiliares quedan dentro de `abc373_*`; se retiran
+al finalizar. Activar únicamente contra una base de prueba accesible con las
+variables `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD` y `DB_DATABASE`.
+
+Desde `services/logistica-service`:
+
+```powershell
+$env:LOGISTICA_DB_REAL='1'
+npm test -- --runInBand src/rutas src/recursos-externos
+npm run build
+```
+
+El recorrido de planificación desde la interfaz (CA-05) sigue dependiendo de
+ABC-372. La evidencia y los puntos pendientes se detallan en
+`docs/evidencias/sprint-3/ABC-373.md` desde la raíz del repositorio.
