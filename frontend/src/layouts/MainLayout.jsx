@@ -48,6 +48,7 @@ export default function MainLayout({ children }) {
   const puedeSalidas = tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES);
   const activo = (path) => {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
+    if (path === "/produccion/historial") return location.pathname.startsWith("/produccion/historial") ? "active" : "";
     if (path === "/demandas") return location.pathname.startsWith("/demandas") ? "active" : "";
     if (path === "/logistica/rutas/historial") return location.pathname.startsWith("/logistica/rutas") ? "active" : "";
     if (path === "/logistica/boletas") return location.pathname.startsWith("/logistica/boletas") ? "active" : "";
@@ -65,6 +66,7 @@ export default function MainLayout({ children }) {
         </div>
         <nav className="navbar" aria-label="Navegación principal">
           {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
+          {puedeOrdenes && <Link className={activo("/produccion/historial")} to="/produccion/historial" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Historial de producción</Link>}
           {puedeOrdenes && <Link className={activo("/demandas")} to="/demandas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="demandas" />Demandas</Link>}
           {puedeOrdenes && <Link className={activo("/produccion/reportes")} to="/produccion/reportes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Reportes de producción</Link>}
           {puedeRecetas && <Link className={activo("/recetas")} to="/recetas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recetas" />Recetas</Link>}

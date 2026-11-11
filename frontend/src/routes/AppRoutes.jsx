@@ -16,11 +16,13 @@ import LogisticaPage from "../pages/LogisticaPage.jsx";
 import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
 import HistorialLogisticoPage from "../pages/HistorialLogisticoPage.jsx";
+import HistorialProduccionPage from "../pages/HistorialProduccionPage.jsx";
 import ReportesProduccionPage from "../pages/ReportesProduccionPage.jsx";
 import ReportesLogisticosPage from "../pages/ReportesLogisticosPage.jsx";
 import RutaDetallePage from "../pages/RutaDetallePage.jsx";
 import DemandasPage from "../pages/DemandasPage.jsx";
 import { PERMISO_CONSULTAR_DEMANDAS } from "../services/demandasService.js";
+import { PERMISO_HISTORIAL_PRODUCCION } from "../services/historialProduccionService.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import RecursosLogisticosPage from "../pages/RecursosLogisticosPage.jsx";
 import MainLayout from "../layouts/MainLayout.jsx";
@@ -227,6 +229,8 @@ export default function AppRoutes() {
           element={privada(<LogisticaPage />, [PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES])}
         />
 
+        <Route path="/produccion/historial" element={privada(<HistorialProduccionPage />, [PERMISO_HISTORIAL_PRODUCCION])} />
+        <Route path="/ordenes/historial" element={<Navigate to="/produccion/historial" replace />} />
         <Route path="/produccion/reportes" element={privada(<ReportesProduccionPage />, ["ordenes.consultar"])} />
         <Route path="/logistica/reportes" element={privada(<ReportesLogisticosPage />, [PERMISO_CONSULTAR_RUTAS])} />
         <Route path="/produccion" element={<Navigate to="/ordenes" replace />} />
