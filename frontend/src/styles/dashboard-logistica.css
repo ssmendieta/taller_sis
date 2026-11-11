@@ -1,0 +1,39 @@
+/* ABC-330: widgets del tablero logístico. Una sola tonalidad (--ts-accent, validada
+   contra superficie blanca); textos con los tokens de tinta, nunca con el color de la barra. */
+.dash-logistica { display: flex; flex-direction: column; gap: 16px; }
+
+.dash-periodo { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.dash-periodo label { display: flex; flex-direction: column; gap: 4px; font-size: .82rem; color: var(--ts-muted); }
+.dash-periodo input { min-height: 32px; padding: 4px 8px; border: 1px solid var(--ts-border); border-radius: 5px; }
+
+.dash-cifras { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.dash-cifra { background: #fff; border: 1px solid var(--ts-border-soft); border-radius: 8px; padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.dash-cifra span { font-size: .8rem; color: var(--ts-muted); }
+.dash-cifra strong { font-size: 1.6rem; font-weight: 600; color: #1d1d1f; font-variant-numeric: tabular-nums; }
+
+.dash-graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; transition: opacity var(--ts-ease); }
+.dash-graficos[data-cargando] { opacity: .55; }
+
+.dash-grafico { margin: 0; background: #fff; border: 1px solid var(--ts-border-soft); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.dash-grafico-cabecera { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.dash-grafico-cabecera h3 { margin: 0; font-size: .92rem; font-weight: 600; color: #1d1d1f; }
+.dash-grafico-total { font-size: .8rem; color: var(--ts-muted); font-variant-numeric: tabular-nums; }
+
+.dash-barras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.dash-barra-fila { position: relative; display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; padding: 2px 0; cursor: default; }
+.dash-barra-etiqueta { font-size: .82rem; color: #424245; }
+.dash-barra-pista { display: flex; align-items: center; gap: 6px; min-height: 18px; }
+/* Barra fina, anclada a la izquierda (cero), extremo redondeado de 4 px. */
+.dash-barra { display: block; height: 10px; background: var(--ts-accent); border-radius: 0 4px 4px 0; }
+.dash-barra-fila[data-activa] .dash-barra { background: var(--ts-accent-hover); }
+.dash-barra-valor { font-size: .82rem; font-weight: 600; color: #1d1d1f; font-variant-numeric: tabular-nums; }
+.dash-tooltip { position: absolute; left: 104px; top: -26px; z-index: 2; background: #1d1d1f; color: #fff; font-size: .76rem; padding: 4px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+
+.dash-ver-tabla { align-self: flex-start; }
+.dash-tabla { font-size: .82rem; }
+.sr-solo { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (max-width: 480px) {
+  .dash-barra-fila { grid-template-columns: 84px 1fr; }
+  .dash-tooltip { left: 0; }
+}
