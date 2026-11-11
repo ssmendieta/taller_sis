@@ -116,3 +116,32 @@ Sin `HISTORIAL_DB_REAL=1` esos 10 casos se omiten explícitamente.
 Resultado de implementación: 40 pruebas aprobadas, 0 omitidas con la variable
 activada. La primera ejecución detectó un cast con propiedad TypeORM sin
 traducir; se sustituyó por `CAST(... AS text)` y la repetición pasó completa.
+
+## ABC-334 · Cronología de una orden
+
+`GET /api/produccion/historial/ordenes/:ordenId/eventos` requiere Bearer y
+`ordenes.consultar`. Devuelve `orden` (id, código, estado y unidad del producto)
+y `eventos`, una lista de solo lectura. La pantalla se abre desde **Historial de
+producción → Ver cronología** en `/produccion/historial/ordenes/:id`.
+
+Las fuentes son `historial_estado_orden`, `avances_produccion`,
+`resultados_conformes`, `perdidas_materia_prima`, `observaciones_orden`,
+`lotes` y `reprocesos`. Se consulta cada fuente para la misma orden y se
+combinan con UNION ALL. La consulta usa una instantánea REPEATABLE READ.
+
+Cada evento contiene `clave`, `id`, `tipo`, `fechaHora`, `usuarioId`,
+`usuarioNombre` y `datos`. Las cantidades se conservan como strings decimales.
+Los tipos son ESTADO, AVANCE, CONFORME, DEFECTUOSO, PERDIDA, OBSERVACION,
+INCIDENCIA, LOTE y REPROCESO. Los eventos se ordenan por instante ascendente,
+prioridad de fuente en el orden anterior de las tablas y finalmente id numérico
+ascendente. La clave combina tipo e id para distinguir registros de distintas
+fuentes que tienen el mismo identificador.
+
+La fecha se muestra en Bolivia. Cuando el registro carece de nombre histórico,
+se presenta `Usuario #id`. Una orden existente sin eventos devuelve una lista
+vacía. Un id inválido devuelve 400 y una orden inexistente devuelve 404. No se
+generan eventos a partir de datos supuestos.
+
+El listado conserva su enlace **Ver detalle** a la orden y añade **Ver
+cronología**. Los filtros usan los estados del glosario compartido, compatibles
+con el backend.

@@ -60,8 +60,8 @@ beforeEach(() => {
   respuesta = (params) =>
     json({
       items: [
-        orden(12, { estado: 'EN_PROCESO', responsable_nombre: 'Andrés Pabón' }),
-        orden(11, { estado: 'COMPLETADA', producto_nombre: 'Esmalte Sintético' }),
+        orden(12, { estado: 'EN_PRODUCCION', responsable_nombre: 'Andrés Pabón' }),
+        orden(11, { estado: 'FINALIZADA', producto_nombre: 'Esmalte Sintético' }),
       ],
       total: 15,
       page: Number(params.get('page') || 1),
@@ -136,8 +136,8 @@ test('1. Consulta inicial: gateway, token Bearer y omisión de parámetros vací
   assert.deepEqual(ultima(), { page: '1', limit: '10' });
   assert.match(texto(), /OP-2026-00012/);
   assert.match(texto(), /Pintura Látex Blanca/);
-  assert.match(texto(), /EN PROCESO/);
-  assert.match(texto(), /COMPLETADA/);
+  assert.match(texto(), /En producción/);
+  assert.match(texto(), /Finalizada/);
   assert.match(texto(), /15.*órdenes encontradas/);
 });
 
@@ -145,7 +145,7 @@ test('2. Envío combinado de filtros: fechaDesde, fechaHasta, estado y producto'
   await montar();
   await cambiar('historial-desde', '2026-11-01');
   await cambiar('historial-hasta', '2026-11-30');
-  await cambiar('historial-estado', 'EN_PROCESO');
+  await cambiar('historial-estado', 'EN_PRODUCCION');
   await cambiar('historial-producto', '  Látex  ');
   await aplicar();
 
@@ -154,14 +154,14 @@ test('2. Envío combinado de filtros: fechaDesde, fechaHasta, estado y producto'
     limit: '10',
     fechaDesde: '2026-11-01',
     fechaHasta: '2026-11-30',
-    estado: 'EN_PROCESO',
+    estado: 'EN_PRODUCCION',
     producto: 'Látex',
   });
 });
 
 test('3. Conserva filtros al paginar (Página siguiente)', async () => {
   await montar();
-  await cambiar('historial-estado', 'COMPLETADA');
+  await cambiar('historial-estado', 'FINALIZADA');
   await aplicar();
 
   const btnSiguiente = boton('Siguiente');
@@ -172,7 +172,7 @@ test('3. Conserva filtros al paginar (Página siguiente)', async () => {
   assert.deepEqual(ultima(), {
     page: '2',
     limit: '10',
-    estado: 'COMPLETADA',
+    estado: 'FINALIZADA',
   });
 });
 
@@ -289,7 +289,7 @@ test('11. Unidad de servicio validarFiltrosHistorial: comprueba reglas de negoci
   const limpio = servicio.validarFiltrosHistorial({
     fechaDesde: '2026-11-01',
     fechaHasta: '2026-11-15',
-    estado: 'COMPLETADA',
+    estado: 'FINALIZADA',
     producto: 'Pintura',
     page: 2,
     limit: 20,
@@ -298,7 +298,7 @@ test('11. Unidad de servicio validarFiltrosHistorial: comprueba reglas de negoci
   assert.deepEqual(limpio, {
     fechaDesde: '2026-11-01',
     fechaHasta: '2026-11-15',
-    estado: 'COMPLETADA',
+    estado: 'FINALIZADA',
     producto: 'Pintura',
     page: 2,
     limit: 20,

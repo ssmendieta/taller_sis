@@ -1,4 +1,4 @@
-import { Controller, Get, Query, SetMetadata, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query, SetMetadata, UseGuards } from '@nestjs/common';
 import { PermisoProduccionGuard, PERMISO_PRODUCCION } from '../auth/permiso-produccion.guard';
 import { ListarHistorialOrdenesDto } from './dto/listar-historial-ordenes.dto';
 import { ValidarListarHistorialOrdenesPipe } from './dto/validar-listar-historial-ordenes.pipe';
@@ -14,5 +14,11 @@ export class HistorialController {
   @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
   listarOrdenes(@Query(new ValidarListarHistorialOrdenesPipe()) query: ListarHistorialOrdenesDto) {
     return this.service.listarOrdenes(query);
+  }
+
+  @Get('ordenes/:ordenId/eventos')
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
+  detalleOrden(@Param('ordenId', ParseIntPipe) ordenId: number) {
+    return this.service.detalleOrden(ordenId);
   }
 }

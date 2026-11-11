@@ -16,6 +16,7 @@ import LogisticaPage from "../pages/LogisticaPage.jsx";
 import ConsultaBoletasPage from "../pages/ConsultaBoletasPage.jsx";
 import TrazabilidadPage from "../pages/TrazabilidadPage.jsx";
 import HistorialLogisticoPage from "../pages/HistorialLogisticoPage.jsx";
+import HistorialOrdenDetallePage from "../pages/HistorialOrdenDetallePage.jsx";
 import HistorialProduccionPage from "../pages/HistorialProduccionPage.jsx";
 import ReportesProduccionPage from "../pages/ReportesProduccionPage.jsx";
 import ReportesLogisticosPage from "../pages/ReportesLogisticosPage.jsx";
@@ -229,6 +230,7 @@ export default function AppRoutes() {
           element={privada(<LogisticaPage />, [PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES])}
         />
 
+        <Route path="/produccion/historial/ordenes/:id" element={privada(<HistorialOrdenDetallePage />, [PERMISO_HISTORIAL_PRODUCCION])} />
         <Route path="/produccion/historial" element={privada(<HistorialProduccionPage />, [PERMISO_HISTORIAL_PRODUCCION])} />
         <Route path="/ordenes/historial" element={<Navigate to="/produccion/historial" replace />} />
         <Route path="/produccion/reportes" element={privada(<ReportesProduccionPage />, ["ordenes.consultar"])} />

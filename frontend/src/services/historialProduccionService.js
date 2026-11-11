@@ -1,14 +1,9 @@
 import { apiConfig } from "./api.js";
+import { ETIQUETAS_ESTADO_ORDEN } from "../constants/estados.js";
 
 export const PERMISO_HISTORIAL_PRODUCCION = "ordenes.consultar";
 
-export const ESTADOS_ORDEN_HISTORIAL = [
-  "CREADA",
-  "PLANIFICADA",
-  "EN_PROCESO",
-  "COMPLETADA",
-  "CANCELADA",
-];
+export const ESTADOS_ORDEN_HISTORIAL = Object.keys(ETIQUETAS_ESTADO_ORDEN);
 
 export const FILTROS_HISTORIAL_INICIALES = {
   fechaDesde: "",
@@ -137,5 +132,41 @@ export async function consultarHistorialOrdenes(filtros = {}, { signal } = {}) {
     throw new Error("El servicio devolvió un historial con formato inválido.");
   }
 
+  return datos;
+}
+
+export const TIPOS_EVENTO_HISTORIAL = [
+  "ESTADO", "AVANCE", "CONFORME", "DEFECTUOSO", "PERDIDA",
+  "OBSERVACION", "INCIDENCIA", "LOTE", "REPROCESO",
+];
+
+export async function consultarEventosOrden(ordenId, { signal } = {}) {
+  if (!/^[1-9]\d*$/.test(String(ordenId)) || !Number.isSafeInteger(Number(ordenId))) {
+    const error = new Error("El identificador de la orden no es válido.");
+    error.status = 400;
+    throw error;
+  }
+  const token = sessionStorage.getItem("accessToken") || localStorage.getItem("accessToken");
+  const response = await fetch(
+    `${apiConfig.gatewayUrl}/api/produccion/historial/ordenes/${ordenId}/eventos`,
+    { signal, headers: token ? { Authorization: `Bearer ${token}` } : {} },
+  );
+  const datos = await response.json().catch(() => null);
+  if (!response.ok) {
+    const mensaje = datos?.message;
+    const error = new Error((Array.isArray(mensaje) ? mensaje.join(". ") : mensaje) ||
+      "No se pudo consultar la cronología de la orden.");
+    error.status = response.status;
+    throw error;
+  }
+  if (String(datos?.orden?.id) !== String(ordenId) || !Array.isArray(datos?.eventos) ||
+      datos.eventos.some((evento) =>
+        typeof evento?.clave !== "string" || !TIPOS_EVENTO_HISTORIAL.includes(evento.tipo) ||
+        typeof evento.fechaHora !== "string" || !Number.isFinite(Date.parse(evento.fechaHora)) ||
+        typeof evento.usuarioNombre !== "string" || !evento.datos || Array.isArray(evento.datos) ||
+        typeof evento.datos !== "object",
+      ) || new Set(datos.eventos.map(({ clave }) => clave)).size !== datos.eventos.length) {
+    throw new Error("El servicio devolvió una cronología con formato inválido.");
+  }
   return datos;
 }

@@ -1,0 +1,10 @@
+.cronologia-orden { list-style: none; padding: 0 0 0 1rem; margin: 1.5rem 0; border-left: 2px solid var(--color-borde, #d8dee8); }
+.cronologia-orden li { padding: 0 0 1.5rem 1rem; position: relative; }
+.cronologia-orden li::before { content: ""; position: absolute; width: .65rem; height: .65rem; top: .4rem; left: -1.4rem; border-radius: 50%; background: var(--color-primario, #315c83); }
+.cronologia-orden article { padding: 1rem; border: 1px solid var(--color-borde, #d8dee8); border-radius: .5rem; overflow-wrap: anywhere; }
+.cronologia-orden header, .cronologia-orden__cabecera { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+.cronologia-orden h2 { font-size: 1rem; margin: 0; }
+.cronologia-orden p { margin: .7rem 0 0; white-space: pre-wrap; }
+.cronologia-orden time, .cronologia-orden__autor { color: var(--color-texto-secundario, #526174); font-size: .9rem; }
+.cronologia-orden dl { display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin-bottom: 0; }
+.cronologia-orden dd { margin: .25rem 0 0; }
