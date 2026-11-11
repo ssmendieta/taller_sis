@@ -15,6 +15,7 @@
     "test:observaciones": "node --test scripts/observaciones-orden.test.mjs",
     "test:historial-rutas": "node --test scripts/historial-rutas.test.mjs",
     "test:detalle-ruta-boletas": "node --test scripts/detalle-ruta-boletas.test.mjs",
+    "test:integraciones-logistica": "node --test scripts/integraciones-logistica.test.mjs",
     "test:demandas": "node --test scripts/demandas.test.mjs",
     "test:reportes-produccion": "node --test scripts/reportes-produccion.test.mjs",
     "test:reportes-logisticos": "node --test scripts/reportes-logisticos.test.mjs",

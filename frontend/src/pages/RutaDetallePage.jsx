@@ -25,6 +25,18 @@ function mensajeError(fallo) {
   return fallo?.message || "No se pudo completar la operación.";
 }
 
+const ESTADO_INVENTARIO = {
+  NO_ENVIADO: { texto: "Se enviará al despachar", clase: "ts-badge--inactivo" },
+  ESPERANDO: { texto: "Esperando respuesta", clase: "ts-badge--PENDIENTE" },
+  ACEPTADA: { texto: "Salida aceptada", clase: "ts-badge--FINALIZADA" },
+  RECHAZADA: { texto: "Salida rechazada", clase: "ts-badge--CANCELADA" },
+};
+
+function estadoInventario(ruta) {
+  if (ruta.inventarioEstado) return ruta.inventarioEstado;
+  return ruta.despachadaEn ? "ESPERANDO" : "NO_ENVIADO";
+}
+
 function resumenEntregas(paradas) {
   const cuenta = (estado) => paradas.filter((parada) => parada.estadoEntrega === estado).length;
   const anuladas = cuenta("ANULADA");
@@ -308,16 +320,24 @@ export default function RutaDetallePage() {
         {historial && <HistorialIncidencias historial={historial} paradas={paradas} />}
       </div>
 
-      {/* Separado del tránsito y la entrega: el resultado de Inventarios llegará con ABC-384. */}
+      {/* ABC-384/387: resultado de Inventarios, separado del tránsito y la entrega. */}
       <div className="ts-panel despacho-inventarios" aria-labelledby="ruta-inventarios-titulo">
         <div className="ts-panel-title">
           <h2 id="ruta-inventarios-titulo">Notificación a Inventarios</h2>
-          <span className="ts-badge ts-badge--inactivo">Sin integrar</span>
+          <span className={`ts-badge ${ESTADO_INVENTARIO[estadoInventario(ruta)].clase}`}>
+            {ESTADO_INVENTARIO[estadoInventario(ruta)].texto}
+          </span>
         </div>
+        {ruta.inventarioEstado === "RECHAZADA" && (
+          <p className="ts-feedback ts-error" role="alert">
+            Inventarios rechazó la salida ({ruta.inventarioCodigoRechazo}){ruta.inventarioDetalle ? `: ${ruta.inventarioDetalle}` : "."}
+          </p>
+        )}
+        {ruta.inventarioResultadoEn && <p className="ts-field-help">Respuesta recibida el {fechaHora(ruta.inventarioResultadoEn)}.</p>}
         <p className="ts-field-help">
-          El estado de tránsito y de entrega es de Logística. Que Inventarios reciba el aviso de salida es un
-          resultado aparte, que se mostrará aquí cuando esté integrado: despachar o entregar no confirma
-          movimientos de inventario.
+          Al despachar, Logística envía el aviso de salida a Inventarios. El tránsito y la entrega son de
+          Logística: despachar o entregar no confirma movimientos de inventario; eso lo indica la respuesta de
+          Inventarios. Los envíos pendientes y sus reintentos se ven en Integraciones → Logística.
         </p>
       </div>
     </section>
