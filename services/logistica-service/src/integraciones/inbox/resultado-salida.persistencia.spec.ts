@@ -62,7 +62,7 @@ describeReal('ABC-387: resultado de Inventarios aplicado a la ruta en PostgreSQL
     despacho = new DespachoService(source, new OutboxEventosDespacho());
     processor = new ProcesadorResultadoSalidaService(source);
     consumer = new PubSubResultadoSalidaConsumer(processor, null, {
-      projectId: 'taller-local', publicacion: { enabled: false, topicId: '' }, resultado: { enabled: false, subscriptionId: '' },
+      projectId: 'taller-local', publicacion: { enabled: false, topicId: '', timeoutMs: 1 }, resultado: { enabled: false, subscriptionId: '' },
       outbox: { batchSize: 1, pollIntervalMs: 1, leaseMs: 1, retryBaseMs: 1, retryMaxMs: 1 },
     });
   }, 30000);

@@ -31,7 +31,7 @@ describe('ABC-386: configuración de Pub/Sub de Logística', () => {
     expect(() => loadPubSubLogisticaConfig({ LOGISTICA_PUBSUB_ENABLED: 'true', GCP_PROJECT_ID: 'p' })).toThrow('LOGISTICA_PUBSUB_SALIDA_TOPIC_ID');
     expect(loadPubSubLogisticaConfig({
       LOGISTICA_PUBSUB_ENABLED: 'true', GCP_PROJECT_ID: 'p', LOGISTICA_PUBSUB_SALIDA_TOPIC_ID: 'projects/p/topics/salida',
-    }).publicacion).toEqual({ enabled: true, topicId: 'salida' });
+    }).publicacion).toEqual({ enabled: true, topicId: 'salida', timeoutMs: 10000 });
   });
 });
 
@@ -170,14 +170,16 @@ describeReal('ABC-386: despacho con outbox y publicación confiable en PostgreSQ
     };
     const publicador = new OutboxPublicadorService(store, publisher as any, config);
 
-    expect(await publicador.procesarPendientes()).toMatchObject({ reclamados: 1, publicados: 0, fallidos: 1 });
+    // El reloj de PostgreSQL (Docker) puede ir unos ms adelantado: se reclama con un margen.
+    const ahora = new Date(Date.now() + 1000);
+    expect(await publicador.procesarPendientes(ahora)).toMatchObject({ reclamados: 1, publicados: 0, fallidos: 1 });
     const [pendiente] = await eventos();
     expect(pendiente).toMatchObject({ estado: 'PENDIENTE', intentos: 1, messageId: null });
     expect(pendiente.ultimoError).toContain('broker caído');
     expect(pendiente.proximoIntentoEn.getTime()).toBeGreaterThan(Date.now());
 
     // Mientras dura la espera no se reintenta.
-    expect((await publicador.procesarPendientes()).reclamados).toBe(0);
+    expect((await publicador.procesarPendientes(ahora)).reclamados).toBe(0);
 
     caido = false;
     const despues = new Date(pendiente.proximoIntentoEn.getTime() + 1);
@@ -192,7 +194,7 @@ describeReal('ABC-386: despacho con outbox y publicación confiable en PostgreSQ
       const { rutaId } = await rutaConBoleta();
       await despacho.despachar(rutaId, '4', null);
     }
-    const ahora = new Date();
+    const ahora = new Date(Date.now() + 1000);
     const [a, b] = await Promise.all([
       store.reclamarPendientes({ ahora, limite: 3, leaseMs: 30000 }),
       store.reclamarPendientes({ ahora, limite: 3, leaseMs: 30000 }),
@@ -205,8 +207,8 @@ describeReal('ABC-386: despacho con outbox y publicación confiable en PostgreSQ
   it('un resultado tardío de un lease vencido no pisa al nuevo propietario', async () => {
     const { rutaId } = await rutaConBoleta();
     await despacho.despachar(rutaId, '4', null);
-    const [viejo] = await store.reclamarPendientes({ ahora: new Date(), limite: 1, leaseMs: 1 });
-    const [nuevo] = await store.reclamarPendientes({ ahora: new Date(Date.now() + 10), limite: 1, leaseMs: 30000 });
+    const [viejo] = await store.reclamarPendientes({ ahora: new Date(Date.now() + 1000), limite: 1, leaseMs: 1 });
+    const [nuevo] = await store.reclamarPendientes({ ahora: new Date(Date.now() + 2000), limite: 1, leaseMs: 30000 });
     expect(nuevo.id).toBe(viejo.id);
     expect(await store.marcarPublicado(viejo, 'msg-viejo', new Date())).toBe(false);
     expect(await store.marcarPublicado(nuevo, 'msg-nuevo', new Date())).toBe(true);
