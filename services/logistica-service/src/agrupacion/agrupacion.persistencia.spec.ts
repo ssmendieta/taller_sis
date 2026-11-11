@@ -13,6 +13,8 @@ import { CrearRespaldoRecursosLogisticos1710000000007 } from '../database/migrat
 import { ObservacionesDespachoEntrega1710000000008 } from '../database/migrations/1710000000008-ObservacionesDespachoEntrega';
 import { CrearIncidenciasTransporte1710000000009 } from '../database/migrations/1710000000009-CrearIncidenciasTransporte';
 import { CrearGruposSalida1710000000010 } from '../database/migrations/1710000000010-CrearGruposSalida';
+import { EventosOutboxLogistica1710000000011 } from '../database/migrations/1710000000011-EventosOutboxLogistica';
+import { ResultadoInventarioRuta1710000000012 } from '../database/migrations/1710000000012-ResultadoInventarioRuta';
 import { LotesProduccionClient } from '../disponibilidad-documental/lotes-produccion.client';
 import { Ruta } from '../rutas/entities/ruta.entity';
 import { EstadoRuta } from '../rutas/entities/estado-ruta.enum';
@@ -81,6 +83,8 @@ describeConPostgres('ABC-363: aceptación y regresión de agrupaciones con Postg
         ObservacionesDespachoEntrega1710000000008,
         CrearIncidenciasTransporte1710000000009,
         CrearGruposSalida1710000000010,
+        EventosOutboxLogistica1710000000011,
+        ResultadoInventarioRuta1710000000012,
       ],
       migrationsTableName: 'migrations_abc363',
       extra: { options: `-c search_path=${schema}` },

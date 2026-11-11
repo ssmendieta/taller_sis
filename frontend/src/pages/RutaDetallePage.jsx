@@ -2,7 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
-import { obtenerRuta, PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
+import { obtenerDetalleHistorialRuta, obtenerRuta, PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import { PERMISO_CONSULTAR_BOLETAS } from "../services/boletasService.js";
 import {
   despacharRuta, obtenerHistorialIncidencias, PERMISO_GESTIONAR_RUTAS, registrarEntrega, registrarIncidencia,
@@ -13,6 +13,7 @@ import FormularioObservacion from "../components/logistica/despacho/FormularioOb
 import EstadoEntregaParada, { fechaHora } from "../components/logistica/despacho/EstadoEntregaParada.jsx";
 import FormularioIncidencia from "../components/logistica/incidencias/FormularioIncidencia.jsx";
 import HistorialIncidencias from "../components/logistica/incidencias/HistorialIncidencias.jsx";
+import BoletasLotesRuta, { etiquetaBoleta } from "../components/logistica/historial/BoletasLotesRuta.jsx";
 import { formatearFecha } from "../utils/format.js";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import "../styles/despacho-ruta.css";
@@ -22,6 +23,18 @@ function mensajeError(fallo) {
   if (fallo?.status === 401) return "Tu sesión expiró. Vuelve a ingresar.";
   if (fallo?.status === 403) return `No tienes permiso para despachar ni registrar entregas. Permiso necesario: ${PERMISO_GESTIONAR_RUTAS}.`;
   return fallo?.message || "No se pudo completar la operación.";
+}
+
+const ESTADO_INVENTARIO = {
+  NO_ENVIADO: { texto: "Se enviará al despachar", clase: "ts-badge--inactivo" },
+  ESPERANDO: { texto: "Esperando respuesta", clase: "ts-badge--PENDIENTE" },
+  ACEPTADA: { texto: "Salida aceptada", clase: "ts-badge--FINALIZADA" },
+  RECHAZADA: { texto: "Salida rechazada", clase: "ts-badge--CANCELADA" },
+};
+
+function estadoInventario(ruta) {
+  if (ruta.inventarioEstado) return ruta.inventarioEstado;
+  return ruta.despachadaEn ? "ESPERANDO" : "NO_ENVIADO";
 }
 
 function resumenEntregas(paradas) {
@@ -46,6 +59,27 @@ export default function RutaDetallePage() {
   const [paradaAbierta, setParadaAbierta] = useState(null);
   const [historial, setHistorial] = useState(null);
   const [errorHistorial, setErrorHistorial] = useState("");
+  const [detalle, setDetalle] = useState(null);
+  const [errorDetalle, setErrorDetalle] = useState("");
+  const [versionDetalle, setVersionDetalle] = useState(0);
+
+  // ABC-393: boletas y lotes de la ruta; se vuelve a leer tras cada cambio.
+  useEffect(() => {
+    let vigente = true;
+    const controller = new AbortController();
+    setErrorDetalle("");
+    obtenerDetalleHistorialRuta(id, { signal: controller.signal })
+      .then((datos) => { if (vigente) setDetalle(datos); })
+      .catch((fallo) => {
+        if (!vigente || fallo?.name === "AbortError") return;
+        setDetalle(null);
+        setErrorDetalle(fallo?.message || "No se pudo cargar el detalle de boletas y lotes.");
+      });
+    return () => { vigente = false; controller.abort(); };
+  }, [id, versionDetalle]);
+
+  useEffect(() => { setDetalle(null); }, [id]);
+  const refrescarDetalle = () => setVersionDetalle((v) => v + 1);
 
   useEffect(() => {
     let vigente = true;
@@ -87,6 +121,7 @@ export default function RutaDetallePage() {
       setRuta(actualizada);
       setParadaAbierta(null);
       setAviso(exito(actualizada));
+      refrescarDetalle();
     } catch (fallo) {
       setErrorAccion(`${contexto}${mensajeError(fallo)}`);
       if (fallo?.status === 409 || fallo?.status === 404) await recargar();
@@ -117,6 +152,7 @@ export default function RutaDetallePage() {
     setHistorial(actualizado);
     setErrorHistorial("");
     setRuta((actual) => ({ ...actual, fechaProgramada: actualizado.fechaProgramada }));
+    refrescarDetalle();
     return datos.nuevaFecha
       ? `Incidencia registrada y ruta reprogramada al ${formatearFecha(actualizado.fechaProgramada)}.`
       : "Incidencia registrada.";
@@ -138,6 +174,7 @@ export default function RutaDetallePage() {
   if (!ruta) return <p className="ts-empty">Cargando ruta…</p>;
 
   const paradas = [...(ruta.paradas ?? [])].sort((a, b) => a.secuencia - b.secuencia);
+  const boletasDetalle = new Map((detalle?.paradas ?? []).flatMap((p) => p.boletas.map((b) => [String(b.id), b])));
   const enTransito = ruta.estado === "DESPACHADA";
   const puedeEntregar = puedeGestionar && enTransito;
   return (
@@ -212,14 +249,18 @@ export default function RutaDetallePage() {
                         <td>{parada.secuencia}</td>
                         <td>{parada.destino}</td>
                         <td>
-                          {(parada.boletas ?? []).map((documento, indice) => (
-                            <span key={documento.id}>
-                              {indice > 0 && ", "}
-                              {puedeVerBoletas
-                                ? <Link to={`/logistica/boletas/${documento.boletaId}`}>Boleta {documento.boletaId}</Link>
-                                : `Boleta ${documento.boletaId}`}
-                            </span>
-                          ))}
+                          {(parada.boletas ?? []).map((documento, indice) => {
+                            const datos = boletasDetalle.get(String(documento.boletaId));
+                            const texto = datos ? etiquetaBoleta(datos) : `Boleta ${documento.boletaId}`;
+                            return (
+                              <span key={documento.id}>
+                                {indice > 0 && ", "}
+                                {puedeVerBoletas
+                                  ? <Link to={`/logistica/boletas/${documento.boletaId}`}>{texto}</Link>
+                                  : texto}
+                              </span>
+                            );
+                          })}
                         </td>
                         <td><EstadoEntregaParada parada={parada} /></td>
                         {puedeEntregar && (
@@ -258,6 +299,16 @@ export default function RutaDetallePage() {
         )}
       </div>
 
+      <div className="ts-panel" aria-labelledby="ruta-boletas-titulo">
+        <div className="ts-panel-title">
+          <h2 id="ruta-boletas-titulo">Boletas y lotes</h2>
+          {detalle && <span>{detalle.paradas.reduce((n, p) => n + p.boletas.length, 0)} boletas · {detalle.lotes.length} lotes</span>}
+        </div>
+        {errorDetalle && <p className="ts-feedback ts-error" role="alert">{errorDetalle}</p>}
+        {!detalle && !errorDetalle && <p className="ts-empty">Cargando boletas y lotes…</p>}
+        {detalle && <BoletasLotesRuta detalle={detalle} puedeVerBoletas={puedeVerBoletas} />}
+      </div>
+
       <div className="ts-panel" aria-labelledby="ruta-incidencias-titulo">
         <div className="ts-panel-title">
           <h2 id="ruta-incidencias-titulo">Incidencias y reprogramaciones</h2>
@@ -269,16 +320,24 @@ export default function RutaDetallePage() {
         {historial && <HistorialIncidencias historial={historial} paradas={paradas} />}
       </div>
 
-      {/* Separado del tránsito y la entrega: el resultado de Inventarios llegará con ABC-384. */}
+      {/* ABC-384/387: resultado de Inventarios, separado del tránsito y la entrega. */}
       <div className="ts-panel despacho-inventarios" aria-labelledby="ruta-inventarios-titulo">
         <div className="ts-panel-title">
           <h2 id="ruta-inventarios-titulo">Notificación a Inventarios</h2>
-          <span className="ts-badge ts-badge--inactivo">Sin integrar</span>
+          <span className={`ts-badge ${ESTADO_INVENTARIO[estadoInventario(ruta)].clase}`}>
+            {ESTADO_INVENTARIO[estadoInventario(ruta)].texto}
+          </span>
         </div>
+        {ruta.inventarioEstado === "RECHAZADA" && (
+          <p className="ts-feedback ts-error" role="alert">
+            Inventarios rechazó la salida ({ruta.inventarioCodigoRechazo}){ruta.inventarioDetalle ? `: ${ruta.inventarioDetalle}` : "."}
+          </p>
+        )}
+        {ruta.inventarioResultadoEn && <p className="ts-field-help">Respuesta recibida el {fechaHora(ruta.inventarioResultadoEn)}.</p>}
         <p className="ts-field-help">
-          El estado de tránsito y de entrega es de Logística. Que Inventarios reciba el aviso de salida es un
-          resultado aparte, que se mostrará aquí cuando esté integrado: despachar o entregar no confirma
-          movimientos de inventario.
+          Al despachar, Logística envía el aviso de salida a Inventarios. El tránsito y la entrega son de
+          Logística: despachar o entregar no confirma movimientos de inventario; eso lo indica la respuesta de
+          Inventarios. Los envíos pendientes y sus reintentos se ven en Integraciones → Logística.
         </p>
       </div>
     </section>

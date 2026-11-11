@@ -20,7 +20,8 @@ export interface EventosDespacho {
   registrarDespacho(manager: EntityManager, despacho: DespachoRegistrado): Promise<void>;
 }
 
-// Hasta ABC-386 no hay outbox en Logística: el despacho no genera evento.
+// Implementación nula para pruebas unitarias del despacho; en ejecución se usa
+// OutboxEventosDespacho (ABC-386).
 export const SIN_EVENTOS_DESPACHO: EventosDespacho = {
   registrarDespacho: async () => undefined,
 };

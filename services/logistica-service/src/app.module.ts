@@ -12,6 +12,7 @@ import { IncidenciasModule } from './incidencias/incidencias.module';
 import { AgrupacionModule } from './agrupacion/agrupacion.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { HistorialModule } from './historial/historial.module';
+import { IntegracionesLogisticaModule } from './integraciones/integraciones.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { RecursosExternosModule } from './recursos-externos/recursos-externos.module';
 
@@ -29,6 +30,7 @@ import { RecursosExternosModule } from './recursos-externos/recursos-externos.mo
     AgrupacionModule,
     ReportesModule,
     HistorialModule,
+    IntegracionesLogisticaModule,
     DashboardModule,
     RecursosExternosModule,
   ],

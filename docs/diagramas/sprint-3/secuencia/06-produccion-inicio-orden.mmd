@@ -1,0 +1,28 @@
+%% ABC-407 · ABC-70 (S3-03) — Verificar materiales antes de iniciar la orden (ABC-311/312/313), con la consulta de ABC-113
+sequenceDiagram
+  autonumber
+  actor P as Encargado de Producción
+  participant F as Frontend (OrdenDetallePage)
+  participant PR as produccion-service
+  participant DB as produccion_db
+  participant PS as Pub/Sub
+  participant INV as Inventarios
+
+  P->>F: Solicitar disponibilidad
+  F->>PR: POST /api/produccion/ordenes/:id/disponibilidad-materiales/consultar
+  PR->>DB: consulta PENDIENTE y evento en el outbox (misma transacción)
+  PR-->>F: 202 PENDIENTE
+  PR->>PS: el publicador del outbox envía la solicitud
+  PS->>INV: solicitud de disponibilidad
+  INV->>PS: respuesta
+  PS->>PR: consumidor (inbox) marca la consulta RESPONDIDA
+  F->>PR: GET .../disponibilidad-materiales (sondeo)
+  P->>F: Iniciar orden
+  F->>PR: PATCH /api/produccion/ordenes/:id/estado (EN_PRODUCCION)
+  PR->>DB: orden PLANIFICADA y receta activa
+  alt consulta sin responder o con faltantes
+    PR-->>F: 409 con faltantes (requerido, disponible, falta)
+  else disponibilidad suficiente
+    PR->>DB: UPDATE estado EN_PRODUCCION e historial (sin duplicar)
+    PR-->>F: 200
+  end

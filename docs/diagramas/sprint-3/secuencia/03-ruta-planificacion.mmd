@@ -1,0 +1,41 @@
+%% ABC-407 · ABC-128 (S3-12) y ABC-368 (S3-13) — Agrupar solicitudes y planificar la ruta (ABC-360/361/362/369/370/371)
+sequenceDiagram
+  autonumber
+  actor L as Encargado de Logística
+  participant F as Frontend
+  participant G as API Gateway
+  participant A as Auth (/me)
+  participant LG as logistica-service
+  participant ERP as ERP de recursos (o respaldo)
+  participant PR as produccion-service
+  participant DB as logistica_db
+
+  L->>F: selecciona solicitudes de salida
+  F->>G: POST /api/logistica/agrupaciones
+  G->>LG: proxy
+  LG->>A: GET /me (logistica.solicitudes.gestionar)
+  LG->>LG: compatibilidad (destino, fecha, tipo, unidad) y prioridad
+  LG->>DB: BEGIN · INSERT grupo y miembros (único por miembro activo) · COMMIT
+  LG-->>F: 201 grupo o 409 con conflictos
+
+  L->>F: fecha, vehículo, chofer, paradas y boletas
+  F->>G: POST /api/logistica/rutas
+  G->>LG: proxy
+  LG->>A: GET /me (logistica.rutas.gestionar)
+  Note over LG,PR: Consultas externas FUERA de la transacción
+  LG->>ERP: vehículos y choferes de la fecha (con capacidad)
+  LG->>PR: unidad de carga de cada orden
+  LG->>DB: BEGIN
+  LG->>DB: pg_advisory_xact_lock (vehículo·día y chofer·día)
+  LG->>DB: SELECT boletas FOR UPDATE
+  LG->>LG: boletas EMITIDAS y no asignadas a otra ruta activa
+  LG->>LG: recurso disponible, sin solapamientos y con capacidad
+  alt alguna regla falla
+    LG->>DB: ROLLBACK
+    LG-->>F: 404 o 409 (CONFLICTO_RECURSOS, sobrecarga, boleta no emitida)
+  else todo válido
+    LG->>DB: INSERT rutas PLANIFICADA, rutas_paradas, rutas_paradas_boletas
+    LG->>DB: COMMIT
+    LG-->>F: 201 ruta
+  end
+  Note over F,LG: PUT /rutas/:id repite las reglas y solo edita rutas PLANIFICADAS

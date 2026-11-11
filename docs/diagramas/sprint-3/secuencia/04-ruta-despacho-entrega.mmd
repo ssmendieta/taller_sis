@@ -1,0 +1,35 @@
+%% ABC-407 · ABC-374 (S3-14) — Despacho y entrega (ABC-375/376/377) con evento para Inventarios (ABC-384/386)
+sequenceDiagram
+  autonumber
+  actor L as Encargado de Logística
+  participant F as Frontend (RutaDetallePage)
+  participant LG as logistica-service
+  participant DB as logistica_db
+  participant OB as Outbox de Logística
+
+  L->>F: Despachar ruta (observación opcional)
+  F->>LG: POST /api/logistica/rutas/:id/despacho
+  LG->>DB: BEGIN · ruta FOR UPDATE · paradas FOR UPDATE
+  LG->>LG: PLANIFICADA → DESPACHADA con al menos una entrega PENDIENTE
+  LG->>DB: boletas de paradas no anuladas FOR UPDATE OF boleta
+  alt sin boletas o alguna no EMITIDA
+    LG->>DB: ROLLBACK
+    LG-->>F: 409
+  else válido
+    LG->>DB: UPDATE rutas DESPACHADA (fecha, autor, observación)
+    LG->>OB: registrarDespacho(manager, ...) INSERT evento PENDIENTE
+    LG->>DB: COMMIT (despacho y evento en el mismo commit)
+    LG-->>F: 200 ruta DESPACHADA
+  end
+
+  L->>F: Registrar entrega de una parada
+  F->>LG: POST /api/logistica/rutas/:id/paradas/:paradaId/entrega
+  LG->>DB: BEGIN · ruta y paradas FOR UPDATE
+  LG->>LG: la parada es de la ruta · PENDIENTE → ENTREGADA solo si la ruta está DESPACHADA
+  LG->>DB: boletas de la parada FOR UPDATE (todas EMITIDAS)
+  LG->>DB: UPDATE parada ENTREGADA (fecha, autor, observación)
+  opt todas las entregas válidas están ENTREGADAS
+    LG->>DB: UPDATE rutas COMPLETADA
+  end
+  LG->>DB: COMMIT
+  LG-->>F: 200 (una entrega parcial deja la ruta DESPACHADA)
