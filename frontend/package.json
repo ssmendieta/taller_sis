@@ -13,6 +13,7 @@
     "test:boletas-consulta": "node --test scripts/boletas-consulta.test.mjs",
     "test:disponibilidad": "node --test scripts/disponibilidad-orden.test.mjs",
     "test:observaciones": "node --test scripts/observaciones-orden.test.mjs",
+    "test:reprocesos": "node --test scripts/reprocesos-orden.test.mjs",
     "test:historial-rutas": "node --test scripts/historial-rutas.test.mjs",
     "test:detalle-ruta-boletas": "node --test scripts/detalle-ruta-boletas.test.mjs",
     "test:integraciones-logistica": "node --test scripts/integraciones-logistica.test.mjs",
