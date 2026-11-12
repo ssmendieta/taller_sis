@@ -8,8 +8,8 @@ exportaciones se regeneran con el comando de la sección 5.
 | Subtarea | Contenido | Carpeta | Estado |
 | --- | --- | --- | --- |
 | ABC-405 | Diagramas de clases de produccion-service y logistica-service | [`clases/`](clases/) | **Hecho** (Andrés) |
-| ABC-406 | Secuencias de integración con Contabilidad e Inventarios | [`secuencia/`](secuencia/) | **Pendiente** (Andrea) |
-| ABC-407 | Secuencias de demanda, rutas y despacho, y escenarios agrupados | [`secuencia/`](secuencia/) (`01` a `08`) | **Hecho** |
+| ABC-406 | Secuencias de integración con Contabilidad e Inventarios | [`secuencia/`](secuencia/) (`09` y `10`) | **Hecho** (Andrea) |
+| ABC-407 | Secuencias de demanda, rutas y despacho, y escenarios agrupados | [`secuencia/`](secuencia/) (`01` a `08`) | **Hecho** (Gemina) |
 
 ---
 
@@ -61,7 +61,7 @@ En los diagramas de clases, cada entidad cuenta con el estereotipo `<<Sprint 2>>
 
 ---
 
-## 2. Secuencias de ABC-407
+## 2. Secuencias de ABC-406 y ABC-407
 
 | N.º | Diagrama | HU | Qué muestra |
 | --- | --- | --- | --- |
@@ -73,6 +73,8 @@ En los diagramas de clases, cada entidad cuenta con el estereotipo `<<Sprint 2>>
 | 06 | [Inicio de orden con verificación de materiales](secuencia/06-produccion-inicio-orden.svg) ([PNG](secuencia/06-produccion-inicio-orden.png), [PDF](secuencia/06-produccion-inicio-orden.pdf)) | ABC-70 | Consulta asíncrona a Inventarios y bloqueo del inicio con faltantes |
 | 07 | [Ejecución de la orden (agrupado)](secuencia/07-produccion-ejecucion.svg) ([PNG](secuencia/07-produccion-ejecucion.png), [PDF](secuencia/07-produccion-ejecucion.pdf)) | ABC-74, ABC-100, ABC-105, ABC-394 | Mermas, observaciones e incidencias, avance y reproceso con saldo defectuoso |
 | 08 | [Historiales y reportes (agrupado)](secuencia/08-consultas-historiales-reportes.svg) ([PNG](secuencia/08-consultas-historiales-reportes.png), [PDF](secuencia/08-consultas-historiales-reportes.pdf)) | ABC-108, ABC-109, ABC-390, ABC-110 | Consultas paginadas de solo lectura, detalle de ruta aislado, vista previa y exportación con los mismos filtros |
+| 09 | [Cierre contable y costos](secuencia/09-contabilidad-cierre-costos.svg) ([PNG](secuencia/09-contabilidad-cierre-costos.png), [PDF](secuencia/09-contabilidad-cierre-costos.pdf)) | ABC-114 | Outbox transaccional de costos, lease de publicación a Pub/Sub, procesamiento externo, inbox transaccional y actualización a CERRADA_CONTABLE |
+| 10 | [Despacho y salida a Inventarios](secuencia/10-inventarios-despacho-salida.svg) ([PNG](secuencia/10-inventarios-despacho-salida.png), [PDF](secuencia/10-inventarios-despacho-salida.pdf)) | ABC-384 | Transacción atómica de despacho y outbox en Logística, publicación a Pub/Sub, validación externa de stock, inbox y actualización de inventario_estado |
 
 ---
 
@@ -84,20 +86,20 @@ En los diagramas de clases, cada entidad cuenta con el estereotipo `<<Sprint 2>>
 | --- | --- | --- | --- | --- |
 | ABC-122 ★ | [S3-01] Recibir demanda por Pub/Sub | 01 | [produccion-service](clases/01-produccion-service.svg) (`Demanda`, `DemandaItem`, `DemandaRechazada`, `EventoInbox`) | — |
 | ABC-130 | [S3-02] Recibir confirmación de demanda | 02 | [produccion-service](clases/01-produccion-service.svg) (`Demanda`, `EventoInbox`) | — |
-| ABC-70 ★ | [S3-03] Verificar materiales antes de iniciar | 06 | [produccion-service](clases/01-produccion-service.svg) (`ConsultaDisponibilidad`, `ConsultaDisponibilidadItem`, `OrdenProduccion`) | Inventarios: pendiente |
+| ABC-70 ★ | [S3-03] Verificar materiales antes de iniciar | 06 | [produccion-service](clases/01-produccion-service.svg) (`ConsultaDisponibilidad`, `ConsultaDisponibilidadItem`, `OrdenProduccion`) | Inventarios: [06](secuencia/06-produccion-inicio-orden.svg) |
 | ABC-74 ★ | [S3-04] Pérdidas de materia prima | 07 | [produccion-service](clases/01-produccion-service.svg) (`PerdidaMateriaPrima`, `OrdenProduccion`, `Material`) | — |
 | ABC-100 | [S3-05] Observaciones e incidencias de la orden | 07 | [produccion-service](clases/01-produccion-service.svg) (`ObservacionOrden`, `OrdenProduccion`) | — |
 | ABC-105 | [S3-06] Consultar avance de la orden | 07 | [produccion-service](clases/01-produccion-service.svg) (`AvancesProduccion`, `OrdenProduccion`) | — |
 | ABC-394 | [S3-07] Reproceso de defectuosas | 07 | [produccion-service](clases/01-produccion-service.svg) (`Reproceso`, `ResultadoConforme`, `OrdenProduccion`) | — |
 | ABC-108 | [S3-08] Historial de producción | 08 | [produccion-service](clases/01-produccion-service.svg) (`HistorialEstadoOrden`, `OrdenProduccion`, `CierreProduccion`) | — |
 | ABC-109 | [S3-09] Reportes de producción | 08 | [produccion-service](clases/01-produccion-service.svg) (`OrdenProduccion`, `AvancesProduccion`, `PerdidaMateriaPrima`, `ConsumoMaterial`) | — |
-| ABC-114 | [S3-10] Consumos y costos a Contabilidad | — | [produccion-service](clases/01-produccion-service.svg) (`CierreProduccion`, `ConsumoMaterial`, `EventoOutbox`) | Contabilidad: pendiente |
+| ABC-114 | [S3-10] Consumos y costos a Contabilidad | 09 | [produccion-service](clases/01-produccion-service.svg) (`CierreProduccion`, `ConsumoMaterial`, `EventoOutbox`, `EventoInbox`) | Contabilidad: [09](secuencia/09-contabilidad-cierre-costos.svg) |
 | ABC-115 | [S3-11] Vehículos y choferes del ERP | 03 (consulta y respaldo) | [logistica-service](clases/02-logistica-service.svg) (`RecursoExternoVehiculo`, `RecursoExternoChofer`, `RecursoExternoSnapshot`) | — |
 | ABC-128 | [S3-12] Priorizar y agrupar solicitudes | 03 | [logistica-service](clases/02-logistica-service.svg) (`GrupoSalida`, `GrupoSolicitud`, `SolicitudSalida`, `SolicitudSalidaItem`) | — |
 | ABC-368 ★ | [S3-13] Asignar vehículo y chofer a una ruta | 03 | [logistica-service](clases/02-logistica-service.svg) (`Ruta`, `RutaParada`, `RecursoExternoVehiculo`, `RecursoExternoChofer`) | — |
 | ABC-374 ★ | [S3-14] Despacho y entrega | 04 | [logistica-service](clases/02-logistica-service.svg) (`Ruta`, `RutaParada`, `RutaParadaBoleta`, `BoletaEnvio`, `BoletaEnvioItem`, `BoletaEnvioHistorial`) | — |
 | ABC-379 | [S3-15] Incidencias y reprogramación | 05 | [logistica-service](clases/02-logistica-service.svg) (`IncidenciaTransporte`, `ReprogramacionRuta`, `Ruta`, `RutaParada`) | — |
-| ABC-384 | [S3-16] Notificar despachos a Inventarios | 04 (evento en el commit) | [logistica-service](clases/02-logistica-service.svg) (`Ruta`, `EventoOutbox`, `BoletaEnvio`) | Inventarios: pendiente |
+| ABC-384 | [S3-16] Notificar despachos a Inventarios | 04, 10 | [logistica-service](clases/02-logistica-service.svg) (`Ruta`, `EventoOutbox`, `EventoInbox`, `BoletaEnvio`) | Inventarios: [10](secuencia/10-inventarios-despacho-salida.svg) |
 | ABC-390 | [S3-17] Historial de rutas y entregas | 08 | [logistica-service](clases/02-logistica-service.svg) (`Ruta`, `RutaParada`, `BoletaEnvioHistorial`, `IncidenciaTransporte`) | — |
 | ABC-110 | [S3-18] Reportes logísticos | 08 | [logistica-service](clases/02-logistica-service.svg) (`Ruta`, `BoletaEnvio`, `IncidenciaTransporte`, `GrupoSalida`) | — |
 | ABC-399 | [S3-19] Despliegue con Docker | No aplica (infraestructura) | No aplica (infraestructura) | — |
@@ -128,7 +130,7 @@ Get-ChildItem *.mmd | ForEach-Object {
 }
 ```
 
-### Diagramas de secuencia (ABC-407)
+### Diagramas de secuencia (ABC-406 y ABC-407)
 Desde `docs/diagramas/sprint-3/secuencia`:
 
 ```powershell

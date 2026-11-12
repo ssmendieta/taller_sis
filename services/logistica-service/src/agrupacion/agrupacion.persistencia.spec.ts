@@ -7,6 +7,7 @@ import { CrearSolicitudesSalida1710000000001 } from '../database/migrations/1710
 import { CrearBoletasEnvio1710000000002 } from '../database/migrations/1710000000002-CrearBoletasEnvio';
 import { ReglaConcurrenciaDocumental1710000000003 } from '../database/migrations/1710000000003-ReglaConcurrenciaDocumental';
 import { HistorialBoletasEnvio1710000000004 } from '../database/migrations/1710000000004-HistorialBoletasEnvio';
+import { ProductoUnidadBoleta1710000000013 } from '../database/migrations/1710000000013-ProductoUnidadBoleta';
 import { CrearRutas1710000000005 } from '../database/migrations/1710000000005-CrearRutas';
 import { EstadosDespachoEntrega1710000000006 } from '../database/migrations/1710000000006-EstadosDespachoEntrega';
 import { CrearRespaldoRecursosLogisticos1710000000007 } from '../database/migrations/1710000000007-CrearRespaldoRecursosLogisticos';
@@ -77,6 +78,7 @@ describeConPostgres('ABC-363: aceptación y regresión de agrupaciones con Postg
         CrearBoletasEnvio1710000000002,
         ReglaConcurrenciaDocumental1710000000003,
         HistorialBoletasEnvio1710000000004,
+        ProductoUnidadBoleta1710000000013,
         CrearRutas1710000000005,
         EstadosDespachoEntrega1710000000006,
         CrearRespaldoRecursosLogisticos1710000000007,

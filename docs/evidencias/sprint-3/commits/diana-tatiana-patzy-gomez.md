@@ -1,0 +1,26 @@
+# Reporte de commits: Diana Tatiana Patzy Gomez
+
+- Autor(es) Git observados: `TatianaPattzy27` (`tpattzyg@gmail.com`).
+- Período por fecha de autor: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz` (UTC−4).
+- Fuente: unión sin duplicar SHA de `origin/develop` (`b4ee381c`) y `RamaSergio` (`78d48af1`).
+- Se excluyen merges y cambios sin commit. Los mensajes sin clave Jira quedan sin asociación inferida. Validación individual de autoría: pendiente.
+- Commits incluidos: **16** (16 en origin/develop; 0 exclusivamente locales al corte).
+
+| Fecha y hora (UTC−4) | SHA | Jira | Mensaje del commit |
+| --- | --- | --- | --- |
+| 2026-11-05T23:27:45-04:00 | [8fef6c06f818](https://github.com/ssmendieta/taller_sis/commit/8fef6c06f818ea1c17fd87c540cd7e390931d215) | [ABC-314](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-314) | feat(ABC-314): crear entidad y migracion de perdida de materia prima |
+| 2026-11-05T23:31:51-04:00 | [0628f49a0777](https://github.com/ssmendieta/taller_sis/commit/0628f49a0777d3a47571ddda4b0b3867d1ba6532) | [ABC-315](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-315) | feat(ABC-315): crear endpoints para registrar y listar perdidas de materia prima |
+| 2026-11-05T23:41:59-04:00 | [f27ba4ccd20f](https://github.com/ssmendieta/taller_sis/commit/f27ba4ccd20fa0b542ddc7e2fee51abaa51cb08f) | [ABC-316](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-316) | feat(ABC-316): agregar formulario y listado de perdidas en la orden |
+| 2026-11-05T23:48:40-04:00 | [eb024e7fb503](https://github.com/ssmendieta/taller_sis/commit/eb024e7fb503a5c7c28b27eced6a7d5999761277) | [ABC-350](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-350) | feat(ABC-350): definir contrato v1 de recursos logisticos con el ERP |
+| 2026-11-05T23:53:30-04:00 | [1888a26fa8ab](https://github.com/ssmendieta/taller_sis/commit/1888a26fa8ab40848bd80fe0980e9ba6c1dd5759) | [ABC-351](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-351) | feat(ABC-351): crear cliente del ERP de recursos con timeout, reintentos y validacion |
+| 2026-11-06T00:07:55-04:00 | [8ef9d4499f5a](https://github.com/ssmendieta/taller_sis/commit/8ef9d4499f5a041f4e9debd598d694954b2774c4) | [ABC-353](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-353) | feat(ABC-353): exponer consulta de recursos logisticos con filtros y pantalla de seleccion |
+| 2026-11-06T17:22:11-04:00 | [be32743bf719](https://github.com/ssmendieta/taller_sis/commit/be32743bf719985c70e4520457f1bf1bd59f3721) | [ABC-376](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-376) | feat(ABC-376): registrar despacho y entrega de rutas con observacion |
+| 2026-11-06T17:31:53-04:00 | [204ae627acae](https://github.com/ssmendieta/taller_sis/commit/204ae627acae9474cfb60e17cbe1ef7b1fd21c2f) | [ABC-377](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-377) | feat(ABC-377): agregar pantalla de despacho y entrega por parada en el detalle de ruta |
+| 2026-11-06T17:39:52-04:00 | [bf7eb0367a16](https://github.com/ssmendieta/taller_sis/commit/bf7eb0367a16015fa78d19ee0b4938c1224349b1) | [ABC-380](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-380) | feat(ABC-380): crear entidad de incidencia de transporte e historial de reprogramaciones con migracion |
+| 2026-11-06T17:56:42-04:00 | [912b21725172](https://github.com/ssmendieta/taller_sis/commit/912b217251723cf8f44c7341234fadff5ae45c73) | [ABC-382](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-382) | feat(ABC-382): agregar formulario e historial de incidencias y reprogramaciones en el detalle de ruta |
+| 2026-11-06T18:07:33-04:00 | [28a427a6f9bd](https://github.com/ssmendieta/taller_sis/commit/28a427a6f9bdfdaf84b0c278f5df418e938db636) | [ABC-371](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-371) | feat(ABC-371): validar disponibilidad, solapamientos y capacidad al asignar vehiculo y chofer a una ruta |
+| 2026-11-06T18:16:52-04:00 | [d7a0f2ecae08](https://github.com/ssmendieta/taller_sis/commit/d7a0f2ecae088f8836b3d4656df4182166631231) | [ABC-340](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-340) | feat(ABC-340): crear endpoint de datos del reporte logistico con totales por ruta y boleta |
+| 2026-11-06T18:34:45-04:00 | [adae499b88e9](https://github.com/ssmendieta/taller_sis/commit/adae499b88e97b82d5db8b4e5c3ed9cc308fae12) | [ABC-408](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-408) | docs(ABC-408): preparar paquete de evidencias del Sprint 3 y guion de demo de 20 minutos |
+| 2026-11-08T00:29:31-04:00 | [8b5427d8a412](https://github.com/ssmendieta/taller_sis/commit/8b5427d8a412304ca141a06d834ac37ec317348a) | [ABC-367](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-367) | test(ABC-367): verificar criterios de aceptacion y regresion de confirmacion de demanda |
+| 2026-11-11T21:42:07-04:00 | [289131a20f4a](https://github.com/ssmendieta/taller_sis/commit/289131a20f4aa1b664e12814e1048534441d6616) | [ABC-398](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-398) | test(ABC-398): verificar criterios de aceptacion y regresion de reprocesos |
+| 2026-11-11T21:51:28-04:00 | [afcd48ae0569](https://github.com/ssmendieta/taller_sis/commit/afcd48ae05691b156aa05dac97aff2a376f5ca20) | [ABC-335](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-335) | test(ABC-335): verificar criterios de aceptacion y regresion del historial de produccion |
