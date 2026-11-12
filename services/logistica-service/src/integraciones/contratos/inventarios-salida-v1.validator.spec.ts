@@ -55,6 +55,7 @@ describe('ABC-385: SalidaInventarioResultado.v1', () => {
   });
 
   it.each([
+    ['fuente distinta de Inventarios', (e: any) => { e.source = 'logistica-service'; }, 'source'],
     ['estado desconocido', (e: any) => { e.data.estado = 'APROBADA'; }, 'data.estado'],
     ['rechazo sin código', (e: any) => { e.data.estado = 'RECHAZADA'; }, 'data.codigoRechazo'],
     ['aceptada con código', (e: any) => { e.data.codigoRechazo = 'X'; }, 'data.codigoRechazo'],

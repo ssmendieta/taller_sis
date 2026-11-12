@@ -14,6 +14,7 @@ export interface EventoPubSubV1<T> {
 export const DESPACHO_RUTA_REGISTRADO_V1 = 'DespachoRutaRegistrado.v1' as const;
 export const SALIDA_INVENTARIO_RESULTADO_V1 = 'SalidaInventarioResultado.v1' as const;
 export const FUENTE_LOGISTICA = 'logistica-service' as const;
+export const FUENTE_INVENTARIOS = 'inventarios-service' as const;
 
 export interface ItemSalidaV1 {
   loteReferencia: string;
@@ -84,7 +85,7 @@ export const SALIDA_INVENTARIO_RESULTADO_V1_EJEMPLO: SalidaInventarioResultadoV1
   eventId: '0e1f2a3b-4c5d-4e6f-8a9b-0c1d2e3f4a5b',
   eventType: SALIDA_INVENTARIO_RESULTADO_V1,
   occurredAt: '2026-11-12T14:00:05.000Z',
-  source: 'inventarios-service',
+  source: FUENTE_INVENTARIOS,
   correlationId: DESPACHO_RUTA_REGISTRADO_V1_EJEMPLO.correlationId,
   data: {
     rutaId: '9',

@@ -1,6 +1,7 @@
 import {
   DESPACHO_RUTA_REGISTRADO_V1,
   DespachoRutaRegistradoV1Event,
+  FUENTE_INVENTARIOS,
   FUENTE_LOGISTICA,
   SALIDA_INVENTARIO_RESULTADO_V1,
   SalidaInventarioResultadoV1Event,
@@ -91,6 +92,9 @@ export function validarDespachoRutaRegistradoV1(value: unknown): DespachoRutaReg
 export function validarSalidaInventarioResultadoV1(value: unknown): SalidaInventarioResultadoV1Event {
   const errores: ErrorValidacionSalidaV1[] = [];
   const data = sobre(value, SALIDA_INVENTARIO_RESULTADO_V1, errores);
+  if (esObjeto(value) && value.source !== FUENTE_INVENTARIOS) {
+    errores.push({ campo: 'source', motivo: `debe ser ${FUENTE_INVENTARIOS}` });
+  }
   if (typeof data.rutaId !== 'string' || !ID.test(data.rutaId)) errores.push({ campo: 'data.rutaId', motivo: 'debe ser un id positivo en texto' });
   if (typeof data.requestEventId !== 'string' || !UUID.test(data.requestEventId)) errores.push({ campo: 'data.requestEventId', motivo: 'debe ser un UUID' });
   if (data.estado !== 'ACEPTADA' && data.estado !== 'RECHAZADA') errores.push({ campo: 'data.estado', motivo: 'debe ser ACEPTADA o RECHAZADA' });
