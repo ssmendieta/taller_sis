@@ -1,0 +1,62 @@
+%% ABC-406 · ABC-114 (S3-10) — Integración con Contabilidad: Cierre de producción y costos (ABC-345/346/347/348/349)
+sequenceDiagram
+  autonumber
+  actor O as Operario / Supervisor
+  participant F as Frontend (OrdenDetallePage)
+  participant P as produccion-service
+  participant DB as produccion_db (PostgreSQL)
+  participant OB as EventosOutbox (produccion_db)
+  participant PUB as OutboxPublicadorService
+  participant PS as Google Cloud Pub/Sub
+  participant C as Contabilidad (Servicio Externo)
+  participant SUB as PubSubContabilidadConsumerService
+  participant IB as EventosInbox (produccion_db)
+
+  Note over O,IB: Fase 1: Transacción atómica de negocio y registro en Outbox (ABC-345 / ABC-346)
+  O->>F: Confirmar cierre de orden de producción
+  F->>P: POST /api/produccion/ordenes/:id/cierre
+  P->>DB: BEGIN transacción
+  P->>DB: SELECT ordenes FOR UPDATE (verifica estado FINALIZADA)
+  P->>P: calcularCostoBase(ordenId, consumos, materiales) acumulado
+  P->>DB: INSERT cierres_produccion (orden_id, costo_base, consumos, estado_contable PENDIENTE)
+  P->>OB: INSERT eventos_outbox (eventId A, ProduccionCerrada.v1, correlationId C, payload inmutable, estado PENDIENTE)
+  P->>DB: COMMIT (cierre y outbox en el mismo commit atómico)
+  P-->>F: 201 Created (cierre registrado con snapshot de costos)
+
+  Note over PUB,PS: Fase 2: Publicación confiable desacoplada vía Outbox (ABC-347 / ABC-349)
+  PUB->>OB: SELECT eventos_outbox FOR UPDATE (lease transaccional PROCESANDO)
+  PUB->>PS: Publica ProduccionCerrada.v1 (topic PUBSUB_TOPIC_ID, eventId A, correlationId C)
+  alt Broker confirma recepción
+    PS-->>PUB: messageId de Google
+    PUB->>OB: UPDATE eventos_outbox SET estado = PUBLICADO, messageId, publicado_en = NOW()
+  else Fallo de conexión o timeout
+    PUB->>OB: UPDATE eventos_outbox SET estado = PENDIENTE, reintentos++, proximo_intento (backoff)
+    Note over PUB,PS: Reintento conserva estrictamente el mismo eventId A y payload inmutable
+  end
+
+  Note over PS,C: Fase 3: Procesamiento en el dominio contable externo
+  PS->>C: Entrega mensaje ProduccionCerrada.v1 (at-least-once)
+  C->>C: Asiento contable de costos de producción y mano de obra
+  C->>PS: Publica RegistroContableResultado.v1 (correlationId C, requestEventId A, eventId B)
+
+  Note over SUB,IB: Fase 4: Consumo asíncrono e idempotencia con Inbox transaccional (ABC-348 / ABC-349)
+  PS->>SUB: Entrega RegistroContableResultado.v1 (al menos una vez)
+  SUB->>SUB: Valida contrato v1 (contabilidad-v1.validator.ts)
+  alt Payload no es JSON o esquema inválido
+    SUB->>SUB: Registra error permanente (RESULTADO_CONTABLE_RECHAZADO)
+    SUB->>PS: ACK inmediato (sin bucle infinito de reintentos)
+  else Evento válido
+    SUB->>DB: BEGIN transacción
+    SUB->>IB: SELECT eventos_inbox WHERE event_id = B
+    alt Mensaje duplicado ya recibido
+      SUB->>DB: ROLLBACK (sin cambios en datos)
+      SUB->>PS: ACK (idempotencia garantizada)
+    else Mensaje nuevo
+      SUB->>DB: SELECT cierres_produccion WHERE orden_id = C FOR UPDATE
+      SUB->>DB: UPDATE cierres_produccion SET estado_contable = ACEPTADA | RECHAZADA, resultado_contable_event_id = B, resultado_contable_en = NOW()
+      SUB->>IB: INSERT eventos_inbox (eventId B, correlationId C, PROCESADO)
+      SUB->>DB: COMMIT
+      SUB->>PS: ACK solo después del COMMIT exitoso
+    end
+  end
+  Note over SUB,PS: Ante caída transitoria de base de datos: NACK y Pub/Sub reentrega sin pérdida

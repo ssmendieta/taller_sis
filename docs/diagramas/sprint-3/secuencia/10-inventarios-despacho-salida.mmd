@@ -1,0 +1,67 @@
+%% ABC-406 · ABC-384 (S3-16) — Integración con Inventarios: Notificar despacho y salida (ABC-385/386/387/388/389)
+sequenceDiagram
+  autonumber
+  actor L as Encargado de Logística
+  participant F as Frontend (RutaDetallePage)
+  participant LG as logistica-service
+  participant DB as logistica_db (PostgreSQL)
+  participant OB as EventosOutbox (logistica_db)
+  participant PUB as OutboxPublicadorLogisticaService
+  participant PS as Google Cloud Pub/Sub
+  participant I as Inventarios / Almacén (Servicio Externo)
+  participant SUB as PubSubResultadoSalidaConsumer
+  participant IB as EventosInbox (logistica_db)
+
+  Note over L,IB: Fase 1: Transacción atómica de despacho y registro en Outbox (ABC-385 / ABC-386)
+  L->>F: Confirmar despacho de ruta con boletas
+  F->>LG: POST /api/logistica/rutas/:id/despacho
+  LG->>DB: BEGIN transacción
+  LG->>DB: SELECT rutas FOR UPDATE · SELECT paradas FOR UPDATE · SELECT boletas FOR UPDATE
+  LG->>LG: Valida máquina de estados: PLANIFICADA → DESPACHADA (boletas EMITIDAS)
+  LG->>DB: UPDATE rutas SET estado = 'DESPACHADA', fecha_salida_real = NOW(), inventario_estado = 'PENDIENTE'
+  LG->>OB: INSERT eventos_outbox (eventId A, inventarios.salida.v1, correlationId C, items_despacho, estado PENDIENTE)
+  LG->>DB: COMMIT (cambio de estado de ruta y outbox en el mismo commit)
+  LG-->>F: 200 OK (Ruta DESPACHADA, salida registrada)
+
+  Note over PUB,PS: Fase 2: Publicación confiable desacoplada vía Outbox (ABC-386 / ABC-388)
+  PUB->>OB: SELECT eventos_outbox FOR UPDATE (lease transaccional PROCESANDO)
+  PUB->>PS: Publica DespachoRutaRegistrado.v1 (topic PUBSUB_LOGISTICA_TOPIC_ID, eventId A, correlationId C)
+  alt Broker confirma publicación
+    PS-->>PUB: messageId de Google
+    PUB->>OB: UPDATE eventos_outbox SET estado = PUBLICADO, messageId, publicado_en = NOW()
+  else Fallo transitorio o desconexión
+    PUB->>OB: UPDATE eventos_outbox SET estado = PENDIENTE, reintentos++, proximo_intento (backoff)
+    Note over PUB,PS: Reintento conserva estrictamente el mismo eventId A y payload inmutable
+  end
+
+  Note over PS,I: Fase 3: Procesamiento en el dominio de Inventarios / Almacén
+  PS->>I: Entrega evento DespachoRutaRegistrado.v1 (at-least-once)
+  I->>I: Valida disponibilidad física de lotes y stock reservado
+  alt Stock físico suficiente en almacén
+    I->>I: Registra salida de almacén y decrementa stock
+    I->>PS: Publica SalidaInventarioResultado.v1 (resultado: ACEPTADA, correlationId C, requestEventId A, eventId B)
+  else Discrepancia o faltante en almacén
+    I->>PS: Publica SalidaInventarioResultado.v1 (resultado: RECHAZADA, motivo: 'Stock no disponible', correlationId C, requestEventId A, eventId B)
+  end
+
+  Note over SUB,IB: Fase 4: Consumo asíncrono e idempotencia con Inbox transaccional (ABC-387 / ABC-388)
+  PS->>SUB: Entrega SalidaInventarioResultado.v1 (al menos una vez)
+  SUB->>SUB: Valida contrato v1 y origen del resultado de inventarios
+  alt Payload no es JSON o esquema inválido
+    SUB->>SUB: Registra advertencia permanente (RESULTADO_INVENTARIO_RECHAZADO)
+    SUB->>PS: ACK inmediato (sin bucle de reintentos)
+  else Evento válido
+    SUB->>DB: BEGIN transacción
+    SUB->>IB: SELECT eventos_inbox WHERE event_id = B
+    alt Mensaje duplicado ya recibido
+      SUB->>DB: ROLLBACK (sin cambios en datos)
+      SUB->>PS: ACK (idempotencia garantizada)
+    else Mensaje nuevo
+      SUB->>DB: SELECT rutas WHERE id = C FOR UPDATE
+      SUB->>DB: UPDATE rutas SET inventario_estado = ACEPTADA | RECHAZADA (ABC-387)
+      SUB->>IB: INSERT eventos_inbox (eventId B, correlationId C, PROCESADO)
+      SUB->>DB: COMMIT
+      SUB->>PS: ACK solo después del COMMIT exitoso
+    end
+  end
+  Note over SUB,PS: Ante fallo transitorio de PostgreSQL: NACK y Pub/Sub reentrega sin pérdida
