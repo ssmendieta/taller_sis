@@ -40,17 +40,7 @@ function validar({ fecha, capacidadMinima }) {
 
 function Vigencia({ resultado }) {
   const generado = fechaHora(resultado.generadoEn);
-  if (resultado.origen === "RESPALDO") {
-    return (
-      <div className="recursos-vigencia recursos-vigencia--respaldo" role="alert">
-        <span className="ts-badge ts-badge--INSUFICIENTE">Copia de respaldo</span>
-        <p>
-          {resultado.aviso.mensaje} Copia sincronizada el {fechaHora(resultado.sincronizadoEn)} (datos generados por el
-          ERP el {generado}). Verifica la disponibilidad antes de confirmar la ruta.
-        </p>
-      </div>
-    );
-  }
+  if (resultado.origen === "RESPALDO") return null;
   return (
     <div className="recursos-vigencia recursos-vigencia--erp" role="status">
       <span className="ts-badge ts-badge--DISPONIBLE">Datos del ERP</span>
