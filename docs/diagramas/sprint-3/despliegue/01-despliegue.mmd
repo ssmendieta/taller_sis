@@ -1,0 +1,43 @@
+flowchart TB
+    U["«device» Navegador"]
+    subgraph H["«device» Host Docker"]
+        direction TB
+        subgraph N["«network» Docker Compose"]
+            direction TB
+            F["«container» frontend:5173"]
+            G["«container» api-gateway:3000"]
+            A["«container» auth-service:3001"]
+            P["«container» produccion-service:3002"]
+            L["«container» logistica-service:3003"]
+            D["«container» PostgreSQL:5432"]
+        end
+        V["«volume» pgdata"]
+    end
+    subgraph C["«cloud» Google Cloud"]
+        B["«service» Pub/Sub"]
+    end
+    subgraph E["«external» Sistemas de información"]
+        S["SI Ventas"]
+        I["SI Inventarios"]
+        T["SI Contabilidad"]
+        R["ERP de vehículos y choferes"]
+    end
+
+    U -->|"HTTP 5173: recursos web"| F
+    U -->|"HTTP 3000: solicitudes API"| G
+    G -->|"HTTP 3001: autenticación"| A
+    G -->|"HTTP 3002: producción"| P
+    G -->|"HTTP 3003: logística"| L
+    P -->|"HTTP: validar sesión"| A
+    L -->|"HTTP: validar sesión"| A
+    L -->|"HTTP: productos y lotes"| P
+    A -->|"SQL: auth_db"| D
+    P -->|"SQL: produccion_db"| D
+    L -->|"SQL: logistica_db"| D
+    D --- V
+    P <-->|"Mensajes asíncronos"| B
+    L <-->|"Mensajes asíncronos"| B
+    S -->|"Demanda y confirmación"| B
+    B <-->|"Materiales y salidas"| I
+    B <-->|"Cierre y resultado contable"| T
+    L -->|"HTTP: consulta de recursos"| R
