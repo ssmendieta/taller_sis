@@ -33,7 +33,8 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
-import { PERMISO_CONSULTAR_RECURSOS } from "../services/logisticaService.js";
+import { PERMISO_CONSULTAR_RECURSOS, PERMISO_GESTIONAR_RUTAS } from "../services/logisticaService.js";
+import RutasPage from "../pages/RutasPage.jsx";
 
 const privada = (pagina, permisos) => (
   <ProtectedRoute permisos={permisos}>{pagina}</ProtectedRoute>
@@ -217,6 +218,11 @@ export default function AppRoutes() {
         <Route
           path="/logistica/recursos"
           element={privada(<RecursosLogisticosPage />, [PERMISO_CONSULTAR_RECURSOS])}
+        />
+        {/* ABC-372: planificar y editar rutas antes del despacho. */}
+        <Route
+          path="/logistica/planificacion"
+          element={privada(<RutasPage />, [PERMISO_GESTIONAR_RUTAS])}
         />
         <Route
           path="/logistica/dashboard"

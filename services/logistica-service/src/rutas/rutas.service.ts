@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { GrupoSalida } from '../agrupacion/entities/grupo-salida.entity';
@@ -13,6 +13,14 @@ import { ValidacionAsignacionService } from './validaciones/validacion-asignacio
 // Una boleta solo puede viajar en una ruta que todavía no terminó.
 const ESTADOS_RUTA_ACTIVOS = [EstadoRuta.PLANIFICADA, EstadoRuta.DESPACHADA];
 const MAX_BIGINT = BigInt('9223372036854775807');
+
+export interface BoletaDisponible {
+  id: string;
+  numero: string;
+  solicitudSalidaId: string;
+  productoCodigo: string | null;
+  unidad: string | null;
+}
 
 function idValido(id: string): boolean {
   return /^\d+$/.test(id) && BigInt(id) >= BigInt('1') && BigInt(id) <= MAX_BIGINT;
@@ -85,6 +93,28 @@ export class RutasService {
       relations: { paradas: { boletas: true } },
       order: { fechaProgramada: 'DESC', id: 'DESC', paradas: { secuencia: 'ASC' } },
     });
+  }
+
+  // ABC-372: boletas EMITIDAS que ninguna ruta activa tiene. Con `rutaId` también
+  // se incluyen las de esa ruta, para poder editarla sin perder sus boletas.
+  async findBoletasDisponibles(rutaId: string | null = null): Promise<BoletaDisponible[]> {
+    if (rutaId !== null && !idValido(rutaId)) throw new BadRequestException('rutaId debe ser un identificador válido');
+    return this.dataSource.query(
+      `SELECT boleta.id::text AS id, boleta.numero, boleta.solicitud_salida_id::text AS "solicitudSalidaId",
+              boleta.producto_codigo AS "productoCodigo", boleta.unidad
+         FROM boletas_envio boleta
+        WHERE boleta.estado = $1
+          AND NOT EXISTS (
+            SELECT 1
+              FROM rutas_paradas_boletas documento
+              INNER JOIN rutas_paradas parada ON parada.id = documento.parada_id
+              INNER JOIN rutas ruta ON ruta.id = parada.ruta_id
+             WHERE documento.boleta_id = boleta.id
+               AND ruta.estado = ANY($2::varchar[])
+               AND ($3::bigint IS NULL OR ruta.id <> $3::bigint))
+        ORDER BY boleta.id DESC`,
+      [EstadoBoleta.EMITIDA, ESTADOS_RUTA_ACTIVOS, rutaId],
+    );
   }
 
   async findOne(id: string): Promise<Ruta> {

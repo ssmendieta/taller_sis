@@ -8,7 +8,7 @@ import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
-import { PERMISO_CONSULTAR_RECURSOS } from "../services/logisticaService.js";
+import { PERMISO_CONSULTAR_RECURSOS, PERMISO_GESTIONAR_RUTAS } from "../services/logisticaService.js";
 import "../styles/layout.css";
 
 const iconos = {
@@ -46,6 +46,7 @@ export default function MainLayout({ children }) {
   const puedeBoletas = tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS);
   const puedeRutas = tienePermiso(usuario, PERMISO_CONSULTAR_RUTAS);
   const puedeRecursos = tienePermiso(usuario, PERMISO_CONSULTAR_RECURSOS);
+  const puedePlanificar = tienePermiso(usuario, PERMISO_GESTIONAR_RUTAS);
   const puedeSalidas = tienePermiso(usuario, PERMISO_CONSULTAR_SOLICITUDES) || tienePermiso(usuario, PERMISO_GESTIONAR_SOLICITUDES);
   const activo = (path) => {
     if (path === "/ordenes") return location.pathname === "/ordenes" || location.pathname.startsWith("/ordenes/") ? "active" : "";
@@ -53,6 +54,7 @@ export default function MainLayout({ children }) {
     if (path === "/demandas") return location.pathname.startsWith("/demandas") ? "active" : "";
     if (path === "/logistica/rutas/historial") return location.pathname.startsWith("/logistica/rutas") ? "active" : "";
     if (path === "/logistica/boletas") return location.pathname.startsWith("/logistica/boletas") ? "active" : "";
+    if (path === "/logistica/planificacion") return location.pathname.startsWith("/logistica/planificacion") ? "active" : "";
     if (path === "/logistica/recursos") return location.pathname.startsWith("/logistica/recursos") ? "active" : "";
     return location.pathname === path ? "active" : "";
   };
@@ -78,6 +80,7 @@ export default function MainLayout({ children }) {
           {puedeSalidas && <Link className={activo("/logistica/inicio")} to="/logistica/inicio" onClick={() => setAbierto(false)}><IconoNavegacion nombre="solicitudes" />Solicitudes de salida</Link>}
           {puedeBoletas && <Link className={activo("/logistica/boletas")} to="/logistica/boletas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="boletas" />Boletas</Link>}
           {puedeRutas && <Link className={activo("/logistica/dashboard")} to="/logistica/dashboard" onClick={() => setAbierto(false)}><IconoNavegacion nombre="tablero" />Tablero logístico</Link>}
+          {puedePlanificar && <Link className={activo("/logistica/planificacion")} to="/logistica/planificacion" onClick={() => setAbierto(false)}><IconoNavegacion nombre="rutas" />Planificar ruta</Link>}
           {puedeRutas && <Link className={activo("/logistica/rutas/historial")} to="/logistica/rutas/historial" onClick={() => setAbierto(false)}><IconoNavegacion nombre="rutas" />Historial de rutas</Link>}
           {puedeRutas && <Link className={activo("/logistica/reportes")} to="/logistica/reportes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="boletas" />Reportes logísticos</Link>}
           {puedeRecursos && <Link className={activo("/logistica/recursos")} to="/logistica/recursos" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recursos" />Recursos logísticos</Link>}
