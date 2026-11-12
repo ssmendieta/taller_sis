@@ -7,9 +7,9 @@ dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 dotenv.config();
 
 const MATERIALES = [
-  { codigo: 'HAR-001', nombre: 'Harina de trigo', unidad: 'kg', stock: 100 },
+  { codigo: 'HAR-001', nombre: 'Harina de trigo', unidad: 'kg', stock: 100, costo: '8.5000' },
   { codigo: 'AZU-001', nombre: 'Azúcar', unidad: 'kg', stock: 5 },
-  { codigo: 'MAN-001', nombre: 'Manteca', unidad: 'kg', stock: 50 },
+  { codigo: 'MAN-001', nombre: 'Manteca', unidad: 'kg', stock: 50, costo: '22.0000' },
 ];
 
 async function main() {
@@ -31,6 +31,11 @@ async function main() {
          VALUES ($1, $2, $3, TRUE)
          ON CONFLICT (codigo) DO UPDATE SET nombre = EXCLUDED.nombre, unidad_medida = EXCLUDED.unidad_medida`,
         [m.codigo, m.nombre, m.unidad],
+      );
+      // ABC-345: AZU-001 queda sin precio a proposito para demostrar costo PENDIENTE.
+      await client.query(
+        'UPDATE materiales SET costo_unitario = $2 WHERE codigo = $1',
+        [m.codigo, m.costo ?? null],
       );
       await client.query(
         `INSERT INTO inventario_material (material_id, cantidad_disponible, actualizado_en)

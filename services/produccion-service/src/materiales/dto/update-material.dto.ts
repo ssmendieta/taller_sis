@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 import { CreateMaterialDto } from './create-material.dto';
 import { CODIGOS_UNIDADES } from '../../unidades/unidades.catalogo';
@@ -30,5 +30,12 @@ export class UpdateMaterialDto {
   })
   @MaxLength(40)
   unidadMedida?: CreateMaterialDto['unidadMedida'];
+
+  @IsOptional()
+  @IsString({ message: 'costoUnitario debe ser un texto decimal' })
+  @Matches(/^\d{1,10}(\.\d{1,4})?$/, {
+    message: 'costoUnitario debe ser un decimal no negativo con hasta 4 decimales',
+  })
+  costoUnitario?: CreateMaterialDto['costoUnitario'];
 
 }

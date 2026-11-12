@@ -104,6 +104,63 @@ El consumidor valida los atributos `eventId`, `eventType` y `correlationId`
 contra el JSON. Hace ACK después del commit; hace ACK y log para errores
 permanentes, y NACK para fallos transitorios.
 
+## Costos base por orden (ABC-345)
+
+Contabilidad y Almacén no existen como sistemas reales en este proyecto: no hay un
+equipo externo con quien acordar el contrato, así que **el proyecto define la fuente
+de costos**. Es una definición interna de referencia, no un precio contable.
+
+| Decisión | Valor definido |
+| --- | --- |
+| Fuente de precios | Catálogo de materiales de Producción (`materiales.costo_unitario`, nullable) |
+| Moneda | `BOB` (restricción `ck_materiales_moneda_costo`) |
+| Precisión | Texto decimal con 4 posiciones, como las cantidades; `NUMERIC(14,4)` en BD |
+| Redondeo | Half-up a 4 decimales, con enteros escalados (`BigInt`), nunca `number` |
+| Unidad | El precio aplica solo a consumos en la unidad del material; otra unidad (p. ej. `g` frente a `kg`) queda PENDIENTE, sin conversión |
+
+### Ampliación de `ProduccionCerrada.v1` (aditiva y opcional)
+
+Cada consumo agrega `estadoCosto` (`CALCULADO` | `PENDIENTE`) y, solo si es
+`CALCULADO`, `costoUnitario` y `costoTotal`. El evento agrega `costoBase`:
+`{ moneda: "BOB", fuentePrecios: "CATALOGO_MATERIALES", estado, total? }`, con
+`estado` `COMPLETO` (todos calculados; incluye `total`), `PARCIAL` o `PENDIENTE` (sin
+`total`: nunca se informa un total parcial). Un cierre sin consumos es `COMPLETO` con
+total `0.0000`. Los consumidores v1 ignoran los campos nuevos; los eventos anteriores
+no los traen y siguen siendo válidos. Un cambio incompatible requeriría `.v2`.
+
+Si falta el precio, **no se inventa ningún importe**: el consumo queda `PENDIENTE`.
+
+### Trazabilidad e inmutabilidad
+
+Los consumos del evento se copian del snapshot inmutable de cierre (misma
+`cantidad`, `unidad` y material) y se ligan por `cierreId`/`cierreVersion`/`resumenId`.
+El snapshot **no se modifica** ni se reescribe: `cierres_produccion` conserva solo
+cantidades. Los precios se leen del catálogo dentro de la misma transacción del cierre
+y el costo queda congelado únicamente en el payload del outbox (los reintentos
+conservan el mismo contenido aunque el precio cambie después). Snapshots y eventos
+anteriores a ABC-345 no se recalculan.
+
+### Estado de la implementación
+
+- Implementado: migración 29 (`costo_unitario`, `moneda_costo`), campo opcional
+  `costoUnitario` en `POST/PUT /materiales`, cálculo (`calcular-costo-base.ts`),
+  ampliación del contrato, `validarCostoBaseProduccionCerradaV1` y seed demo
+  (HAR-001 y MAN-001 con precio; AZU-001 sin precio, para mostrar `PENDIENTE`).
+- Pendiente: integración con un sistema de Contabilidad real (no existe), historial
+  de precios con vigencia, conversión entre unidades, otras monedas y que el
+  consumidor valide el contrato ampliado. La mensajería real en Docker
+  corresponde a ABC-399, no a esta subtarea.
+
+### Cómo se valida
+
+- `cd services/produccion-service && npx jest src/integraciones src/cierre-produccion src/materiales`
+  (pruebas unitarias del cálculo, generador y validador; son simuladas, sin broker).
+- `CIERRE_DB_REAL=1 npx jest src/cierre-produccion/cierre-produccion.persistencia.spec.ts`
+  con PostgreSQL real en un esquema aislado: el payload del outbox trae costos, los
+  consumos sin precio o en otra unidad quedan `PENDIENTE` y el snapshot no cambia.
+- Para el demo: `npm run migration:run` y `npm run seed:demo`; luego cerrar una orden y
+  revisar `eventos_outbox.payload`.
+
 ## Reglas de versión e idempotencia
 
 - `eventType` termina en `.v1`; un cambio incompatible requiere `.v2`.

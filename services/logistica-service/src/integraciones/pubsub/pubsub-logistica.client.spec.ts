@@ -34,4 +34,28 @@ describe('ABC-386: publicador de Logística', () => {
     const apagado = new PubSubLogisticaPublisher(loadPubSubLogisticaConfig({}), null);
     await expect(apagado.publicar(DESPACHO_RUTA_REGISTRADO_V1_EJEMPLO)).rejects.toThrow('deshabilitada');
   });
+
+  it('reutiliza los recursos Pub/Sub compartidos cuando Logistica no tiene recursos exclusivos', () => {
+    const compartida = loadPubSubLogisticaConfig({
+      GCP_PROJECT_ID: 'p',
+      PUBSUB_TOPIC_ID: 'topic-compartido',
+      PUBSUB_SUBSCRIPTION_ID: 'suscripcion-compartida',
+      LOGISTICA_PUBSUB_SALIDA_TOPIC_ID: ' ',
+      LOGISTICA_PUBSUB_RESULTADO_SUBSCRIPTION_ID: '',
+      LOGISTICA_PUBSUB_ENABLED: 'true',
+      LOGISTICA_PUBSUB_RESULTADO_CONSUMER_ENABLED: 'true',
+    });
+
+    expect(compartida.publicacion.topicId).toBe('topic-compartido');
+    expect(compartida.resultado.subscriptionId).toBe('suscripcion-compartida');
+  });
+
+  it('prioriza los recursos exclusivos de Logistica cuando estan configurados', () => {
+    const exclusiva = config({
+      PUBSUB_TOPIC_ID: 'topic-compartido',
+      LOGISTICA_PUBSUB_SALIDA_TOPIC_ID: 'topic-logistica',
+    });
+
+    expect(exclusiva.publicacion.topicId).toBe('topic-logistica');
+  });
 });

@@ -133,6 +133,67 @@ export function validarRegistroContableResultadoV1(value: unknown): RegistroCont
   return value as unknown as RegistroContableResultadoV1Event;
 }
 
+const MONTO = /^\d+\.\d{4}$/;
+
+// ABC-345: valida solo la ampliacion de costos. Los eventos anteriores, sin
+// costoBase ni campos de costo en los consumos, siguen siendo validos.
+export function validarCostoBaseProduccionCerradaV1(value: unknown): ProduccionCerradaV1Event {
+  const errores: ErrorValidacionContabilidadV1[] = [];
+  if (!esObjeto(value) || value.eventType !== PRODUCCION_CERRADA_V1 || !esObjeto(value.data)) {
+    throw error(value, [{ campo: '$', motivo: 'debe ser un ProduccionCerrada.v1' }]);
+  }
+  const data = value.data;
+  const consumos = Array.isArray(data.consumos) ? data.consumos : [];
+  let calculados = 0;
+  consumos.forEach((consumo, i) => {
+    if (!esObjeto(consumo)) return;
+    const campo = `data.consumos[${i}]`;
+    if (consumo.estadoCosto === undefined) {
+      for (const k of ['costoUnitario', 'costoTotal']) {
+        if (consumo[k] !== undefined) errores.push({ campo: `${campo}.${k}`, motivo: 'requiere estadoCosto' });
+      }
+    } else if (consumo.estadoCosto === 'CALCULADO') {
+      calculados += 1;
+      for (const k of ['costoUnitario', 'costoTotal']) {
+        if (typeof consumo[k] !== 'string' || !MONTO.test(consumo[k] as string)) {
+          errores.push({ campo: `${campo}.${k}`, motivo: 'debe ser decimal con 4 posiciones' });
+        }
+      }
+    } else if (consumo.estadoCosto === 'PENDIENTE') {
+      for (const k of ['costoUnitario', 'costoTotal']) {
+        if (consumo[k] !== undefined) errores.push({ campo: `${campo}.${k}`, motivo: 'no se informa importe si esta PENDIENTE' });
+      }
+    } else {
+      errores.push({ campo: `${campo}.estadoCosto`, motivo: 'debe ser CALCULADO o PENDIENTE' });
+    }
+  });
+  if (data.costoBase !== undefined) {
+    const base = data.costoBase;
+    if (!esObjeto(base)) {
+      errores.push({ campo: 'data.costoBase', motivo: 'debe ser un objeto' });
+    } else {
+      if (base.moneda !== 'BOB') errores.push({ campo: 'data.costoBase.moneda', motivo: 'debe ser BOB' });
+      if (base.fuentePrecios !== 'CATALOGO_MATERIALES') {
+        errores.push({ campo: 'data.costoBase.fuentePrecios', motivo: 'debe ser CATALOGO_MATERIALES' });
+      }
+      if (base.estado !== 'COMPLETO' && base.estado !== 'PARCIAL' && base.estado !== 'PENDIENTE') {
+        errores.push({ campo: 'data.costoBase.estado', motivo: 'debe ser COMPLETO, PARCIAL o PENDIENTE' });
+      } else if (base.estado === 'COMPLETO') {
+        if (typeof base.total !== 'string' || !MONTO.test(base.total)) {
+          errores.push({ campo: 'data.costoBase.total', motivo: 'COMPLETO requiere total decimal con 4 posiciones' });
+        }
+        if (calculados !== consumos.length) {
+          errores.push({ campo: 'data.costoBase.estado', motivo: 'COMPLETO exige todos los consumos CALCULADOS' });
+        }
+      } else if (base.total !== undefined) {
+        errores.push({ campo: 'data.costoBase.total', motivo: 'solo se informa con estado COMPLETO' });
+      }
+    }
+  }
+  if (errores.length) throw error(value, errores);
+  return value as unknown as ProduccionCerradaV1Event;
+}
+
 export function validarCorrelacionRegistroContableV1(
   solicitudValue: unknown,
   respuestaValue: unknown,

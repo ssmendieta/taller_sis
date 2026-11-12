@@ -14,6 +14,27 @@ export interface ConsumoCierreV1 {
   unidad: string;
 }
 
+export type EstadoCostoConsumo = 'CALCULADO' | 'PENDIENTE';
+export type EstadoCostoBase = 'COMPLETO' | 'PARCIAL' | 'PENDIENTE';
+
+// ABC-345: ampliacion aditiva y opcional de v1 (los consumidores ignoran campos
+// desconocidos; los eventos anteriores no los traen). Fuente de precios definida
+// por el proyecto: catalogo de materiales de Produccion, moneda BOB, 4 decimales.
+// No es un precio contable ni proviene de un sistema de Contabilidad.
+export interface ConsumoCostoV1 extends ConsumoCierreV1 {
+  estadoCosto?: EstadoCostoConsumo;
+  costoUnitario?: string;
+  costoTotal?: string;
+}
+
+export interface CostoBaseV1 {
+  moneda: 'BOB';
+  fuentePrecios: 'CATALOGO_MATERIALES';
+  estado: EstadoCostoBase;
+  // Solo cuando estado=COMPLETO; nunca se estima un total parcial.
+  total?: string;
+}
+
 export interface ProduccionCerradaV1Data {
   cierreId: string;
   cierreVersion: number;
@@ -28,7 +49,8 @@ export interface ProduccionCerradaV1Data {
   };
   cantidadSolicitada: string;
   cantidadConforme: string;
-  consumos: ConsumoCierreV1[];
+  consumos: ConsumoCostoV1[];
+  costoBase?: CostoBaseV1;
   finalizadaAt: string;
 }
 
@@ -78,7 +100,16 @@ export const PRODUCCION_CERRADA_V1_EJEMPLO: ProduccionCerradaV1Event = {
       materialNombre: 'Harina de trigo',
       cantidad: '12.5000',
       unidad: 'kg',
+      estadoCosto: 'CALCULADO',
+      costoUnitario: '8.5000',
+      costoTotal: '106.2500',
     }],
+    costoBase: {
+      moneda: 'BOB',
+      fuentePrecios: 'CATALOGO_MATERIALES',
+      estado: 'COMPLETO',
+      total: '106.2500',
+    },
     finalizadaAt: '2026-10-11T17:55:00.000Z',
   },
 };
