@@ -14,6 +14,7 @@ import { TipoResultadoCalidad1710000000015 } from '../database/migrations/171000
 import { CierresProduccion1710000000018 } from '../database/migrations/1710000000018-CierresProduccion';
 import { EventosOutbox1710000000017 } from '../database/migrations/1710000000017-EventosOutbox';
 import { ResultadoContableCierre1710000000021 } from '../database/migrations/1710000000021-ResultadoContableCierre';
+import { CostoUnitarioMateriales1710000000029 } from '../database/migrations/1710000000029-CostoUnitarioMateriales';
 import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { loadOutboxConfig, OUTBOX_CONFIG } from '../integraciones/outbox/outbox.config';
 import { OutboxPublicadorService } from '../integraciones/outbox/outbox-publicador.service';
@@ -83,6 +84,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
       await new EventosOutbox1710000000017().up(runner);
       await new CierresProduccion1710000000018().up(runner);
       await new ResultadoContableCierre1710000000021().up(runner);
+      await new CostoUnitarioMateriales1710000000029().up(runner);
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.query("INSERT INTO materiales (codigo,nombre,unidad_medida) VALUES ('M1','Harina','kg'),('M2','Envase','unidad')");
       await runner.commitTransaction();
@@ -549,6 +551,30 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
       expect((await request('', 'POST', { ordenId: Number(ordenId) })).status).toBe(409);
       expect(await source.getRepository(EventoOutbox).find()).toEqual([evento]);
       expect(await source.getRepository(CierreProduccion).countBy({ ordenId })).toBe(1);
+    });
+
+    it('ABC-345: el costo base queda solo en el payload; sin precio o con otra unidad es PENDIENTE y el snapshot no cambia', async () => {
+      // M1 (kg) con precio; M2 (unidad) sin precio. Los consumos de M1 en 'g' no se convierten.
+      await source.query(`UPDATE "${schema}".materiales SET costo_unitario = 8.5 WHERE codigo = 'M1'`);
+      const ordenId = await prepararOrden();
+      const creado = await request('', 'POST', { ordenId: Number(ordenId) });
+      expect(creado.status).toBe(201);
+      const [outbox] = await source.getRepository(EventoOutbox).find();
+      const evento = { payload: outbox.payload as any };
+      const porClave = (c: any) => `${c.materialCodigo}|${c.unidad}`;
+      const consumos = Object.fromEntries(evento.payload.data.consumos.map((c: any) => [porClave(c), c]));
+      expect(consumos['M1|kg']).toMatchObject({ cantidad: '23.0000', estadoCosto: 'CALCULADO', costoUnitario: '8.5000', costoTotal: '195.5000' });
+      expect(consumos['M1|g']).toMatchObject({ estadoCosto: 'PENDIENTE' });
+      expect(consumos['M2|unidad']).toMatchObject({ estadoCosto: 'PENDIENTE' });
+      expect(consumos['M2|unidad']).not.toHaveProperty('costoTotal');
+      expect(evento.payload.data.costoBase).toEqual({ moneda: 'BOB', fuentePrecios: 'CATALOGO_MATERIALES', estado: 'PARCIAL' });
+      // Trazabilidad: las cantidades del evento son exactamente las del snapshot persistido.
+      const snapshot = await source.getRepository(CierreProduccion).findOneByOrFail({ id: creado.body.id });
+      expect(snapshot.consumos).toEqual(creado.body.consumos);
+      expect(snapshot.consumos.every((c: any) => c.costoTotal === undefined && c.estadoCosto === undefined)).toBe(true);
+      expect(evento.payload.data.consumos.map(({ materialId, materialCodigo, materialNombre, cantidad, unidad }: any) => (
+        { materialId, materialCodigo, materialNombre, cantidad, unidad }
+      ))).toEqual(snapshot.consumos);
     });
 
     it('404/409: una orden inexistente o no finalizada no deja snapshot ni evento', async () => {

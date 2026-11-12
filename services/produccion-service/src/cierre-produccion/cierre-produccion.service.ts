@@ -1,11 +1,12 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { AvancesProduccion } from '../avances_produccion/entities/avances_produccion.entity';
 import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity';
 import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad.enum';
 import { ConsumoMaterial } from '../consumos-material/entities/consumo-material.entity';
 import { ConsumoCierreV1 } from '../integraciones/contratos/contabilidad-v1';
+import { clavePrecio } from '../integraciones/outbox/calcular-costo-base';
 import { crearEventoProduccionCerrada } from '../integraciones/outbox/crear-evento-produccion-cerrada';
 import { ESTADO_OUTBOX_PENDIENTE, EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 import { Material } from '../materiales/entities/material.entity';
@@ -98,7 +99,21 @@ export class CierreProduccionService {
           finalizadaAt: orden.finalizada_en,
         }));
         const snapshot = await cierres.findOneByOrFail({ id: guardado.id });
-        const evento = crearEventoProduccionCerrada(snapshot);
+        // ABC-345: precios del catalogo en la misma transaccion; solo afectan al evento.
+        const ids = snapshot.consumos.map((consumo) => Number(consumo.materialId));
+        const materiales = ids.length
+          ? await manager.getRepository(Material).find({ where: { id: In(ids) } })
+          : [];
+        const porId = new Map(materiales.map((m) => [String(m.id), m]));
+        const precios = new Map<string, string | null>();
+        for (const consumo of snapshot.consumos) {
+          const material = porId.get(consumo.materialId);
+          // El precio solo vale para consumos en la unidad del catalogo.
+          if (material && material.unidadMedida === consumo.unidad) {
+            precios.set(clavePrecio(consumo.materialId, consumo.unidad), material.costoUnitario);
+          }
+        }
+        const evento = crearEventoProduccionCerrada(snapshot, precios);
         await manager.save(EventoOutbox, {
           eventId: evento.eventId,
           correlationId: evento.correlationId,

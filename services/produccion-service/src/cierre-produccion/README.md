@@ -177,3 +177,7 @@ clases mantiene las mismas entidades; el flujo de publicación se documenta en
 [Contabilidad v1](../../../../docs/diagramas/contabilidad-v1.md).
 
 Diagrama: [clases del cierre](../../../../docs/diagramas/cierre-produccion-clases.md).
+
+## Costo base (ABC-345)
+
+El snapshot sigue guardando solo cantidades; no incluye precios ni costos. El costo base se calcula al armar `ProduccionCerrada.v1` desde `materiales.costo_unitario` (BOB, 4 decimales) y queda congelado en el payload del outbox. Sin precio, o con consumo en otra unidad, el costo es `PENDIENTE`. Detalle en `docs/integraciones/contabilidad-v1.md`.

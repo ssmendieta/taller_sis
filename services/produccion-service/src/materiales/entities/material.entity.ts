@@ -32,6 +32,26 @@ export class Material {
   unidadMedida: string;
 
 
+  // ABC-345: precio de referencia interno en BOB (4 decimales); null = sin precio.
+  @Column({
+    name: 'costo_unitario',
+    type: 'numeric',
+    precision: 14,
+    scale: 4,
+    nullable: true,
+  })
+  costoUnitario: string | null;
+
+
+  @Column({
+    name: 'moneda_costo',
+    type: 'varchar',
+    length: 3,
+    default: 'BOB',
+  })
+  monedaCosto: string;
+
+
   @Column({
     default: true,
   })

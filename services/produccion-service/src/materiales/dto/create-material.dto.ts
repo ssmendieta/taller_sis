@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { CODIGOS_UNIDADES } from '../../unidades/unidades.catalogo';
 
 // Límites alineados con la tabla 'materiales' (varchar 80 / 150).
@@ -22,5 +22,13 @@ export class CreateMaterialDto {
   })
   @MaxLength(40)
   unidadMedida: string;
+
+  // ABC-345: costo unitario en BOB, texto decimal con hasta 4 decimales.
+  @IsOptional()
+  @IsString({ message: 'costoUnitario debe ser un texto decimal' })
+  @Matches(/^\d{1,10}(\.\d{1,4})?$/, {
+    message: 'costoUnitario debe ser un decimal no negativo con hasta 4 decimales',
+  })
+  costoUnitario?: string;
 
 }
