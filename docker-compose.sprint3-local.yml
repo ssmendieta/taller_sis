@@ -1,0 +1,20 @@
+# ABC-403: modo local para probar las HU sin credenciales de Google Cloud.
+# Uso explícito con -f; la configuración real de Pub/Sub no cambia.
+services:
+  produccion-service:
+    volumes: !reset []
+    environment:
+      PUBSUB_ENABLED: "false"
+      PUBSUB_CONSUMER_ENABLED: "false"
+      PUBSUB_CONTABILIDAD_CONSUMER_ENABLED: "false"
+      PUBSUB_DEMANDA_CONSUMER_ENABLED: "false"
+      PUBSUB_DEMANDA_CONFIRMACION_CONSUMER_ENABLED: "false"
+      GOOGLE_APPLICATION_CREDENTIALS: ""
+      PUBSUB_EMULATOR_HOST: ""
+  logistica-service:
+    volumes: !reset []
+    environment:
+      LOGISTICA_PUBSUB_ENABLED: "false"
+      LOGISTICA_PUBSUB_RESULTADO_CONSUMER_ENABLED: "false"
+      GOOGLE_APPLICATION_CREDENTIALS: ""
+      PUBSUB_EMULATOR_HOST: ""
