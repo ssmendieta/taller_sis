@@ -1,67 +1,64 @@
-%% ABC-406 · ABC-384 (S3-16) — Integración con Inventarios: Notificar despacho y salida (ABC-385/386/387/388/389)
 sequenceDiagram
-  autonumber
-  actor L as Encargado de Logística
-  participant F as Frontend (RutaDetallePage)
-  participant LG as logistica-service
-  participant DB as logistica_db (PostgreSQL)
-  participant OB as EventosOutbox (logistica_db)
-  participant PUB as OutboxPublicadorLogisticaService
-  participant PS as Google Cloud Pub/Sub
-  participant I as Inventarios / Almacén (Servicio Externo)
-  participant SUB as PubSubResultadoSalidaConsumer
-  participant IB as EventosInbox (logistica_db)
+    autonumber
+    actor U as Encargado
+    participant L as Logística
+    participant D as logistica_db
+    participant B as Google Pub/Sub
+    participant I as SI Inventarios
 
-  Note over L,IB: Fase 1: Transacción atómica de despacho y registro en Outbox (ABC-385 / ABC-386)
-  L->>F: Confirmar despacho de ruta con boletas
-  F->>LG: POST /api/logistica/rutas/:id/despacho
-  LG->>DB: BEGIN transacción
-  LG->>DB: SELECT rutas FOR UPDATE · SELECT paradas FOR UPDATE · SELECT boletas FOR UPDATE
-  LG->>LG: Valida máquina de estados: PLANIFICADA → DESPACHADA (boletas EMITIDAS)
-  LG->>DB: UPDATE rutas SET estado = 'DESPACHADA', fecha_salida_real = NOW(), inventario_estado = 'PENDIENTE'
-  LG->>OB: INSERT eventos_outbox (eventId A, inventarios.salida.v1, correlationId C, items_despacho, estado PENDIENTE)
-  LG->>DB: COMMIT (cambio de estado de ruta y outbox en el mismo commit)
-  LG-->>F: 200 OK (Ruta DESPACHADA, salida registrada)
-
-  Note over PUB,PS: Fase 2: Publicación confiable desacoplada vía Outbox (ABC-386 / ABC-388)
-  PUB->>OB: SELECT eventos_outbox FOR UPDATE (lease transaccional PROCESANDO)
-  PUB->>PS: Publica DespachoRutaRegistrado.v1 (topic PUBSUB_LOGISTICA_TOPIC_ID, eventId A, correlationId C)
-  alt Broker confirma publicación
-    PS-->>PUB: messageId de Google
-    PUB->>OB: UPDATE eventos_outbox SET estado = PUBLICADO, messageId, publicado_en = NOW()
-  else Fallo transitorio o desconexión
-    PUB->>OB: UPDATE eventos_outbox SET estado = PENDIENTE, reintentos++, proximo_intento (backoff)
-    Note over PUB,PS: Reintento conserva estrictamente el mismo eventId A y payload inmutable
-  end
-
-  Note over PS,I: Fase 3: Procesamiento en el dominio de Inventarios / Almacén
-  PS->>I: Entrega evento DespachoRutaRegistrado.v1 (at-least-once)
-  I->>I: Valida disponibilidad física de lotes y stock reservado
-  alt Stock físico suficiente en almacén
-    I->>I: Registra salida de almacén y decrementa stock
-    I->>PS: Publica SalidaInventarioResultado.v1 (resultado: ACEPTADA, correlationId C, requestEventId A, eventId B)
-  else Discrepancia o faltante en almacén
-    I->>PS: Publica SalidaInventarioResultado.v1 (resultado: RECHAZADA, motivo: 'Stock no disponible', correlationId C, requestEventId A, eventId B)
-  end
-
-  Note over SUB,IB: Fase 4: Consumo asíncrono e idempotencia con Inbox transaccional (ABC-387 / ABC-388)
-  PS->>SUB: Entrega SalidaInventarioResultado.v1 (al menos una vez)
-  SUB->>SUB: Valida contrato v1 y origen del resultado de inventarios
-  alt Payload no es JSON o esquema inválido
-    SUB->>SUB: Registra advertencia permanente (RESULTADO_INVENTARIO_RECHAZADO)
-    SUB->>PS: ACK inmediato (sin bucle de reintentos)
-  else Evento válido
-    SUB->>DB: BEGIN transacción
-    SUB->>IB: SELECT eventos_inbox WHERE event_id = B
-    alt Mensaje duplicado ya recibido
-      SUB->>DB: ROLLBACK (sin cambios en datos)
-      SUB->>PS: ACK (idempotencia garantizada)
-    else Mensaje nuevo
-      SUB->>DB: SELECT rutas WHERE id = C FOR UPDATE
-      SUB->>DB: UPDATE rutas SET inventario_estado = ACEPTADA | RECHAZADA (ABC-387)
-      SUB->>IB: INSERT eventos_inbox (eventId B, correlationId C, PROCESADO)
-      SUB->>DB: COMMIT
-      SUB->>PS: ACK solo después del COMMIT exitoso
+    U->>L: POST /api/logistica/rutas/:id/despacho
+    Note over U,L: Sesión válida y permiso logistica.rutas.gestionar
+    L->>D: BEGIN, bloquear ruta, paradas y boletas
+    L->>L: Validar ruta PLANIFICADA, recursos y boletas EMITIDAS
+    alt Datos inválidos o contrato de salida incompleto
+        L->>D: ROLLBACK sin despacho ni evento
+        L-->>U: Rechazo de la operación
+    else Despacho válido
+        L->>D: Ruta DESPACHADA y outbox PENDIENTE
+        L->>D: COMMIT de ambos registros
+        L-->>U: Ruta despachada
     end
-  end
-  Note over SUB,PS: Ante fallo transitorio de PostgreSQL: NACK y Pub/Sub reentrega sin pérdida
+
+    Note over L,D: Publicador independiente, después del commit
+    loop Eventos elegibles y reintentos con espera
+        L->>D: Reclamar outbox con lease
+        D-->>L: Payload persistido, eventId A, correlationId C
+        L->>B: DespachoRutaRegistrado.v1
+        alt Google confirma la publicación
+            B-->>L: messageId
+            L->>D: Outbox PUBLICADO y messageId
+        else Error o confirmación perdida
+            L->>D: Outbox PENDIENTE y próximo intento
+            Note over L,B: Mismos A, C y payload en cada reintento
+        end
+    end
+
+    Note over B,I: Contrato con Inventarios, sistema externo
+    B-->>I: DespachoRutaRegistrado.v1
+    Note over L,I: Ruta, boletas, producto, unidad, lotes y cantidades
+    I->>B: SalidaInventarioResultado.v1
+    Note over B,I: source inventarios-service, eventId B, requestEventId A, correlationId C
+    B-->>L: Respuesta desde la suscripción configurada
+    L->>L: Validar contrato, origen y correlación
+    alt Mensaje inválido o conflicto permanente
+        L->>B: ACK y registro del descarte
+    else Respuesta válida y correlacionada
+        L->>D: BEGIN, consultar inbox y bloquear ruta
+        alt Fallo transitorio de persistencia
+            D--xL: Error
+            L->>D: ROLLBACK
+            L->>B: NACK para reentrega
+        else Persistencia disponible
+            alt Mismo eventId B y mismo hash
+                D-->>L: DUPLICADO, sin reaplicar
+            else Primer resultado de Inventarios
+                L->>D: inventarioEstado ACEPTADA o RECHAZADA
+                L->>D: Guardar inbox PROCESADO
+            else Ruta con resultado de Inventarios previo
+                L->>D: Conservar resultado e inbox IGNORADO
+            end
+            L->>D: COMMIT
+            L->>B: ACK después del commit
+        end
+    end
+    Note over L,D: El resultado de Inventarios no cambia el estado operativo de la ruta

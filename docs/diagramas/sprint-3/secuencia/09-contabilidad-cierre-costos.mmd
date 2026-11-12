@@ -1,62 +1,64 @@
-%% ABC-406 · ABC-114 (S3-10) — Integración con Contabilidad: Cierre de producción y costos (ABC-345/346/347/348/349)
 sequenceDiagram
-  autonumber
-  actor O as Operario / Supervisor
-  participant F as Frontend (OrdenDetallePage)
-  participant P as produccion-service
-  participant DB as produccion_db (PostgreSQL)
-  participant OB as EventosOutbox (produccion_db)
-  participant PUB as OutboxPublicadorService
-  participant PS as Google Cloud Pub/Sub
-  participant C as Contabilidad (Servicio Externo)
-  participant SUB as PubSubContabilidadConsumerService
-  participant IB as EventosInbox (produccion_db)
+    autonumber
+    actor U as Encargado
+    participant P as Producción
+    participant D as produccion_db
+    participant B as Google Pub/Sub
+    participant C as SI Contabilidad
 
-  Note over O,IB: Fase 1: Transacción atómica de negocio y registro en Outbox (ABC-345 / ABC-346)
-  O->>F: Confirmar cierre de orden de producción
-  F->>P: POST /api/produccion/ordenes/:id/cierre
-  P->>DB: BEGIN transacción
-  P->>DB: SELECT ordenes FOR UPDATE (verifica estado FINALIZADA)
-  P->>P: calcularCostoBase(ordenId, consumos, materiales) acumulado
-  P->>DB: INSERT cierres_produccion (orden_id, costo_base, consumos, estado_contable PENDIENTE)
-  P->>OB: INSERT eventos_outbox (eventId A, ProduccionCerrada.v1, correlationId C, payload inmutable, estado PENDIENTE)
-  P->>DB: COMMIT (cierre y outbox en el mismo commit atómico)
-  P-->>F: 201 Created (cierre registrado con snapshot de costos)
-
-  Note over PUB,PS: Fase 2: Publicación confiable desacoplada vía Outbox (ABC-347 / ABC-349)
-  PUB->>OB: SELECT eventos_outbox FOR UPDATE (lease transaccional PROCESANDO)
-  PUB->>PS: Publica ProduccionCerrada.v1 (topic PUBSUB_TOPIC_ID, eventId A, correlationId C)
-  alt Broker confirma recepción
-    PS-->>PUB: messageId de Google
-    PUB->>OB: UPDATE eventos_outbox SET estado = PUBLICADO, messageId, publicado_en = NOW()
-  else Fallo de conexión o timeout
-    PUB->>OB: UPDATE eventos_outbox SET estado = PENDIENTE, reintentos++, proximo_intento (backoff)
-    Note over PUB,PS: Reintento conserva estrictamente el mismo eventId A y payload inmutable
-  end
-
-  Note over PS,C: Fase 3: Procesamiento en el dominio contable externo
-  PS->>C: Entrega mensaje ProduccionCerrada.v1 (at-least-once)
-  C->>C: Asiento contable de costos de producción y mano de obra
-  C->>PS: Publica RegistroContableResultado.v1 (correlationId C, requestEventId A, eventId B)
-
-  Note over SUB,IB: Fase 4: Consumo asíncrono e idempotencia con Inbox transaccional (ABC-348 / ABC-349)
-  PS->>SUB: Entrega RegistroContableResultado.v1 (al menos una vez)
-  SUB->>SUB: Valida contrato v1 (contabilidad-v1.validator.ts)
-  alt Payload no es JSON o esquema inválido
-    SUB->>SUB: Registra error permanente (RESULTADO_CONTABLE_RECHAZADO)
-    SUB->>PS: ACK inmediato (sin bucle infinito de reintentos)
-  else Evento válido
-    SUB->>DB: BEGIN transacción
-    SUB->>IB: SELECT eventos_inbox WHERE event_id = B
-    alt Mensaje duplicado ya recibido
-      SUB->>DB: ROLLBACK (sin cambios en datos)
-      SUB->>PS: ACK (idempotencia garantizada)
-    else Mensaje nuevo
-      SUB->>DB: SELECT cierres_produccion WHERE orden_id = C FOR UPDATE
-      SUB->>DB: UPDATE cierres_produccion SET estado_contable = ACEPTADA | RECHAZADA, resultado_contable_event_id = B, resultado_contable_en = NOW()
-      SUB->>IB: INSERT eventos_inbox (eventId B, correlationId C, PROCESADO)
-      SUB->>DB: COMMIT
-      SUB->>PS: ACK solo después del COMMIT exitoso
+    U->>P: POST /api/produccion/cierres-produccion
+    Note over U,P: Sesión válida y permiso ordenes.finalizar_cancelar
+    P->>D: BEGIN, bloquear orden FINALIZADA
+    alt Orden inválida o versión de cierre existente
+        P->>D: ROLLBACK
+        P-->>U: Rechazo sin crear otro cierre ni evento
+    else Cierre válido
+        P->>D: Leer precios del catálogo y calcular costo base en BOB
+        P->>D: Guardar snapshot y outbox PENDIENTE
+        P->>D: COMMIT de ambos registros
+        P-->>U: 201 con cierre y estadoContable PENDIENTE
     end
-  end
-  Note over SUB,PS: Ante caída transitoria de base de datos: NACK y Pub/Sub reentrega sin pérdida
+
+    Note over P,D: Publicador independiente, después del commit
+    loop Eventos elegibles y reintentos con espera
+        P->>D: Reclamar outbox con lease
+        D-->>P: Payload persistido, eventId A, correlationId C
+        P->>B: ProduccionCerrada.v1 y atributos
+        alt Google confirma la publicación
+            B-->>P: messageId
+            P->>D: Outbox PUBLICADO y messageId
+        else Error o confirmación perdida
+            P->>D: Outbox PENDIENTE y próximo intento
+            Note over P,B: Mismos A, C y payload en cada reintento
+        end
+    end
+
+    Note over B,C: Entrega asíncrona, el receptor es un sistema externo
+    B-->>C: ProduccionCerrada.v1
+    Note over P,C: Consumos, cantidades y costoBase COMPLETO, PARCIAL o PENDIENTE
+    C->>B: RegistroContableResultado.v1
+    Note over B,C: eventId B, requestEventId A, correlationId C
+    B-->>P: Respuesta desde la suscripción contable
+    P->>P: Validar JSON, contrato y atributos
+    alt Mensaje inválido o conflicto permanente
+        P->>B: ACK y registro del descarte
+    else Respuesta válida y correlacionada
+        P->>D: BEGIN, consultar inbox y bloquear cierre
+        alt Fallo transitorio de persistencia
+            D--xP: Error
+            P->>D: ROLLBACK
+            P->>B: NACK para reentrega
+        else Persistencia disponible
+            alt Mismo eventId B y mismo hash
+                D-->>P: DUPLICADO, sin reaplicar
+            else Primer resultado del cierre
+                P->>D: Estado contable RECIBIDO o RECHAZADO
+                P->>D: Guardar inbox PROCESADO
+            else Cierre con resultado final previo
+                P->>D: Conservar estado final e inbox IGNORADO
+            end
+            P->>D: COMMIT
+            P->>B: ACK después del commit
+        end
+    end
+    Note over P,B: Puede haber varias entregas físicas, el efecto de negocio se aplica una vez
