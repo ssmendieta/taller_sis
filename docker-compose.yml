@@ -166,12 +166,15 @@
     profiles: ["full"]
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:${GATEWAY_PORT:-3000}}
     container_name: frontend
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
-    environment:
-      - VITE_API_URL=http://localhost:${GATEWAY_PORT:-3000}
+    depends_on:
+      - api-gateway
     profiles: ["full"]
 
 volumes:
