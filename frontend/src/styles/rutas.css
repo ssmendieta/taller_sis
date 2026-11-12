@@ -1,0 +1,23 @@
+/* ABC-372: planificación de rutas. Reutiliza tokens y las clases de recursos-logisticos.css. */
+.rutas-planificacion .rutas-nota { margin: 0; padding: 0 20px 16px; max-width: 90ch; }
+.rutas-planificacion .rutas-formulario > .ts-feedback,
+.rutas-planificacion .rutas-formulario > .ts-success { margin-bottom: 16px; }
+.rutas-planificacion .ts-feedback ul { margin: 6px 0 0; padding-left: 20px; }
+.rutas-planificacion .ts-feedback p { margin: 0; }
+.rutas-planificacion .ts-feedback .ts-field-help { margin-top: 6px; }
+.rutas-acciones { margin: 0 0 24px; }
+
+.rutas-paradas { list-style: none; margin: 0; padding: 8px 20px 16px; display: grid; gap: 12px; }
+.rutas-parada { border: 1px solid var(--ts-border); border-radius: var(--ts-radius-control); padding: 12px; min-width: 0; }
+.rutas-parada-cabecera { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 10px; }
+.rutas-parada-cabecera label { flex: 1; min-width: 0; }
+
+.rutas-boletas { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 6px 12px; }
+.rutas-boletas legend { padding: 0; margin-bottom: 6px; color: var(--ts-secondary); font-size: 0.8rem; }
+.rutas-boleta { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer; }
+.rutas-boleta input { width: 16px; height: 16px; margin: 0; accent-color: var(--ts-accent); }
+.rutas-boleta--usada { opacity: 0.55; cursor: not-allowed; }
+
+@media (max-width: 767px) {
+  .rutas-parada-cabecera { flex-direction: column; align-items: stretch; }
+}

@@ -5,6 +5,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Req,
   SetMetadata,
   UseGuards,
@@ -46,6 +47,13 @@ export class RutasController {
   @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
   findAll() {
     return this.service.findAll();
+  }
+
+  // Debe declararse antes de `:id` para no confundirse con un identificador.
+  @Get('boletas-disponibles')
+  @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
+  findBoletasDisponibles(@Query('rutaId') rutaId?: string) {
+    return this.service.findBoletasDisponibles(rutaId ? rutaId : null);
   }
 
   @Get(':id')

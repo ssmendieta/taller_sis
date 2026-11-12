@@ -177,3 +177,88 @@ export function deshacerAgrupacion(id) {
     method: "POST",
   });
 }
+
+// ABC-372: planificación de rutas sobre el contrato de ABC-371
+// (services/logistica-service/src/rutas/README.md). Solo una ruta PLANIFICADA
+// se puede editar y la edición reemplaza todas sus paradas.
+const RUTAS = `${apiConfig.gatewayUrl}/api/logistica/rutas`;
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+function rutaConfirmada(ruta) {
+  if (!ruta?.id || !ruta.estado || !Array.isArray(ruta.paradas)) {
+    throw new Error("El servidor devolvió una ruta incompleta o inválida.");
+  }
+  return ruta;
+}
+
+// El formulario guarda vehículo y chofer como ids elegidos; la API usa *ExternoId.
+function cuerpoRuta({ grupoId, fecha, vehiculo, chofer, paradas }) {
+  return {
+    grupoId: grupoId || null,
+    fechaProgramada: fecha,
+    vehiculoExternoId: vehiculo,
+    choferExternoId: chofer,
+    paradas: paradas.map((parada) => ({ destino: parada.destino.trim(), boletaIds: parada.boletaIds })),
+  };
+}
+
+// Primer error de la ruta o "" si se puede enviar. `hoy` es YYYY-MM-DD.
+export function validarRuta(datos, hoy) {
+  if (!FECHA_ISO.test(datos.fecha ?? "")) return "Elige la fecha programada de la ruta.";
+  if (datos.fecha < hoy) return "La fecha programada no puede ser anterior a hoy.";
+  if (!datos.vehiculo) return "Elige un vehículo disponible para la ruta.";
+  if (!datos.chofer) return "Elige un chofer disponible para la ruta.";
+  if (!datos.paradas.length) return "Agrega al menos una parada.";
+  const vistas = new Set();
+  for (const [indice, parada] of datos.paradas.entries()) {
+    const numero = indice + 1;
+    if (!parada.destino.trim()) return `Indica el destino de la parada ${numero}.`;
+    if (parada.destino.trim().length > 250) return `El destino de la parada ${numero} supera los 250 caracteres.`;
+    if (!parada.boletaIds.length) return `Elige al menos una boleta para la parada ${numero}.`;
+    for (const boletaId of parada.boletaIds) {
+      if (vistas.has(boletaId)) return "Una boleta no puede estar en más de una parada.";
+      vistas.add(boletaId);
+    }
+  }
+  return "";
+}
+
+async function guardarRuta(url, metodo, datos, mensaje, signal) {
+  const response = await fetch(url, {
+    method: metodo,
+    headers: { ...encabezados(), "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpoRuta(datos)),
+    signal,
+  });
+  await exigirOk(response, mensaje);
+  return rutaConfirmada(await response.json());
+}
+
+export function crearRuta(datos, { signal } = {}) {
+  return guardarRuta(RUTAS, "POST", datos, "No se pudo guardar la ruta.", signal);
+}
+
+export function actualizarRuta(id, datos, { signal } = {}) {
+  return guardarRuta(`${RUTAS}/${encodeURIComponent(id)}`, "PUT", datos, "No se pudo actualizar la ruta.", signal);
+}
+
+// Boletas EMITIDAS que ninguna ruta activa tiene. Con `rutaId` incluye también las
+// de esa ruta, para editarla sin perderlas.
+export async function listarBoletasDisponibles({ rutaId = null, signal } = {}) {
+  const consulta = rutaId ? `?rutaId=${encodeURIComponent(rutaId)}` : "";
+  const response = await fetch(`${RUTAS}/boletas-disponibles${consulta}`, { headers: encabezados(), signal });
+  await exigirOk(response, "No se pudieron cargar las boletas disponibles.");
+  const boletas = await response.json();
+  if (!Array.isArray(boletas) || boletas.some((boleta) => !boleta?.id || !boleta.numero)) {
+    throw new Error("El servidor devolvió un listado de boletas inválido.");
+  }
+  return boletas;
+}
+
+export async function listarRutas({ signal } = {}) {
+  const response = await fetch(RUTAS, { headers: encabezados(), signal });
+  await exigirOk(response, "No se pudieron cargar las rutas.");
+  const rutas = await response.json();
+  if (!Array.isArray(rutas)) throw new Error("El servidor devolvió un listado de rutas inválido.");
+  return rutas.map(rutaConfirmada);
+}

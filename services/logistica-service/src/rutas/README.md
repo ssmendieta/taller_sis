@@ -116,6 +116,44 @@ Los filtros se combinan con AND. Orden estable: fecha programada descendente y
 luego id descendente. Respuesta `{ items, total, page, limit, totalPages }` con
 `totalParadas` y `totalBoletas` por ruta, calculados sin duplicar filas.
 
+## Pantalla de planificación (ABC-372)
+
+`frontend/src/pages/RutasPage.jsx` (ruta `/logistica/planificacion`, permiso
+`logistica.rutas.gestionar`) consume este API sin cambios en el servidor:
+
+| Acción de la pantalla | Llamada |
+| --- | --- |
+| Listar rutas y habilitar *Editar* solo en `PLANIFICADA` | `GET /rutas` |
+| Guardar una ruta nueva | `POST /rutas` |
+| Guardar cambios (reemplaza todas las paradas) | `PUT /rutas/:id` |
+| Elegir grupo (precarga `fechaRequerida` y `destino`) | `GET /agrupaciones` |
+| Elegir boletas de cada parada | `GET /rutas/boletas-disponibles` (al editar, `?rutaId=<id>`) |
+| Ver capacidad, disponibilidad y origen ERP/RESPALDO al cambiar la fecha | `GET /recursos-logisticos?fecha=` |
+
+Cuerpo de `POST`/`PUT`: `{ grupoId|null, fechaProgramada, vehiculoExternoId,
+choferExternoId, paradas: [{ destino, boletaIds }] }`. Antes de enviar, la
+pantalla valida fecha (no anterior a hoy), vehículo, chofer, al menos una
+parada con destino y boletas, y que ninguna boleta se repita.
+
+Los errores del servidor se muestran sin borrar nada de lo escrito: `400` y
+`409` con su `message` (por ejemplo `Sobrecarga: …`), la lista `conflictos`
+de `CONFLICTO_RECURSOS` (vehículo o chofer con su motivo), `503` si no hay ERP
+ni copia de respaldo y `401`/`403` por sesión o permiso. La pantalla no calcula
+la carga: la sobrecarga la decide el servidor.
+
+`GET /rutas/boletas-disponibles` (permiso `logistica.rutas.consultar`) devuelve
+`[{ id, numero, solicitudSalidaId, productoCodigo, unidad }]` de las boletas
+`EMITIDA` que no están en ninguna ruta `PLANIFICADA` ni `DESPACHADA`, de la más
+reciente a la más antigua, con la misma regla que `validarBoletas`. Con
+`?rutaId=<id>` se suman las boletas de esa ruta para poder editarla. Un `rutaId`
+inválido responde `400`. Es una consulta informativa: no bloquea filas, así que
+si otra ruta toma una boleta justo después, el `409` de guardado sigue siendo la
+validación definitiva y la pantalla refresca el listado.
+
+Las pruebas (`frontend/scripts/rutas.test.mjs`, `npm run test:rutas`) son
+**simuladas**: usan un `fetch` en memoria que sigue este contrato, sin ERP,
+Producción ni mensajería reales.
+
 ## Aceptación y regresión (ABC-373)
 
 `rutas.aceptacion.spec.ts` ejecuta peticiones HTTP contra `RutasModule`, su
