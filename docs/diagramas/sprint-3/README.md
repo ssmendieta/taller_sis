@@ -73,8 +73,8 @@ En los diagramas de clases, cada entidad cuenta con el estereotipo `<<Sprint 2>>
 | 06 | [Inicio de orden con verificación de materiales](secuencia/06-produccion-inicio-orden.svg) ([PNG](secuencia/06-produccion-inicio-orden.png), [PDF](secuencia/06-produccion-inicio-orden.pdf)) | ABC-70 | Consulta asíncrona a Inventarios y bloqueo del inicio con faltantes |
 | 07 | [Ejecución de la orden (agrupado)](secuencia/07-produccion-ejecucion.svg) ([PNG](secuencia/07-produccion-ejecucion.png), [PDF](secuencia/07-produccion-ejecucion.pdf)) | ABC-74, ABC-100, ABC-105, ABC-394 | Mermas, observaciones e incidencias, avance y reproceso con saldo defectuoso |
 | 08 | [Historiales y reportes (agrupado)](secuencia/08-consultas-historiales-reportes.svg) ([PNG](secuencia/08-consultas-historiales-reportes.png), [PDF](secuencia/08-consultas-historiales-reportes.pdf)) | ABC-108, ABC-109, ABC-390, ABC-110 | Consultas paginadas de solo lectura, detalle de ruta aislado, vista previa y exportación con los mismos filtros |
-| 09 | [Cierre contable y costos](secuencia/09-contabilidad-cierre-costos.svg) ([PNG](secuencia/09-contabilidad-cierre-costos.png), [PDF](secuencia/09-contabilidad-cierre-costos.pdf)) | ABC-114 | Outbox transaccional de costos, lease de publicación a Pub/Sub, procesamiento externo, inbox transaccional y actualización a CERRADA_CONTABLE |
-| 10 | [Despacho y salida a Inventarios](secuencia/10-inventarios-despacho-salida.svg) ([PNG](secuencia/10-inventarios-despacho-salida.png), [PDF](secuencia/10-inventarios-despacho-salida.pdf)) | ABC-384 | Transacción atómica de despacho y outbox en Logística, publicación a Pub/Sub, validación externa de stock, inbox y actualización de inventario_estado |
+| 09 | [Cierre contable y costos](secuencia/09-contabilidad-cierre-costos.svg) ([PNG](secuencia/09-contabilidad-cierre-costos.png), [PDF](secuencia/09-contabilidad-cierre-costos.pdf)) | ABC-114 | Cierre y outbox atómicos, costo base BOB, reintento del mismo evento, resultado RECIBIDO/RECHAZADO e inbox con ACK posterior al commit |
+| 10 | [Despacho y salida a Inventarios](secuencia/10-inventarios-despacho-salida.svg) ([PNG](secuencia/10-inventarios-despacho-salida.png), [PDF](secuencia/10-inventarios-despacho-salida.pdf)) | ABC-384 | Despacho y outbox atómicos, DespachoRutaRegistrado.v1, SalidaInventarioResultado.v1, deduplicación y conservación del resultado final |
 
 ---
 
@@ -144,3 +144,25 @@ Get-ChildItem *.mmd | ForEach-Object {
   & "$env:TEMP\mmdc\node_modules\.bin\mmdc.cmd" -i $_.Name -o "$n.pdf" -c "$env:TEMP\mmdc\config.json" -b white -f
 }
 ```
+
+
+## Revisión de integraciones y despliegue (ABC-406, 12/11/2026)
+
+Se sustituyen las exportaciones 09 y 10 conservando sus nombres y enlaces.
+Las secuencias usan cinco participantes para facilitar su lectura. Se corrigen
+la ruta de creación del cierre, los estados contables RECIBIDO/RECHAZADO,
+la correlación, los reintentos, los descartes y el ACK posterior al commit.
+El comportamiento interno de los sistemas externos no se representa como
+una funcionalidad implementada en este repositorio.
+
+La versión vigente de Contabilidad usa `POST /api/produccion/cierres-produccion`
+y costo base BOB COMPLETO/PARCIAL/PENDIENTE. La de Inventarios conserva
+`inventarioEstado` ACEPTADA/RECHAZADA y el estado operativo de la ruta.
+Las fuentes Mermaid y los tres formatos exportados se actualizan juntos.
+
+La vista de despliegue está disponible como [Mermaid](despliegue/01-despliegue.mmd),
+[PDF](despliegue/01-despliegue.pdf), [SVG](despliegue/01-despliegue.svg) y
+[PNG](despliegue/01-despliegue.png). Representa Docker Compose, las tres bases
+lógicas en PostgreSQL, el volumen persistente, el gateway y Google Pub/Sub.
+Los enlaces cloud requieren configuración y credenciales reales: el diagrama
+no constituye evidencia de ejecución de Docker ni de Google.

@@ -1,0 +1,31 @@
+{
+  "theme": "neutral",
+  "fontFamily": "Arial, sans-serif",
+  "sequence": {
+    "useMaxWidth": false,
+    "wrap": true,
+    "width": 185,
+    "messageFontSize": 15,
+    "actorFontSize": 16,
+    "noteFontSize": 14,
+    "diagramMarginX": 25,
+    "diagramMarginY": 20,
+    "messageMargin": 32
+  },
+  "flowchart": {
+    "useMaxWidth": false,
+    "htmlLabels": false,
+    "nodeSpacing": 35,
+    "rankSpacing": 55,
+    "curve": "linear",
+    "diagramPadding": 80
+  },
+  "htmlLabels": false,
+  "themeVariables": {
+    "lineColor": "#444444",
+    "actorBorder": "#444444",
+    "actorLineColor": "#777777",
+    "signalColor": "#333333",
+    "textColor": "#222222"
+  }
+}
