@@ -18,6 +18,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "seed:demo": "ts-node --transpile-only src/seeds/seed-demo.ts",
+    "demanda:publicar-prueba": "ts-node --transpile-only src/seeds/publicar-demanda-prueba.ts",
     "seed:contabilidad-demo": "ts-node --transpile-only src/seeds/seed-contabilidad-demo.ts",
     "verify:contabilidad-demo": "ts-node --transpile-only src/seeds/verificar-contabilidad-demo.ts",
     "verify:demanda-confirmacion-local": "ts-node --transpile-only src/seeds/verificar-confirmacion-demanda-local.ts",

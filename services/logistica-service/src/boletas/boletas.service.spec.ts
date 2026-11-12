@@ -28,7 +28,9 @@ describe('ABC-213/214: creación de boletas con validación documental', () => {
     const result = await service().create({ solicitudSalidaId: '7', items: [{ referencia: 'L-1', cantidad: '10.0000' }] }, '42', 'Bearer token');
     expect(produccion.consultarOrdenPorId).toHaveBeenCalledWith('8', 'Bearer token');
     expect(produccion.consultarPorOrden).toHaveBeenCalledWith('ORD-7', 'Bearer token');
-    expect(save).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ responsableUsuarioId: '42', estado: 'BORRADOR' }));
+    expect(save).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      responsableUsuarioId: '42', estado: 'BORRADOR', productoCodigo: 'P-3', unidad: 'unidad',
+    }));
     expect(result.items).toHaveLength(1);
   });
 
@@ -849,6 +851,8 @@ describe('ABC-232 / ABC-235: transición a EMITIDA, responsable emisor y precond
         id: '25',
         estado: EstadoBoleta.EMITIDA,
         responsableUsuarioId: '99',
+        productoCodigo: 'P-5',
+        unidad: 'unidad',
       }),
     );
   });

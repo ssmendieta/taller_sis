@@ -1,0 +1,38 @@
+%% ABC-407 · escenarios agrupados de ejecución: ABC-74 mermas (S3-04), ABC-100 observaciones (S3-05),
+%% ABC-105 avance (S3-06) y ABC-394 reproceso (S3-07)
+sequenceDiagram
+  autonumber
+  actor P as Encargado de Producción o Supervisor
+  participant F as Frontend (OrdenDetallePage)
+  participant PR as produccion-service
+  participant A as Auth (/me)
+  participant DB as produccion_db
+
+  Note over F,DB: Las escrituras toman el autor de la sesión y la fecha del servidor
+  P->>F: registrar merma (material, cantidad, unidad, motivo)
+  F->>PR: POST /api/produccion/perdidas-materia-prima
+  PR->>A: GET /me (permiso)
+  PR->>DB: valida orden, material y unidad · INSERT pérdida
+  PR-->>F: 201 (separada de los defectuosos de calidad)
+
+  P->>F: registrar observación o incidencia
+  F->>PR: POST /api/produccion/observaciones
+  PR->>DB: la orden existe · INSERT observaciones_orden
+  F->>PR: GET /observaciones/orden/:id (más reciente primero)
+
+  P->>F: registrar avance
+  F->>PR: POST /api/produccion/avances/:ordenId
+  PR->>DB: INSERT avance
+  F->>PR: GET /avances/:ordenId/resumen (producido, solicitado y porcentaje)
+
+  P->>F: registrar reproceso de defectuosas
+  F->>PR: POST /api/produccion/ordenes/:ordenId/reprocesos
+  PR->>DB: BEGIN · orden y resultados FOR UPDATE
+  alt la cantidad supera el saldo defectuoso
+    PR->>DB: ROLLBACK
+    PR-->>F: 409
+  else válido
+    PR->>DB: INSERT reproceso (recuperadas a conformes, resto a descarte)
+    PR->>DB: COMMIT
+    PR-->>F: 201 con saldos actualizados
+  end

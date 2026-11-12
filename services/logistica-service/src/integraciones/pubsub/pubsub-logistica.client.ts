@@ -36,7 +36,8 @@ export class PubSubLogisticaPublisher {
     if (!this.config.publicacion.enabled || !this.client) {
       throw new Error('La publicación Pub/Sub de Logística está deshabilitada');
     }
-    const messageId = await this.client.topic(this.config.publicacion.topicId).publishMessage({
+    const { topicId, timeoutMs } = this.config.publicacion;
+    const publicacion = this.client.topic(topicId, { gaxOpts: { timeout: timeoutMs } }).publishMessage({
       data: Buffer.from(JSON.stringify(evento), 'utf8'),
       attributes: {
         eventId: evento.eventId,
@@ -45,6 +46,17 @@ export class PubSubLogisticaPublisher {
         correlationId: evento.correlationId,
       },
     });
-    return { messageId, topicId: this.config.publicacion.topicId };
+    const messageId = await limitarTiempo(publicacion, timeoutMs);
+    return { messageId, topicId };
   }
+}
+
+// Si se agota el tiempo, el evento vuelve a PENDIENTE con este error. Una confirmación
+// tardía del broker puede producir un duplicado del mismo eventId, que el receptor descarta.
+function limitarTiempo<T>(promesa: Promise<T>, ms: number): Promise<T> {
+  let temporizador: NodeJS.Timeout | undefined;
+  const limite = new Promise<never>((_, rechazar) => {
+    temporizador = setTimeout(() => rechazar(new Error(`DEADLINE_EXCEEDED: Pub/Sub no confirmó la publicación en ${ms} ms`)), ms);
+  });
+  return Promise.race([promesa, limite]).finally(() => clearTimeout(temporizador));
 }

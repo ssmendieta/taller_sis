@@ -1,0 +1,37 @@
+{
+  "historia": "ABC-384",
+  "subtarea": "ABC-389",
+  "fechaCertificacion": "2026-11-11T03:15:00.000Z",
+  "entorno": "simulacion-en-memoria-y-emulador",
+  "topicos": {
+    "publicacionSalida": "taller-logistica-salida-local",
+    "suscripcionResultado": "taller-logistica-resultado-local"
+  },
+  "trazabilidad": {
+    "despacho": {
+      "rutaId": "10",
+      "outboxEventId": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+      "correlationId": "f7e6d5c4-b3a2-4109-8877-665544332211",
+      "eventType": "DespachoRutaRegistrado.v1",
+      "estadoFinalOutbox": "PUBLICADO",
+      "brokerMessageId": "pubsub-msg-12345"
+    },
+    "respuestaAceptada": {
+      "inboxEventId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+      "correlationId": "f7e6d5c4-b3a2-4109-8877-665544332211",
+      "eventType": "SalidaInventarioResultado.v1",
+      "estadoFinalInbox": "PROCESADO",
+      "estadoRuta": "DESPACHADA",
+      "inventarioEstadoRuta": "ACEPTADA",
+      "brokerAck": true
+    },
+    "garantiasIdempotencia": {
+      "redeliveryIdentica": "Detectada por eventId y sha256(payload) -> responde DUPLICADO, omite reescritura de ruta y hace ACK",
+      "mensajeContradictorio": "Detecta divergencia de hash sobre mismo eventId -> lanza Conflicto y hace ACK (evita bucle)",
+      "brokerCaido": "Evento permanece PENDIENTE en outbox con incremento de intentos y backoff; reintenta con mismo eventId",
+      "rollbackDespacho": "Si el despacho o el guardado outbox falla, la transacción TypeORM aplica ROLLBACK completo sin publicar nada",
+      "atLeastOnce": "La re-publicación preserva eventId; el receptor es idempotente frente a entregas duplicadas",
+      "timeoutPublicacion": "LOGISTICA_PUBSUB_PUBLISH_TIMEOUT_MS (10s) cancela reintentos infinitos con DEADLINE_EXCEEDED"
+    }
+  }
+}

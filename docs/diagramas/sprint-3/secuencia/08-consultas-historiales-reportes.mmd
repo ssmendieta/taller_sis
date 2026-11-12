@@ -1,0 +1,33 @@
+%% ABC-407 · escenarios agrupados de solo lectura: ABC-108 historial de producción (S3-08), ABC-109 reportes de
+%% producción (S3-09), ABC-390 historial de rutas (S3-17) y ABC-110 reportes logísticos (S3-18)
+sequenceDiagram
+  autonumber
+  actor S as Supervisor o Encargado
+  participant F as Frontend
+  participant G as API Gateway
+  participant PR as produccion-service
+  participant LG as logistica-service
+  participant DBP as produccion_db
+  participant DBL as logistica_db
+
+  S->>F: filtros (fechas, estado, producto o chofer)
+  F->>G: GET /api/produccion/historial/ordenes?filtros&page
+  G->>PR: proxy
+  PR->>DBP: consulta paginada con desempate por id
+  PR-->>F: items, total y totalPages
+
+  F->>G: GET /api/logistica/historial/rutas?filtros&page (ABC-391)
+  G->>LG: proxy
+  LG->>DBL: rutas filtradas, paradas y boletas contadas en subconsultas
+  S->>F: abre una ruta
+  F->>G: GET /api/logistica/historial/rutas/:id (ABC-393)
+  G->>LG: proxy
+  LG->>DBL: REPEATABLE READ: ruta, paradas, boletas, ítems, incidencias y reprogramaciones de esa ruta
+  LG-->>F: detalle y lotes vigentes (sin boletas anuladas)
+
+  S->>F: vista previa de reporte
+  F->>G: GET /api/produccion/reportes/produccion?filtros (ABC-336/337)
+  F->>G: GET /api/logistica/reportes/logistica?filtros (ABC-340/341)
+  S->>F: exportar
+  F->>G: GET .../exportar/pdf o excel con los mismos filtros (ABC-338/342)
+  G-->>F: archivo PDF o Excel

@@ -37,6 +37,12 @@ export class BoletaEnvio {
   @Column({ name: 'responsable_usuario_id', type: 'bigint' })
   responsableUsuarioId!: string;
 
+  @Column({ name: 'producto_codigo', type: 'varchar', length: 80, nullable: true })
+  productoCodigo!: string | null;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  unidad!: string | null;
+
   @OneToMany(() => BoletaEnvioItem, (item) => item.boleta, { cascade: false })
   items!: BoletaEnvioItem[];
 

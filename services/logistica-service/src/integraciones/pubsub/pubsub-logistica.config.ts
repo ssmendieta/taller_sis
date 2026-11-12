@@ -5,7 +5,7 @@ export const PUBSUB_LOGISTICA_CONFIG = Symbol('PUBSUB_LOGISTICA_CONFIG');
 
 export interface PubSubLogisticaConfig {
   projectId: string;
-  publicacion: { enabled: boolean; topicId: string };
+  publicacion: { enabled: boolean; topicId: string; timeoutMs: number };
   resultado: { enabled: boolean; subscriptionId: string };
   outbox: {
     batchSize: number;
@@ -53,9 +53,18 @@ export function loadPubSubLogisticaConfig(env: NodeJS.ProcessEnv = process.env):
   const retryBaseMs = entero(env, 'OUTBOX_RETRY_BASE_MS', 5000);
   const retryMaxMs = entero(env, 'OUTBOX_RETRY_MAX_MS', 300000);
   if (retryMaxMs < retryBaseMs) throw new Error('OUTBOX_RETRY_MAX_MS no puede ser menor que OUTBOX_RETRY_BASE_MS');
+  const leaseMs = entero(env, 'OUTBOX_LEASE_MS', 30000);
+  // Sin límite, el cliente de Google reintenta durante minutos con el broker caído y el
+  // evento queda PROCESANDO sin error visible. Debe vencer antes que el lease.
+  const timeoutMs = entero(env, 'LOGISTICA_PUBSUB_PUBLISH_TIMEOUT_MS', 10000);
+  if (timeoutMs >= leaseMs) throw new Error('LOGISTICA_PUBSUB_PUBLISH_TIMEOUT_MS debe ser menor que OUTBOX_LEASE_MS');
   return {
     projectId,
-    publicacion: { enabled: publica, topicId: publica ? recurso(topic, projectId, 'topics', 'LOGISTICA_PUBSUB_SALIDA_TOPIC_ID') : topic },
+    publicacion: {
+      enabled: publica,
+      topicId: publica ? recurso(topic, projectId, 'topics', 'LOGISTICA_PUBSUB_SALIDA_TOPIC_ID') : topic,
+      timeoutMs,
+    },
     resultado: {
       enabled: consume,
       subscriptionId: consume ? recurso(suscripcion, projectId, 'subscriptions', 'LOGISTICA_PUBSUB_RESULTADO_SUBSCRIPTION_ID') : suscripcion,
@@ -63,7 +72,7 @@ export function loadPubSubLogisticaConfig(env: NodeJS.ProcessEnv = process.env):
     outbox: {
       batchSize: entero(env, 'OUTBOX_BATCH_SIZE', 20),
       pollIntervalMs: entero(env, 'OUTBOX_POLL_INTERVAL_MS', 5000),
-      leaseMs: entero(env, 'OUTBOX_LEASE_MS', 30000),
+      leaseMs,
       retryBaseMs,
       retryMaxMs,
     },

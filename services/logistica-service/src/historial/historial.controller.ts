@@ -1,4 +1,4 @@
-import { Controller, Get, Query, SetMetadata, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, SetMetadata, UseGuards } from '@nestjs/common';
 import { PermisoLogisticaGuard, PERMISO_LOGISTICA } from '../auth/permiso-logistica.guard';
 import { PERMISO_CONSULTAR_RUTAS } from '../rutas/rutas.controller';
 import { ListarHistorialRutasDto } from './dto/listar-historial-rutas.dto';
@@ -14,5 +14,11 @@ export class HistorialController {
   @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
   listarRutas(@Query(new ValidarListarHistorialRutasPipe()) query: ListarHistorialRutasDto) {
     return this.service.listarRutas(query);
+  }
+
+  @Get('rutas/:id')
+  @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
+  detalleRuta(@Param('id') id: string) {
+    return this.service.detalleRuta(id);
   }
 }

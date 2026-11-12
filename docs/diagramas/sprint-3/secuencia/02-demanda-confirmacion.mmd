@@ -1,0 +1,35 @@
+%% ABC-407 · ABC-130 (S3-02) — Confirmación de demanda (ABC-364/365/366/367)
+sequenceDiagram
+  autonumber
+  participant V as Ventas / Facturación
+  participant PS as Google Cloud Pub/Sub
+  participant C as Consumidor de confirmación
+  participant P as Procesador de confirmación
+  participant D as Procesador de demanda
+  participant DB as produccion_db
+
+  V->>PS: publica DemandaConfirmada.v1
+  PS->>C: entrega el mensaje
+  C->>P: procesar(payload, messageId)
+  P->>DB: BEGIN · SELECT eventos_inbox WHERE event_id
+  alt eventId repetido
+    P-->>C: DUPLICADO o PENDIENTE (según el inbox previo)
+  else evento nuevo
+    P->>DB: SELECT demanda (origen, id externo) FOR UPDATE
+    alt la demanda todavía no llegó
+      P->>DB: INSERT eventos_inbox PENDIENTE con próximo intento
+      P-->>C: PENDIENTE
+    else demanda encontrada
+      P->>D: confirmarDemanda(origen, id externo, fecha y correlación)
+      D->>DB: UPDATE demandas SET estado CONFIRMADA (misma fila, mismos ítems)
+      P->>DB: INSERT eventos_inbox PROCESADO (IGNORADO si ya estaba confirmada)
+      P-->>C: PROCESADO
+    end
+    P->>DB: COMMIT
+  end
+  C->>PS: ACK después del COMMIT
+  loop reprocesarPendientes (periódico)
+    C->>P: reprocesarPendientes()
+    P->>DB: confirma las PENDIENTES cuya demanda ya existe
+  end
+  Note over P,DB: Consulta: GET /api/produccion/demandas/planificables (solo CONFIRMADAS, ABC-366)

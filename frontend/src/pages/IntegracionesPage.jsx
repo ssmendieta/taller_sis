@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ESTADOS_OUTBOX,
   LIMITE_EVENTOS,
+  ORIGENES_INTEGRACION,
   listarEventos,
   reintentarEvento,
 } from "../services/integracionesService.js";
@@ -45,6 +46,7 @@ function mensajeError(fallo, respaldo) {
 }
 
 export default function IntegracionesPage() {
+  const [origen, setOrigen] = useState("produccion");
   const [estado, setEstado] = useState("");
   const [pagina, setPagina] = useState(1);
   const [datos, setDatos] = useState({ items: [], total: 0, limit: LIMITE_EVENTOS });
@@ -60,7 +62,7 @@ export default function IntegracionesPage() {
     setError("");
 
     try {
-      const respuesta = await listarEventos({ estado, page: pagina });
+      const respuesta = await listarEventos({ estado, page: pagina, origen });
       setDatos({
         items: Array.isArray(respuesta?.items) ? respuesta.items : [],
         total: Number(respuesta?.total) || 0,
@@ -77,7 +79,7 @@ export default function IntegracionesPage() {
   useEffect(() => {
     cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [estado, pagina]);
+  }, [estado, pagina, origen]);
 
   useEffect(() => {
     document.title = FORMATO_TITULO("Integraciones");
@@ -91,7 +93,7 @@ export default function IntegracionesPage() {
     setErrorAccion("");
 
     try {
-      const respuesta = await reintentarEvento(evento.id);
+      const respuesta = await reintentarEvento(evento.id, origen);
       setAviso(
         `${respuesta?.mensaje ?? "Reintento programado"} para el evento ${evento.eventId}. Saldrá cuando el publicador lo procese; esto no confirma que el receptor lo haya recibido.`,
       );
@@ -115,6 +117,28 @@ export default function IntegracionesPage() {
         descripcion="Eventos del outbox hacia Inventarios y Contabilidad. «Publicado» significa que Pub/Sub aceptó el mensaje, no que el receptor terminó la operación."
         conteo={!cargando && !error ? `${total} ${total === 1 ? "evento" : "eventos"}` : null}
       />
+
+      <div className="ts-btn-group" role="group" aria-label="Origen de los mensajes" style={{ marginBottom: 12 }}>
+        {Object.entries(ORIGENES_INTEGRACION).map(([valor, { texto, descripcion }]) => (
+          <button
+            key={valor}
+            type="button"
+            className={`ts-btn${origen === valor ? " ts-btn-primary" : ""}`}
+            aria-pressed={origen === valor}
+            title={descripcion}
+            onClick={() => {
+              if (origen === valor) return;
+              setOrigen(valor);
+              setEstado("");
+              setPagina(1);
+              setAviso("");
+              setErrorAccion("");
+            }}
+          >
+            {texto}
+          </button>
+        ))}
+      </div>
 
       {aviso && <p className="ts-success" role="status">{aviso}</p>}
       {errorAccion && <p className="ts-notice ts-error" role="alert">{errorAccion}</p>}
@@ -174,7 +198,7 @@ export default function IntegracionesPage() {
           <>
             <div className="ts-table-wrap">
               <table className="ts-table">
-                <caption>Eventos del outbox con su estado de publicación</caption>
+                <caption>{`Eventos del outbox de ${ORIGENES_INTEGRACION[origen].texto} con su estado de publicación`}</caption>
                 <thead>
                   <tr>
                     <th scope="col">eventId</th>
@@ -198,6 +222,12 @@ export default function IntegracionesPage() {
                           <span className="ts-code">{evento.eventId}</span>
                           <br />
                           <small>{evento.eventType}</small>
+                          {evento.agregado?.tipo === "Ruta" && (
+                            <>
+                              <br />
+                              <small>Ruta #{evento.agregado.id}</small>
+                            </>
+                          )}
                         </td>
                         <td className="ts-code">{evento.correlationId ?? "—"}</td>
                         <td>{evento.destinoConfigurado ?? "Sin topic configurado"}</td>

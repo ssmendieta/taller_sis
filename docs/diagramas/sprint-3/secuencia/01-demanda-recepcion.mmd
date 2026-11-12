@@ -1,0 +1,40 @@
+%% ABC-407 · ABC-122 (S3-01) — Recepción de demanda por Pub/Sub (ABC-355/356/357/358)
+sequenceDiagram
+  autonumber
+  participant V as Ventas / Facturación
+  participant PS as Google Cloud Pub/Sub
+  participant C as Consumidor de demanda
+  participant P as Procesador de demanda
+  participant DB as produccion_db
+
+  V->>PS: publica DemandaRegistrada.v1 (eventId, correlationId, data)
+  PS->>C: entrega el mensaje (al menos una vez)
+  C->>P: procesar(payload, messageId)
+  P->>P: valida sobre v1 y reglas (origen, fecha, ítems, cantidad, unidad)
+  alt evento inválido o no JSON
+    P->>DB: INSERT demandas_rechazadas (EVENTO_INVALIDO)
+    P-->>C: error permanente
+    C->>PS: ACK (sin bucle de reintentos)
+  else válido
+    P->>DB: BEGIN · SELECT eventos_inbox WHERE event_id
+    alt mismo eventId ya recibido
+      P-->>C: DUPLICADO (mismo contenido) o rechazo EVENTO_CONTRADICTORIO
+    else evento nuevo
+      P->>DB: SELECT demanda (origen, id externo) FOR UPDATE
+      alt misma demanda y mismo contenido
+        P->>DB: INSERT eventos_inbox IGNORADO
+        P-->>C: DUPLICADO (devuelve la misma demanda)
+      else misma demanda con contenido distinto
+        P->>DB: ROLLBACK · INSERT demandas_rechazadas (DEMANDA_CONTRADICTORIA)
+        P-->>C: error permanente
+      else demanda nueva
+        P->>DB: INSERT demandas RECIBIDA, demandas_items, eventos_inbox PROCESADO
+        P->>DB: COMMIT
+        P-->>C: PROCESADO
+      end
+    end
+    C->>PS: ACK solo después del COMMIT
+  end
+  Note over P,DB: Choque 23505 por entrega concurrente: un reintento y responde DUPLICADO
+  Note over C,PS: Fallo transitorio (base caída o ACK perdido): NACK y Pub/Sub reentrega
+  Note over P,DB: Consulta: GET /api/produccion/demandas?origen&estado (ABC-358)
