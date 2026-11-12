@@ -1,12 +1,18 @@
 import 'reflect-metadata';
 import { INestApplication, Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { AddressInfo } from 'net';
 import { ERP_RECURSOS_CONFIG } from './clientes/erp-recursos.config';
 import { EJEMPLO_RESPUESTA_RECURSOS_V1 } from './dto/recursos-logisticos-v1';
+import { RecursoExternoChofer } from './entities/recurso-externo-chofer.entity';
+import { RecursoExternoSnapshot } from './entities/recurso-externo-snapshot.entity';
+import { RecursoExternoVehiculo } from './entities/recurso-externo-vehiculo.entity';
 import { RecursosExternosModule } from './recursos-externos.module';
 import { CopiaRecursosLogisticos, RESPALDO_RECURSOS_LOGISTICOS } from './respaldo-recursos';
+import { RespaldoRecursosTypeOrmService } from './respaldo-recursos.service';
 
 // PRUEBA SIMULADA: el ERP y Auth son servidores HTTP locales y la copia de
 // respaldo (ABC-352) es un Map en memoria. El controlador, el pipe, el servicio,
@@ -76,6 +82,16 @@ describe('ABC-353 / ABC-354: GET /recursos-logisticos con ERP simulado, filtros,
       .useValue({ url: urlErp, token: 'token-de-prueba-no-real', timeoutMs: 150, reintentos: 1, esperaReintentoMs: 0 })
       .overrideProvider(RESPALDO_RECURSOS_LOGISTICOS)
       .useValue(respaldo)
+      .overrideProvider(RespaldoRecursosTypeOrmService)
+      .useValue(respaldo)
+      .overrideProvider(DataSource)
+      .useValue({ getRepository: () => ({}) })
+      .overrideProvider(getRepositoryToken(RecursoExternoSnapshot))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(RecursoExternoVehiculo))
+      .useValue({})
+      .overrideProvider(getRepositoryToken(RecursoExternoChofer))
+      .useValue({})
       .compile();
     app = modulo.createNestApplication({ logger: false });
     await app.listen(0, '127.0.0.1');
