@@ -9,6 +9,7 @@ import { CrearSolicitudesSalida1710000000001 } from '../database/migrations/1710
 import { CrearBoletasEnvio1710000000002 } from '../database/migrations/1710000000002-CrearBoletasEnvio';
 import { ReglaConcurrenciaDocumental1710000000003 } from '../database/migrations/1710000000003-ReglaConcurrenciaDocumental';
 import { HistorialBoletasEnvio1710000000004 } from '../database/migrations/1710000000004-HistorialBoletasEnvio';
+import { ProductoUnidadBoleta1710000000013 } from '../database/migrations/1710000000013-ProductoUnidadBoleta';
 import { BoletasModule } from '../boletas/boletas.module';
 import { BoletaEnvio } from '../boletas/entities/boleta-envio.entity';
 import { BoletaEnvioHistorial } from '../boletas/entities/boleta-envio-historial.entity';
@@ -34,7 +35,7 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
   const ordenesPorCodigo: Record<string, string> = { 'ORD-PRUEBA': '8', 'ORD-2026-00007': '700', 'ORD-2026-00008': '800' };
   const codigoOrden = (id: string) => Object.keys(ordenesPorCodigo).find((codigo) => ordenesPorCodigo[codigo] === id) ?? 'ORD-PRUEBA';
   const produccion = {
-    consultarOrdenPorId: jest.fn(async (id: string) => ({ id, codigo: codigoOrden(id), producto_id: 3, producto: { codigo: 'P-PRUEBA' } })),
+    consultarOrdenPorId: jest.fn(async (id: string) => ({ id, codigo: codigoOrden(id), producto_id: 3, producto: { codigo: 'P-PRUEBA', unidad_producto: 'unidad' } })),
     consultarOrdenPorCodigo: jest.fn(async (codigo: string) => {
       const id = ordenesPorCodigo[codigo];
       if (!id) throw new NotFoundException('Orden no encontrada');
@@ -66,7 +67,8 @@ describeReal('Logistica: solicitud de salida a boleta por HTTP y PostgreSQL', ()
       await runner.query(`CREATE SCHEMA "${schema}"`);
       await runner.query(`SET LOCAL search_path TO "${schema}"`);
       for (const migration of [new CrearSolicitudesSalida1710000000001(), new CrearBoletasEnvio1710000000002(),
-        new ReglaConcurrenciaDocumental1710000000003(), new HistorialBoletasEnvio1710000000004()]) {
+        new ReglaConcurrenciaDocumental1710000000003(), new HistorialBoletasEnvio1710000000004(),
+        new ProductoUnidadBoleta1710000000013()]) {
         await migration.up(runner);
       }
       await runner.commitTransaction();

@@ -1,0 +1,28 @@
+# Reporte de commits: Andrea Carolina Narváez Ortega
+
+- Autor(es) Git observados: `Andrea` (`andreanarvaezort@gmail.com`); `Andrea Narváez` (`andreanarvaezort`); `Andrea Narváez` (`andreanarvaezort@gmail.com`).
+- Período por fecha de autor: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz` (UTC−4).
+- Fuente: unión sin duplicar SHA de `origin/develop` (`b4ee381c`) y `RamaSergio` (`78d48af1`).
+- Se excluyen merges y cambios sin commit. Los mensajes sin clave Jira quedan sin asociación inferida. Validación individual de autoría: pendiente.
+- Commits incluidos: **18** (18 en origin/develop; 0 exclusivamente locales al corte).
+
+| Fecha y hora (UTC−4) | SHA | Jira | Mensaje del commit |
+| --- | --- | --- | --- |
+| 2026-11-07T12:15:49-04:00 | [b79280c91184](https://github.com/ssmendieta/taller_sis/commit/b79280c91184dd4ab96717e307d4ec69723eecaf) | [ABC-332](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-332) | feat(ABC-332): agregar historial de produccion con filtros y paginacion |
+| 2026-11-07T12:58:26-04:00 | [551843b67a72](https://github.com/ssmendieta/taller_sis/commit/551843b67a72d7437ef41e3f87574739e4cae23b) | [ABC-336](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-336) | feat(ABC-336): agregar reporte de produccion con filtros y totales |
+| 2026-11-09T14:34:21-04:00 | [2a525164e594](https://github.com/ssmendieta/taller_sis/commit/2a525164e594037265f29da7f44a8bcf9cd62c9f) | [ABC-317](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-317) | test(ABC-317): verificar pérdidas de materia prima |
+| 2026-11-09T15:17:39-04:00 | [aa7d3c9e4c2d](https://github.com/ssmendieta/taller_sis/commit/aa7d3c9e4c2db0c45f3be4f04f2489330ad94c7c) | [ABC-341](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-341) | feat(ABC-341): agregar vista previa de reportes logísticos |
+| 2026-11-09T16:12:38-04:00 | [dae867e41714](https://github.com/ssmendieta/taller_sis/commit/dae867e4171404120783d621c627253f2ab45db9) | [ABC-342](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-342) | feat(ABC-342): exportar reportes logísticos a PDF y Excel |
+| 2026-11-09T16:21:42-04:00 | [0ca191ac1639](https://github.com/ssmendieta/taller_sis/commit/0ca191ac1639ccf2fedb004ba40a7d7ec34b9660) | [ABC-396](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-396) | feat(ABC-396): registrar reprocesos y consultar saldos de calidad |
+| 2026-11-09T16:25:37-04:00 | [883508473372](https://github.com/ssmendieta/taller_sis/commit/88350847337265e1979267ba7b5c150fad50ff45) | [ABC-381](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-381) | feat(ABC-381): registrar incidencias y reprogramar rutas |
+| 2026-11-09T16:39:17-04:00 | [e96055b697b1](https://github.com/ssmendieta/taller_sis/commit/e96055b697b173582de8560973173cdd7a425010) | [ABC-348](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-348) | fix(ABC-348): validar respuestas y preservar el estado contable final |
+| 2026-11-09T21:33:59-04:00 | [83ecea6d4c7f](https://github.com/ssmendieta/taller_sis/commit/83ecea6d4c7f635220d4154cb73f4b7e770b8226) | [ABC-362](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-362) | feat(ABC-362): agrupar y desagrupar solicitudes de salida |
+| 2026-11-09T21:37:28-04:00 | [ab6304266ba3](https://github.com/ssmendieta/taller_sis/commit/ab6304266ba375129a3c7d6913a6713c4c4d1382) | [ABC-347](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-347) | test(ABC-347): verificar el reintento idempotente de cierres |
+| 2026-11-10T23:49:38-04:00 | [fb179c1cd999](https://github.com/ssmendieta/taller_sis/commit/fb179c1cd9990bda20d7307abf5357488d8a2ce9) | [ABC-334](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-334) | feat(ABC-334): consultar la cronología de eventos de producción |
+| 2026-11-11T00:28:58-04:00 | [9a707c24bbf1](https://github.com/ssmendieta/taller_sis/commit/9a707c24bbf13812c9651be0205c7b8374ecde4a) | [ABC-373](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-373) | test(ABC-373): verificar asignación de rutas con PostgreSQL |
+| 2026-11-12T00:31:02-04:00 | [184b899d176b](https://github.com/ssmendieta/taller_sis/commit/184b899d176b6ceeb8f5f51665f8d21572d2953e) | [ABC-373](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-373) | test(ABC-373): integrar planificación React con API y PostgreSQL |
+| 2026-11-12T00:32:43-04:00 | [bd085c0d8d8f](https://github.com/ssmendieta/taller_sis/commit/bd085c0d8d8fc75e8278f662e4b0ba5feb4c001c) | [ABC-373](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-373) | docs(ABC-373): registrar aceptación integrada de rutas |
+| 2026-11-12T00:38:08-04:00 | [894d0558aa39](https://github.com/ssmendieta/taller_sis/commit/894d0558aa396490e16e76c47d21e9e7ab95044c) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | test(ABC-403): automatizar arranque y humo del sprint 3 |
+| 2026-11-12T00:38:52-04:00 | [5ac4e25a2ddb](https://github.com/ssmendieta/taller_sis/commit/5ac4e25a2ddb88b08fa5e51be94e4174640c8789) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | build(ABC-403): permitir pruebas locales sin credenciales GCP |
+| 2026-11-12T00:44:46-04:00 | [f01204c0c9b0](https://github.com/ssmendieta/taller_sis/commit/f01204c0c9b00e3e8f58181112c29da3d77a75cb) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | docs(ABC-403): documentar humo y evidencia de despliegue |
+| 2026-11-12T00:44:59-04:00 | [d236486ce428](https://github.com/ssmendieta/taller_sis/commit/d236486ce428026bc023b39b15bb6fcd9f5ab87a) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | docs(ABC-403): registrar validaciones y evidencia pendiente |
