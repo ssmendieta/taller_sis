@@ -31,7 +31,7 @@ Las estimaciones aparecen en el resumen de cada subtarea; la búsqueda no devolv
 
 ## Pendientes arrastrados del Sprint 2
 
-Jira muestra [ABC-276](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-276) en Por hacer, con vencimiento 15/10/2026. Sus subtareas ABC-277, ABC-278 y ABC-280 aparecen Listo; ABC-279 (“Implementar interfaz de disponibilidad y solicitud a Almacén”) aparece Por hacer. No se encontró una confirmación de las causas por las que quedó pendiente. **Motivo: pendiente de validar con PM/PO y responsables; no se atribuye una causa sin confirmación.** Tampoco se confirmó en la consulta de Jira la asignación de ABC-276 al Sprint 2; el equipo debe validar ese antecedente antes de presentarlo como pendiente arrastrado.
+**Aclaración:** ABC-276 está en el backlog, según confirmación del equipo; no se considera un pendiente arrastrado del Sprint 2. Su subtarea ABC-279 tampoco cambia esa clasificación. No hace falta atribuir una causa a ABC-276 para este cierre.
 
 ## Reportes individuales
 
