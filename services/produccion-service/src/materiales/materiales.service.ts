@@ -53,6 +53,7 @@ export class MaterialesService {
   codigo: dto.codigo,
   nombre: dto.nombre,
   unidadMedida: dto.unidadMedida,
+  ...(dto.costoUnitario !== undefined && { costoUnitario: dto.costoUnitario }),
 });
 
 

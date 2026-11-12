@@ -1,8 +1,15 @@
 import { randomUUID } from 'crypto';
 import { CierreProduccion } from '../../cierre-produccion/entities/cierre-produccion.entity';
 import { PRODUCCION_CERRADA_V1, ProduccionCerradaV1Event } from '../contratos/contabilidad-v1';
+import { calcularCostoBase } from './calcular-costo-base';
 
-export function crearEventoProduccionCerrada(cierre: CierreProduccion): ProduccionCerradaV1Event {
+// `precios` (materialId -> costo unitario BOB o null) se lee del catalogo al cerrar;
+// el snapshot no se modifica: el costo solo queda congelado en el payload del outbox.
+export function crearEventoProduccionCerrada(
+  cierre: CierreProduccion,
+  precios: ReadonlyMap<string, string | null> = new Map(),
+): ProduccionCerradaV1Event {
+  const { consumos, costoBase } = calcularCostoBase(cierre.consumos, precios);
   return {
     eventId: randomUUID(),
     eventType: PRODUCCION_CERRADA_V1,
@@ -18,7 +25,8 @@ export function crearEventoProduccionCerrada(cierre: CierreProduccion): Producci
       producto: { ...cierre.producto },
       cantidadSolicitada: cierre.cantidadSolicitada,
       cantidadConforme: cierre.cantidadConforme,
-      consumos: cierre.consumos.map((consumo) => ({ ...consumo })),
+      consumos,
+      costoBase,
       finalizadaAt: cierre.finalizadaAt.toISOString(),
     },
   };

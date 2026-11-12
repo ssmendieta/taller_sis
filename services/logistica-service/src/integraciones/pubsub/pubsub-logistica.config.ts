@@ -43,8 +43,14 @@ export function loadPubSubLogisticaConfig(env: NodeJS.ProcessEnv = process.env):
   const projectId = env.GCP_PROJECT_ID?.trim() ?? '';
   const publica = bandera(env, 'LOGISTICA_PUBSUB_ENABLED');
   const consume = bandera(env, 'LOGISTICA_PUBSUB_RESULTADO_CONSUMER_ENABLED');
-  const topic = env.LOGISTICA_PUBSUB_SALIDA_TOPIC_ID?.trim() ?? '';
-  const suscripcion = env.LOGISTICA_PUBSUB_RESULTADO_SUBSCRIPTION_ID?.trim() ?? '';
+  // ABC-402: la infraestructura GCP es externa. Cuando no existen recursos
+  // exclusivos de Logistica se reutilizan los recursos compartidos asignados.
+  const topic = env.LOGISTICA_PUBSUB_SALIDA_TOPIC_ID?.trim()
+    || env.PUBSUB_TOPIC_ID?.trim()
+    || '';
+  const suscripcion = env.LOGISTICA_PUBSUB_RESULTADO_SUBSCRIPTION_ID?.trim()
+    || env.PUBSUB_SUBSCRIPTION_ID?.trim()
+    || '';
   if ((publica || consume) && !projectId) throw new Error('GCP_PROJECT_ID es obligatorio cuando Logística usa Pub/Sub');
   if (publica && !topic) throw new Error('LOGISTICA_PUBSUB_SALIDA_TOPIC_ID es obligatorio cuando LOGISTICA_PUBSUB_ENABLED=true');
   if (consume && !suscripcion) {

@@ -2,14 +2,16 @@
 
 ## Objetivo actual
 
-`produccion-service` publica mensajes en un único topic compartido de Google
-Cloud Pub/Sub y puede consumir respuestas de Almacén desde una suscripción
-existente. La aplicación no crea topics ni suscripciones.
-Los contratos de Contabilidad e Inventario/Almacén comparten este topic y se
-diferencian mediante el atributo `eventType`.
+`produccion-service` y `logistica-service` publican en el topic compartido de
+Google Cloud Pub/Sub asignado al proyecto y consumen desde la suscripción
+existente. La aplicación no crea ni modifica topics, suscripciones o permisos.
+Los contratos comparten el topic y se diferencian mediante el atributo
+`eventType`.
 
 ```text
 produccion-service -- publish --> projects/{projectId}/topics/{topicId}
+logistica-service  -- publish --> projects/{projectId}/topics/{topicId}
+projects/{projectId}/subscriptions/{subscriptionId} --> consumer habilitado
 ```
 
 ## Configuración
@@ -21,6 +23,14 @@ produccion-service -- publish --> projects/{projectId}/topics/{topicId}
 | `PUBSUB_TOPIC_ID` | ID corto o nombre completo del topic existente. |
 | `PUBSUB_CONSUMER_ENABLED` | Habilita el consumidor idempotente de ABC-244. |
 | `PUBSUB_SUBSCRIPTION_ID` | ID corto o nombre completo de la suscripción de respuestas. |
+| `PUBSUB_DEMANDA_CONSUMER_ENABLED` | Habilita el consumidor de demandas. |
+| `PUBSUB_DEMANDA_SUBSCRIPTION_ID` | Suscripción existente para demandas. |
+| `PUBSUB_DEMANDA_CONFIRMACION_CONSUMER_ENABLED` | Habilita el consumidor de confirmaciones. |
+| `PUBSUB_DEMANDA_CONFIRMACION_SUBSCRIPTION_ID` | Suscripción existente para confirmaciones. |
+| `LOGISTICA_PUBSUB_ENABLED` | Habilita la publicación de Logística. |
+| `LOGISTICA_PUBSUB_SALIDA_TOPIC_ID` | Topic de Logística; si queda vacío reutiliza `PUBSUB_TOPIC_ID`. |
+| `LOGISTICA_PUBSUB_RESULTADO_CONSUMER_ENABLED` | Habilita el consumidor de resultados de Logística. |
+| `LOGISTICA_PUBSUB_RESULTADO_SUBSCRIPTION_ID` | Suscripción de Logística; si queda vacía reutiliza `PUBSUB_SUBSCRIPTION_ID`. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Ruta que usa Application Default Credentials. |
 | `GCP_CREDENTIALS_HOST_PATH` | Ruta del JSON en el host para el montaje de Docker. |
 | `OUTBOX_BATCH_SIZE` | Máximo de eventos reclamados por ciclo. |
@@ -54,9 +64,18 @@ Una publicación correcta imprime `PUBLICADO`, `eventId`, `correlationId`,
 
 ## Docker Compose
 
-`docker-compose.yml` monta `GCP_CREDENTIALS_HOST_PATH` dentro del contenedor en
-`/run/secrets/gcp/pubsub-service-account.json` como archivo de solo lectura. La
-ruta del host puede usar barras `/` en Windows.
+`docker-compose.yml` monta `GCP_CREDENTIALS_HOST_PATH` en Producción y Logística
+como `/run/secrets/gcp/pubsub-service-account.json`, siempre en modo de solo
+lectura. La ruta del host puede usar barras `/` en Windows.
+
+Para una demostración con una sola suscripción compartida se activa un consumidor
+por vez. Así cada prueba recibe únicamente el contrato que le corresponde:
+
+1. Mantener `PUBSUB_EMULATOR_HOST` vacío.
+2. Habilitar publicación en ambos servicios y un solo flag de consumo.
+3. Levantar el perfil `full` y publicar el evento del flujo elegido.
+4. Verificar en los logs `messageId`, `eventId` y el resultado persistido.
+5. Detener ese consumidor antes de habilitar el siguiente.
 
 ## Mensaje técnico de verificación
 
