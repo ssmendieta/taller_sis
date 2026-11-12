@@ -1,10 +1,10 @@
 # Reporte de commits: Sergio Samuel Mendieta Barrera
 
-- Autor Git: `ssmendieta` (`mendietasergio89@gmail.com`)
-- Período: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz`.
-- Fuente: refs locales después de `git fetch origin`; los commits reportados son alcanzables desde `origin/develop` al corte de consulta.
-- Se excluyen merges. Los commits sin clave Jira en el asunto se indican expresamente; su asociación requiere confirmación, no se infiere.
-- Commits incluidos: **18**.
+- Autor(es) Git observados: `ssmendieta` (`mendietasergio89@gmail.com`).
+- Período por fecha de autor: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz` (UTC−4).
+- Fuente: unión sin duplicar SHA de `origin/develop` (`f977f5cf602cfe7bf8b9efec946fbb578b36dfde`) y `RamaSergio` (`98b15f13ce74b59b3ea34d97d43e444afdb92973`).
+- Se excluyen merges y cambios sin commit. Los mensajes sin clave Jira quedan sin asociación inferida. Validación individual de autoría: pendiente.
+- Commits incluidos: **20** (18 en origin/develop; 2 exclusivamente locales al corte).
 
 | Fecha y hora (UTC−4) | SHA | Jira | Mensaje del commit |
 | --- | --- | --- | --- |
@@ -26,3 +26,5 @@
 | 2026-11-11T23:47:03-04:00 | [98a390dfeac4](https://github.com/ssmendieta/taller_sis/commit/98a390dfeac4223e5bebc0764ddebf7cdc4e7729) | [ABC-372](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-372) | feat(logistica): pantalla de planificacion de ruta (ABC-372) |
 | 2026-11-12T00:18:01-04:00 | [bab1c05f6f43](https://github.com/ssmendieta/taller_sis/commit/bab1c05f6f43d01ddf6559af10ac2e1577d08c05) | [ABC-401](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-401) | build(frontend): VITE_API_URL en build y despliegue via gateway (ABC-401) |
 | 2026-11-12T00:31:51-04:00 | [07718b48ae20](https://github.com/ssmendieta/taller_sis/commit/07718b48ae20b113945a4c77914af8985dad55c9) | [ABC-401](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-401) | fix(logistica): registrar entidades de respaldo de recursos, ERP en compose y ocultar aviso de respaldo (ABC-401) |
+| 2026-11-12T00:46:32-04:00 | `a3ccab240dbb72b4d3b9f5675ea9d661344e96c7` (solo local; sin enlace remoto) | [ABC-409](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-409) | docs(ABC-409): consolidar cierre del sprint y reportes |
+| 2026-11-12T00:50:57-04:00 | `98b15f13ce74b59b3ea34d97d43e444afdb92973` (solo local; sin enlace remoto) | [ABC-409](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-409), [ABC-276](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-276) | docs(ABC-409): excluir ABC-276 del arrastre del sprint |

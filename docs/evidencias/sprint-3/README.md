@@ -7,6 +7,9 @@ administrativo actualizado al 12/11, consultar [cierre-gestion.md](cierre-gestio
 y los [reportes individuales de commits](commits/README.md). No completar causas
 de pendientes del Sprint 2 sin confirmación de los responsables.
 
+Las [correcciones locales del 12/11](correcciones-locales-2026-11-12.md) registran
+el alcance implementado, las pruebas ejecutadas y los pendientes de aplicación.
+
 Paquete de evidencias para la rúbrica y la demo. Subtarea S3-20.04.
 Corte: **06/11/2026**, rama `develop` en `41ad432`. Cada fila indica si la
 evidencia existe en el repositorio, si es **real** (servicios y base reales) o

@@ -1,10 +1,10 @@
 # Reporte de commits: Gemina Ponce
 
-- Autor Git: `GeminaPonce27` (`gemina2703@gmail.com`)
-- Período: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz`.
-- Fuente: refs locales después de `git fetch origin`; los commits reportados son alcanzables desde `origin/develop` al corte de consulta.
-- Se excluyen merges. Los commits sin clave Jira en el asunto se indican expresamente; su asociación requiere confirmación, no se infiere.
-- Commits incluidos: **33**.
+- Autor(es) Git observados: `GeminaPonce27` (`gemina2703@gmail.com`).
+- Período por fecha de autor: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz` (UTC−4).
+- Fuente: unión sin duplicar SHA de `origin/develop` (`f977f5cf602cfe7bf8b9efec946fbb578b36dfde`) y `RamaSergio` (`98b15f13ce74b59b3ea34d97d43e444afdb92973`).
+- Se excluyen merges y cambios sin commit. Los mensajes sin clave Jira quedan sin asociación inferida. Validación individual de autoría: pendiente.
+- Commits incluidos: **33** (33 en origin/develop; 0 exclusivamente locales al corte).
 
 | Fecha y hora (UTC−4) | SHA | Jira | Mensaje del commit |
 | --- | --- | --- | --- |
@@ -34,10 +34,10 @@
 | 2026-11-10T22:17:36-04:00 | [8e8965e50430](https://github.com/ssmendieta/taller_sis/commit/8e8965e504301c1cbeb3218dc47f727c1df28008) | [ABC-385](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-385) | feat(logistica): contrato v1 de salida de productos a Inventarios (ABC-385) |
 | 2026-11-10T22:22:31-04:00 | [c52b03d3a104](https://github.com/ssmendieta/taller_sis/commit/c52b03d3a1041ba709fbd56400dd07fdd054ad43) | [ABC-386](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-386) | feat(logistica): outbox y publicacion confiable del despacho a Inventarios (ABC-386) |
 | 2026-11-10T22:22:31-04:00 | [f2dedfe7ab98](https://github.com/ssmendieta/taller_sis/commit/f2dedfe7ab9802557e1df06f002eb75eaca8136a) | [ABC-386](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-386) | feat(logistica): outbox y publicacion confiable del despacho a Inventarios (ABC-386) |
-| 2026-11-10T22:25:32-04:00 | [420b46f3f1a5](https://github.com/ssmendieta/taller_sis/commit/420b46f3f1a53245b1976d79558ee2f223efddce) | [ABC-387](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-387) | feat(logistica): recibir y aplicar la respuesta de Inventarios a la ruta (ABC-387) |
 | 2026-11-10T22:25:32-04:00 | [30cd53b11d3a](https://github.com/ssmendieta/taller_sis/commit/30cd53b11d3a48eaeb0f566c24323b29c5bcf839) | [ABC-387](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-387) | feat(logistica): recibir y aplicar la respuesta de Inventarios a la ruta (ABC-387) |
+| 2026-11-10T22:25:32-04:00 | [420b46f3f1a5](https://github.com/ssmendieta/taller_sis/commit/420b46f3f1a53245b1976d79558ee2f223efddce) | [ABC-387](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-387) | feat(logistica): recibir y aplicar la respuesta de Inventarios a la ruta (ABC-387) |
 | 2026-11-10T22:28:36-04:00 | [61c03e57738e](https://github.com/ssmendieta/taller_sis/commit/61c03e57738ea5833909de2a8f9fc74e7ff86582) | [ABC-388](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-388) | feat(logistica): pendientes y reintentos de eventos hacia Inventarios (ABC-388) |
-| 2026-11-10T22:33:08-04:00 | [27eff4920209](https://github.com/ssmendieta/taller_sis/commit/27eff4920209c0b02cfbe9a48ab7e86c0dd58402) | [ABC-388](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-388) | test(logistica): reclamar con margen ante el reloj adelantado de PostgreSQL (ABC-388) |
 | 2026-11-10T22:33:08-04:00 | [019743332bdd](https://github.com/ssmendieta/taller_sis/commit/019743332bddd7f35d94bf221d09d2177d6ad74f) | [ABC-386](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-386) | fix(logistica): limitar el tiempo de cada publicacion a Pub/Sub (ABC-386) |
+| 2026-11-10T22:33:08-04:00 | [27eff4920209](https://github.com/ssmendieta/taller_sis/commit/27eff4920209c0b02cfbe9a48ab7e86c0dd58402) | [ABC-388](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-388) | test(logistica): reclamar con margen ante el reloj adelantado de PostgreSQL (ABC-388) |
 | 2026-11-10T22:35:37-04:00 | [cde7294e643c](https://github.com/ssmendieta/taller_sis/commit/cde7294e643c222bc63f9fe1979ebd2b3c781fbe) | [ABC-388](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-388) | docs(evidencias): recorrido de despacho, fallo, reinicio y reintento hacia Inventarios (ABC-388) |
 | 2026-11-10T22:39:25-04:00 | [b598405432df](https://github.com/ssmendieta/taller_sis/commit/b598405432df95c29c2aa6a022a7be81074a6461) | [ABC-330](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-330) | feat(frontend): widgets de boletas, rutas y entregas con filtro de periodo (ABC-330) |

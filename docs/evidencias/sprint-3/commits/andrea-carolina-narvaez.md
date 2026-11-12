@@ -1,10 +1,10 @@
 # Reporte de commits: Andrea Carolina Narváez Ortega
 
-- Autor Git: `Andrea Narváez` (`andreanarvaezort`)
-- Período: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz`.
-- Fuente: refs locales después de `git fetch origin`; los commits reportados son alcanzables desde `origin/develop` al corte de consulta.
-- Se excluyen merges. Los commits sin clave Jira en el asunto se indican expresamente; su asociación requiere confirmación, no se infiere.
-- Commits incluidos: **14**.
+- Autor(es) Git observados: `Andrea` (`andreanarvaezort@gmail.com`); `Andrea Narváez` (`andreanarvaezort`); `Andrea Narváez` (`andreanarvaezort@gmail.com`).
+- Período por fecha de autor: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz` (UTC−4).
+- Fuente: unión sin duplicar SHA de `origin/develop` (`f977f5cf602cfe7bf8b9efec946fbb578b36dfde`) y `RamaSergio` (`98b15f13ce74b59b3ea34d97d43e444afdb92973`).
+- Se excluyen merges y cambios sin commit. Los mensajes sin clave Jira quedan sin asociación inferida. Validación individual de autoría: pendiente.
+- Commits incluidos: **18** (18 en origin/develop; 0 exclusivamente locales al corte).
 
 | Fecha y hora (UTC−4) | SHA | Jira | Mensaje del commit |
 | --- | --- | --- | --- |
@@ -22,3 +22,7 @@
 | 2026-11-11T00:28:58-04:00 | [9a707c24bbf1](https://github.com/ssmendieta/taller_sis/commit/9a707c24bbf13812c9651be0205c7b8374ecde4a) | [ABC-373](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-373) | test(ABC-373): verificar asignación de rutas con PostgreSQL |
 | 2026-11-12T00:31:02-04:00 | [184b899d176b](https://github.com/ssmendieta/taller_sis/commit/184b899d176b6ceeb8f5f51665f8d21572d2953e) | [ABC-373](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-373) | test(ABC-373): integrar planificación React con API y PostgreSQL |
 | 2026-11-12T00:32:43-04:00 | [bd085c0d8d8f](https://github.com/ssmendieta/taller_sis/commit/bd085c0d8d8fc75e8278f662e4b0ba5feb4c001c) | [ABC-373](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-373) | docs(ABC-373): registrar aceptación integrada de rutas |
+| 2026-11-12T00:38:08-04:00 | [894d0558aa39](https://github.com/ssmendieta/taller_sis/commit/894d0558aa396490e16e76c47d21e9e7ab95044c) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | test(ABC-403): automatizar arranque y humo del sprint 3 |
+| 2026-11-12T00:38:52-04:00 | [5ac4e25a2ddb](https://github.com/ssmendieta/taller_sis/commit/5ac4e25a2ddb88b08fa5e51be94e4174640c8789) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | build(ABC-403): permitir pruebas locales sin credenciales GCP |
+| 2026-11-12T00:44:46-04:00 | [f01204c0c9b0](https://github.com/ssmendieta/taller_sis/commit/f01204c0c9b00e3e8f58181112c29da3d77a75cb) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | docs(ABC-403): documentar humo y evidencia de despliegue |
+| 2026-11-12T00:44:59-04:00 | [d236486ce428](https://github.com/ssmendieta/taller_sis/commit/d236486ce428026bc023b39b15bb6fcd9f5ab87a) | [ABC-403](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-403) | docs(ABC-403): registrar validaciones y evidencia pendiente |

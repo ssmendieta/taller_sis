@@ -1,10 +1,10 @@
 # Reporte de commits: Andrés Ignacio Pabón Sotomayor
 
-- Autor Git: `4ndrespabon` (`andres.pabon@ucb.edu.bo`)
-- Período: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz`.
-- Fuente: refs locales después de `git fetch origin`; los commits reportados son alcanzables desde `origin/develop` al corte de consulta.
-- Se excluyen merges. Los commits sin clave Jira en el asunto se indican expresamente; su asociación requiere confirmación, no se infiere.
-- Commits incluidos: **15**.
+- Autor(es) Git observados: `4ndrespabon` (`andres.pabon@ucb.edu.bo`).
+- Período por fecha de autor: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz` (UTC−4).
+- Fuente: unión sin duplicar SHA de `origin/develop` (`f977f5cf602cfe7bf8b9efec946fbb578b36dfde`) y `RamaSergio` (`98b15f13ce74b59b3ea34d97d43e444afdb92973`).
+- Se excluyen merges y cambios sin commit. Los mensajes sin clave Jira quedan sin asociación inferida. Validación individual de autoría: pendiente.
+- Commits incluidos: **15** (15 en origin/develop; 0 exclusivamente locales al corte).
 
 | Fecha y hora (UTC−4) | SHA | Jira | Mensaje del commit |
 | --- | --- | --- | --- |

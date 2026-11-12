@@ -23,6 +23,8 @@
     "test:reportes-logisticos": "node --test scripts/reportes-logisticos.test.mjs",
     "test:agrupacion": "node --test scripts/agrupacion-solicitudes.test.mjs",
     "test:rutas": "node --test scripts/rutas.test.mjs",
+    "test:recursos": "node --test scripts/recursos-logisticos.test.mjs",
+    "test:rutas-integracion": "node --test scripts/rutas-integracion-real.test.mjs",
     "preview": "vite preview --port 5173"
   },
   "dependencies": {

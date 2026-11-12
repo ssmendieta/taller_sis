@@ -1,11 +1,15 @@
 import 'reflect-metadata';
 import { INestApplication, Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { AddressInfo } from 'net';
 import { ERP_RECURSOS_CONFIG } from './clientes/erp-recursos.config';
 import { EJEMPLO_RESPUESTA_RECURSOS_V1 } from './dto/recursos-logisticos-v1';
 import { RecursosExternosModule } from './recursos-externos.module';
+import { RecursoExternoSnapshot } from './entities/recurso-externo-snapshot.entity';
+import { RecursoExternoVehiculo } from './entities/recurso-externo-vehiculo.entity';
+import { RecursoExternoChofer } from './entities/recurso-externo-chofer.entity';
 import { CopiaRecursosLogisticos, RESPALDO_RECURSOS_LOGISTICOS } from './respaldo-recursos';
 
 // PRUEBA SIMULADA: el ERP y Auth son servidores HTTP locales y la copia de
@@ -71,12 +75,17 @@ describe('ABC-353 / ABC-354: GET /recursos-logisticos con ERP simulado, filtros,
         copias.set(copia.respuesta.fecha, copia);
       },
     };
-    const modulo = await Test.createTestingModule({ imports: [RecursosExternosModule] })
+    const builder = Test.createTestingModule({ imports: [RecursosExternosModule] })
       .overrideProvider(ERP_RECURSOS_CONFIG)
       .useValue({ url: urlErp, token: 'token-de-prueba-no-real', timeoutMs: 150, reintentos: 1, esperaReintentoMs: 0 })
       .overrideProvider(RESPALDO_RECURSOS_LOGISTICOS)
-      .useValue(respaldo)
-      .compile();
+      .useValue(respaldo);
+    // Esta suite usa respaldo en memoria. El módulo real registra las entidades
+    // para Docker; sus repositorios no deben abrir una BD en una prueba HTTP simulada.
+    for (const entidad of [RecursoExternoSnapshot, RecursoExternoVehiculo, RecursoExternoChofer]) {
+      builder.overrideProvider(getRepositoryToken(entidad)).useValue({});
+    }
+    const modulo = await builder.compile();
     app = modulo.createNestApplication({ logger: false });
     await app.listen(0, '127.0.0.1');
     base = await app.getUrl();
