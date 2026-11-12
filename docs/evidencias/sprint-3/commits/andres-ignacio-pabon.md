@@ -1,0 +1,25 @@
+# Reporte de commits: Andrés Ignacio Pabón Sotomayor
+
+- Autor Git: `4ndrespabon` (`andres.pabon@ucb.edu.bo`)
+- Período: 26/10/2026–12/11/2026 inclusive, zona `America/La_Paz`.
+- Fuente: refs locales después de `git fetch origin`; los commits reportados son alcanzables desde `origin/develop` al corte de consulta.
+- Se excluyen merges. Los commits sin clave Jira en el asunto se indican expresamente; su asociación requiere confirmación, no se infiere.
+- Commits incluidos: **15**.
+
+| Fecha y hora (UTC−4) | SHA | Jira | Mensaje del commit |
+| --- | --- | --- | --- |
+| 2026-11-04T12:37:31-04:00 | [aa8a4b334aae](https://github.com/ssmendieta/taller_sis/commit/aa8a4b334aae70e4e3b4843fbd625622d157b108) | [ABC-364](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-364) | feat(produccion): estado confirmada en la demanda con migracion (ABC-364) |
+| 2026-11-06T00:53:01-04:00 | [dfd1ea049f07](https://github.com/ssmendieta/taller_sis/commit/dfd1ea049f07a64f0dc8ec070fc447cc623b8048) | [ABC-358](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-358) | feat(produccion): endpoint y pantalla de consulta de demandas (ABC-358) |
+| 2026-11-06T02:09:03-04:00 | [835366851142](https://github.com/ssmendieta/taller_sis/commit/835366851142fb0a197f88abb53a23fe7511b71c) | [ABC-311](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-311) | feat(produccion): calculo de faltantes y validacion de consulta de disponibilidad (ABC-311) |
+| 2026-11-06T02:14:36-04:00 | [f502b88bce95](https://github.com/ssmendieta/taller_sis/commit/f502b88bce95a128abb526b349ed9d956f66e125) | [ABC-312](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-312) | feat(frontend): bloqueo de inicio con detalle de materiales faltantes y reintento (ABC-312) |
+| 2026-11-06T03:12:53-04:00 | [41f24046acd1](https://github.com/ssmendieta/taller_sis/commit/41f24046acd1891dc965a72ce120dc1d28768028) | [ABC-324](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-324) | feat(produccion): endpoint de metricas e indicadores para dashboard de produccion (ABC-324) |
+| 2026-11-06T04:16:10-04:00 | [6af97717c266](https://github.com/ssmendieta/taller_sis/commit/6af97717c266258ca7aaa8c588f8e8f54b4136b3) | [ABC-328](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-328) | feat(logistica): endpoint de metricas e indicadores para dashboard de logistica (ABC-328) |
+| 2026-11-06T04:59:25-04:00 | [697358d44dc7](https://github.com/ssmendieta/taller_sis/commit/697358d44dc74cf7f0e81a2d44707542ee5c64eb) | [ABC-352](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-352) | feat(logistica): copia local y sincronizacion de recursos logisticos (ABC-352) |
+| 2026-11-06T19:32:31-04:00 | [85213d3b1bbf](https://github.com/ssmendieta/taller_sis/commit/85213d3b1bbf2ffad9354e57a60b0c554f661625) | [ABC-319](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-319) | feat(frontend): indicador y barra de avance de orden de produccion (ABC-319) |
+| 2026-11-06T20:02:11-04:00 | [96cafda44f51](https://github.com/ssmendieta/taller_sis/commit/96cafda44f51d3d87ab6b22f6d977273ad1f58b1) | [ABC-320](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-320) | feat(frontend): detalle de registros de avance y observaciones de orden (ABC-320) |
+| 2026-11-06T21:33:07-04:00 | [676a4ceb441a](https://github.com/ssmendieta/taller_sis/commit/676a4ceb441ae0d056f244d6b16d361abae33d8f) | [ABC-378](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-378) | test(logistica): verificar criterios de aceptacion y regresion de despacho y entrega (ABC-378) |
+| 2026-11-10T22:31:28-04:00 | [b4c877631dac](https://github.com/ssmendieta/taller_sis/commit/b4c877631dac7063f4a8266adb33e5f6882af9b9) | [ABC-333](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-333) | feat(frontend): listado y filtros de historial de produccion en pantalla (ABC-333) |
+| 2026-11-10T22:56:35-04:00 | [34253931d0fa](https://github.com/ssmendieta/taller_sis/commit/34253931d0fa3fd5b351b9bfbfb9fc7866e29bea) | [ABC-339](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-339) | test(produccion): verificar criterios de aceptacion y caso sin datos en reportes (ABC-339) |
+| 2026-11-11T02:52:34-04:00 | [c3634c2ff5b4](https://github.com/ssmendieta/taller_sis/commit/c3634c2ff5b4ae566039c1cd6bcadf0ba9ba8ff2) | [ABC-386](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-386) | docs(evidencias): documentar outbox transaccional y publicacion confiable tras despacho (ABC-386) |
+| 2026-11-11T03:21:54-04:00 | [9fa66cda9a60](https://github.com/ssmendieta/taller_sis/commit/9fa66cda9a6007722c97f67ff429267133ec404b) | [ABC-389](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-389) | test(logistica): suite de regresion y verificacion de criterios de aceptacion de integracion pubsub (ABC-389) |
+| 2026-11-11T04:04:03-04:00 | [d52b76715e85](https://github.com/ssmendieta/taller_sis/commit/d52b76715e852a71ea6ad2c2e316b850cf0f75c7) | [ABC-405](https://ucb-team-h8yk3x85.atlassian.net/browse/ABC-405) | docs(diagramas): incorporar diagramas de clases de produccion-service y logistica-service (ABC-405) |
