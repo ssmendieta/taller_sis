@@ -2,8 +2,8 @@
 
 ABC-385. Fuente de verdad del código:
 `services/logistica-service/src/integraciones/contratos/inventarios-salida-v1.ts`
-y su validador. **Contrato propuesto por Logística; debe confirmarse con el
-equipo de Inventarios** antes de la integración real.
+y su validador. Este contrato es la referencia para el receptor de Inventarios,
+implementado inicialmente como simulador.
 
 ## Flujo
 
@@ -39,6 +39,8 @@ Ambos mensajes llevan atributos Pub/Sub `eventId`, `eventType`, `source` y
         "boletaId": "1",
         "numero": "BOL-2026-00001",
         "ordenId": "2",
+        "productoCodigo": "GAL-001",
+        "unidad": "unidad",
         "items": [{ "loteReferencia": "LOT-GAL-001", "cantidad": "6.0000" }]
       }
     ]
@@ -52,6 +54,9 @@ Ambos mensajes llevan atributos Pub/Sub `eventId`, `eventType`, `source` y
 | `fechaProgramada` | `AAAA-MM-DD` |
 | `despachadaEn`, `occurredAt` | ISO 8601 con zona horaria |
 | `boletas` | al menos una, sin repetir; solo boletas EMITIDAS de paradas no anuladas |
+| `boletas[].productoCodigo` | código no vacío del producto de la orden, congelado en la boleta |
+| `boletas[].unidad` | `kg`, `g`, `l`, `ml`, `m`, `cm`, `unidad`, `docena`, `caja` o `paquete` |
+| `boletas[].items[].loteReferencia` | lote documental no vacío asociado al producto |
 | `items[].cantidad` | decimal positivo en texto con exactamente 4 decimales |
 
 Un mismo despacho genera **un solo** evento lógico: el outbox tiene unicidad por
@@ -87,3 +92,7 @@ ruta y tipo de evento. Los reintentos reenvían el mismo `eventId` y cuerpo.
 El primer resultado final de una ruta es el que vale: una respuesta posterior se
 registra como IGNORADA. El mismo `eventId` con otro contenido es un rechazo
 permanente.
+
+El ejemplo anterior representa un rechazo. Una confirmación usa el mismo sobre,
+`correlationId`, `rutaId` y `requestEventId`, con `estado: "ACEPTADA"` y sin
+`codigoRechazo`.

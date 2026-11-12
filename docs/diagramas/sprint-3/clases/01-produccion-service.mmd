@@ -1,0 +1,341 @@
+classDiagram
+    direction TB
+
+    %% ========================================================
+    %% DIAGRAMA DE CLASES: PRODUCCION-SERVICE (Sprint 3 - ABC-405)
+    %% Base de datos: produccion_db (Esquema relacional TypeORM)
+    %% ========================================================
+
+    %% --- AGREGADO ÓRDENES Y EJECUCIÓN (Sprint 2 + Extensiones S3) ---
+    class OrdenProduccion {
+        <<Sprint 2>>
+        +int id PK
+        +varchar(50) codigo UNIQUE
+        +int receta_id FK
+        +decimal(10,2) cantidad_solicitada
+        +date fecha_requerida
+        +varchar(50) estado
+        +int responsable_usuario_id
+        +varchar(150) responsable_nombre
+        +timestamptz iniciada_en
+        +timestamptz pausada_en
+        +timestamptz finalizada_en
+        +timestamptz creado_en
+        +timestamptz actualizado_en
+    }
+
+    class HistorialEstadoOrden {
+        <<Nuevo Sprint 3>>
+        +int id PK
+        +int orden_id FK
+        +varchar(50) estado_anterior
+        +varchar(50) estado_nuevo
+        +varchar(255) motivo
+        +int usuario_id
+        +varchar(150) usuario_nombre
+        +timestamptz creado_en
+    }
+
+    class AvancesProduccion {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint orden_id FK
+        +numeric(14,4) cantidad_producida
+        +timestamptz registrado_en
+        +bigint usuario_responsable_id
+        +varchar(150) usuario_responsable_nombre
+    }
+
+    class PerdidaMateriaPrima {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint orden_id FK
+        +bigint material_id FK
+        +numeric(14,4) cantidad
+        +varchar(40) unidad
+        +varchar(500) motivo
+        +bigint autor_usuario_id
+        +timestamptz registrado_en
+    }
+
+    class ObservacionOrden {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint orden_id FK
+        +varchar(20) tipo
+        +varchar(1000) descripcion
+        +bigint autor_usuario_id
+        +varchar(150) autor_nombre
+        +timestamptz creado_en
+    }
+
+    %% --- AGREGADO CALIDAD, REPROCESO Y CIERRE ---
+    class ResultadoConforme {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint orden_id FK
+        +numeric(14,4) cantidad
+        +varchar(20) tipo
+        +varchar(500) causa_defecto
+        +bigint responsable_usuario_id
+        +timestamptz registrado_en
+    }
+
+    class Reproceso {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint orden_id FK
+        +bigint resultado_calidad_id FK
+        +numeric(14,4) cantidad_procesada
+        +numeric(14,4) cantidad_recuperada
+        +numeric(14,4) cantidad_descartada
+        +varchar(500) motivo
+        +bigint autor_usuario_id
+        +timestamptz registrado_en
+    }
+
+    class CierreProduccion {
+        <<Sprint 2 ampliado S3>>
+        +bigint id PK
+        +bigint orden_id FK
+        +integer cierre_version
+        +varchar(50) orden_codigo
+        +jsonb producto
+        +numeric(14,4) cantidad_solicitada
+        +numeric(14,4) cantidad_producida
+        +numeric(14,4) cantidad_conforme
+        +numeric(14,4) cantidad_defectuosa
+        +jsonb consumos
+        +timestamptz finalizada_at
+        +timestamptz fecha_cierre
+        +varchar(20) estado_contable
+        +uuid resultado_contable_event_id
+        +timestamptz resultado_contable_en
+        +varchar(100) codigo_rechazo_contable
+        +varchar(500) detalle_contable
+    }
+
+    %% --- AGREGADO RECETAS, MATERIALES Y LOTES ---
+    class Receta {
+        <<Sprint 2>>
+        +int id PK
+        +varchar(50) codigo UNIQUE
+        +varchar(150) nombre
+        +varchar(500) descripcion
+        +int producto_id
+        +varchar(150) producto_nombre
+        +timestamptz creado_en
+    }
+
+    class RecetaMaterial {
+        <<Sprint 2>>
+        +int receta_id PK_FK
+        +int material_id PK_FK
+        +decimal(10,4) cantidad
+        +varchar(50) unidad
+    }
+
+    class Material {
+        <<Sprint 2>>
+        +int id PK
+        +varchar(50) codigo UNIQUE
+        +varchar(150) nombre
+        +varchar(500) descripcion
+        +varchar(50) unidad_medida
+        +decimal(10,2) stock_actual
+        +timestamptz creado_en
+    }
+
+    class ConsumoMaterial {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint orden_id FK
+        +bigint material_id FK
+        +numeric(14,4) cantidad
+        +varchar(40) unidad
+        +bigint usuario_registro_id
+        +timestamptz registrado_en
+    }
+
+    class Lote {
+        <<Sprint 2>>
+        +bigint id PK
+        +varchar(80) codigo_lote
+        +bigint orden_id FK
+        +numeric(14,4) cantidad
+        +date fecha_produccion
+        +date fecha_vencimiento
+        +bigint responsable_usuario_id
+        +timestamptz creado_en
+    }
+
+    class Inventario {
+        <<Sprint 2>>
+        +int id PK
+        +int material_id FK
+        +decimal(10,2) cantidad
+        +varchar(100) ubicacion
+        +timestamptz actualizado_en
+    }
+
+    class SolicitudMaterial {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint orden_id FK
+        +bigint solicitante_usuario_id
+        +varchar(20) estado
+        +integer solicitud_version
+        +timestamptz estado_actualizado_en
+        +varchar(500) motivo_estado
+        +timestamptz creado_en
+    }
+
+    class SolicitudMaterialItem {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint solicitud_id FK
+        +bigint material_id FK
+        +numeric(14,4) cantidad
+        +varchar(40) unidad
+    }
+
+    %% --- AGREGADO DEMANDA PUB/SUB (ABC-122, ABC-130) ---
+    class Demanda {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +varchar(80) demanda_externa_id
+        +varchar(20) cliente_id
+        +date fecha_requerida
+        +varchar(20) estado
+        +uuid event_id
+        +uuid correlation_id
+        +char(64) contenido_hash
+        +timestamptz confirmada_en
+        +uuid confirmacion_event_id
+        +timestamptz creado_en
+    }
+
+    class DemandaItem {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint demanda_id FK
+        +varchar(80) producto_codigo
+        +numeric(14,4) cantidad
+        +varchar(20) unidad
+    }
+
+    class DemandaRechazada {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +uuid event_id
+        +varchar(20) cliente_id
+        +varchar(80) demanda_externa_id
+        +varchar(40) motivo_rechazo
+        +varchar(1000) detalle_error
+        +jsonb payload_original
+        +varchar(255) message_id
+        +timestamptz rechazado_en
+    }
+
+    %% --- AGREGADO INTEGRACIONES ASÍNCROANAS (ABC-70, ABC-114) ---
+    class ConsultaDisponibilidad {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +varchar(100) consulta_id UNIQUE
+        +integer consulta_version
+        +bigint orden_id FK
+        +uuid request_event_id
+        +uuid correlation_id
+        +varchar(20) estado
+        +uuid response_event_id
+        +varchar(500) error_respuesta
+        +timestamptz respuesta_esperada_hasta
+        +timestamptz creado_en
+        +timestamptz vigente_en
+    }
+
+    class ConsultaDisponibilidadItem {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint consulta_disponibilidad_id FK
+        +bigint material_id
+        +varchar(80) material_codigo
+        +varchar(160) material_nombre
+        +numeric(14,4) cantidad_requerida
+        +numeric(14,4) cantidad_disponible
+        +varchar(30) unidad
+        +varchar(20) estado
+    }
+
+    class EventoOutbox {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +uuid event_id UNIQUE
+        +uuid correlation_id
+        +varchar(120) event_type
+        +varchar(80) aggregate_type
+        +varchar(100) aggregate_id
+        +jsonb payload
+        +varchar(20) estado
+        +integer reintentos
+        +varchar(255) message_id
+        +text ultimo_error
+        +timestamptz proximo_intento_en
+        +timestamptz ultimo_intento_en
+        +uuid bloqueo_token
+        +timestamptz bloqueo_hasta
+        +timestamptz creado_en
+        +timestamptz publicado_en
+    }
+
+    class EventoInbox {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +uuid event_id UNIQUE
+        +uuid correlation_id
+        +varchar(120) event_type
+        +char(64) payload_hash
+        +jsonb payload
+        +varchar(20) estado
+        +varchar(255) message_id
+        +varchar(500) ultimo_error
+        +smallint reintentos
+        +timestamptz proximo_intento_en
+        +timestamptz procesado_en
+    }
+
+    %% --- RELACIONES (TypeORM Foreign Keys & Cardinallity) ---
+    Receta "1" *-- "0..*" RecetaMaterial : items
+    Material "1" <-- "0..*" RecetaMaterial : material
+    Material "1" <-- "0..*" Inventario : material
+    Receta "1" <-- "0..*" OrdenProduccion : receta_id
+
+    OrdenProduccion "1" *-- "0..*" HistorialEstadoOrden : fk_historial_orden
+    OrdenProduccion "1" *-- "0..*" AvancesProduccion : orden_id
+    OrdenProduccion "1" *-- "0..*" PerdidaMateriaPrima : fk_perdida_mp_orden
+    Material "1" <-- "0..*" PerdidaMateriaPrima : fk_perdida_mp_material
+
+    OrdenProduccion "1" *-- "0..*" ObservacionOrden : fk_observacion_orden_orden
+    OrdenProduccion "1" *-- "0..*" ResultadoConforme : fk_resultado_conforme_orden
+
+    OrdenProduccion "1" <-- "0..*" Reproceso : fk_reproceso_orden
+    ResultadoConforme "1" <-- "0..*" Reproceso : fk_reproceso_resultado_calidad
+
+    OrdenProduccion "1" <-- "0..*" CierreProduccion : fk_cierre_produccion_orden
+
+    OrdenProduccion "1" *-- "0..*" ConsumoMaterial : fk_consumo_material_orden
+    Material "1" <-- "0..*" ConsumoMaterial : fk_consumo_material_material
+
+    OrdenProduccion "1" *-- "0..*" Lote : fk_lote_orden
+    OrdenProduccion "1" *-- "0..*" SolicitudMaterial : fk_solicitud_material_orden
+    SolicitudMaterial "1" *-- "1..*" SolicitudMaterialItem : items
+    Material "1" <-- "0..*" SolicitudMaterialItem : material
+
+    Demanda "1" *-- "1..*" DemandaItem : fk_demanda_item_demanda
+    Demanda <.. DemandaRechazada : auditoria fallos
+
+    OrdenProduccion "1" <-- "0..*" ConsultaDisponibilidad : orden_id
+    ConsultaDisponibilidad "1" *-- "1..*" ConsultaDisponibilidadItem : items
+
+    CierreProduccion ..> EventoOutbox : genera costos.orden.v1 (ABC-114)
+    Demanda <.. EventoInbox : demanda.recibida / confirmada (ABC-122/130)

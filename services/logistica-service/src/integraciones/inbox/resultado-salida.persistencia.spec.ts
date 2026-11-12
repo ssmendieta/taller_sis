@@ -12,6 +12,7 @@ import { EstadosDespachoEntrega1710000000006 } from '../../database/migrations/1
 import { ObservacionesDespachoEntrega1710000000008 } from '../../database/migrations/1710000000008-ObservacionesDespachoEntrega';
 import { EventosOutboxLogistica1710000000011 } from '../../database/migrations/1710000000011-EventosOutboxLogistica';
 import { ResultadoInventarioRuta1710000000012 } from '../../database/migrations/1710000000012-ResultadoInventarioRuta';
+import { ProductoUnidadBoleta1710000000013 } from '../../database/migrations/1710000000013-ProductoUnidadBoleta';
 import { DespachoService } from '../../despacho/despacho.service';
 import { SALIDA_INVENTARIO_RESULTADO_V1, DespachoRutaRegistradoV1Event } from '../contratos/inventarios-salida-v1';
 import { EventoOutbox } from '../outbox/entities/evento-outbox.entity';
@@ -48,7 +49,7 @@ describeReal('ABC-387: resultado de Inventarios aplicado a la ruta en PostgreSQL
         new ReglaConcurrenciaDocumental1710000000003(), new HistorialBoletasEnvio1710000000004(),
         new CrearRutas1710000000005(), new EstadosDespachoEntrega1710000000006(),
         new ObservacionesDespachoEntrega1710000000008(), new EventosOutboxLogistica1710000000011(),
-        new ResultadoInventarioRuta1710000000012(),
+        new ResultadoInventarioRuta1710000000012(), new ProductoUnidadBoleta1710000000013(),
       ]) {
         await migracion.up(runner);
       }
@@ -81,8 +82,10 @@ describeReal('ABC-387: resultado de Inventarios aplicado a la ruta en PostgreSQL
       `INSERT INTO solicitudes_salida (orden_id, destino_documental, motivo, responsable_usuario_id)
        VALUES (2, 'Tienda', 'Envío', 4) RETURNING id::text AS id`);
     const [boleta] = await source.query(
-      `INSERT INTO boletas_envio (solicitud_salida_id, numero, estado, responsable_usuario_id)
-       VALUES ($1, $2, 'EMITIDA', 4) RETURNING id::text AS id`, [solicitud.id, `BOL-387-${++numero}`]);
+      `INSERT INTO boletas_envio
+         (solicitud_salida_id, numero, estado, responsable_usuario_id, producto_codigo, unidad)
+       VALUES ($1, $2, 'EMITIDA', 4, 'GAL-001', 'unidad') RETURNING id::text AS id`,
+      [solicitud.id, `BOL-387-${++numero}`]);
     await source.query("INSERT INTO boletas_envio_items (boleta_id, referencia, cantidad) VALUES ($1, 'LOT-A', 6)", [boleta.id]);
     const [ruta] = await source.query(
       `INSERT INTO rutas (fecha_programada, vehiculo_externo_id, chofer_externo_id, responsable_usuario_id)

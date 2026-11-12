@@ -1,6 +1,7 @@
 import {
   DESPACHO_RUTA_REGISTRADO_V1,
   DespachoRutaRegistradoV1Event,
+  FUENTE_INVENTARIOS,
   FUENTE_LOGISTICA,
   SALIDA_INVENTARIO_RESULTADO_V1,
   SalidaInventarioResultadoV1Event,
@@ -26,6 +27,7 @@ const ISO_CON_ZONA = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[1-9]\d{0,18}$/;
 const CANTIDAD = /^(?:0|[1-9]\d{0,9})\.\d{4}$/;
+const UNIDADES = new Set(['kg', 'g', 'l', 'ml', 'm', 'cm', 'unidad', 'docena', 'caja', 'paquete']);
 
 const esObjeto = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
 const texto = (v: unknown, max = 200): v is string => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
@@ -73,6 +75,10 @@ export function validarDespachoRutaRegistradoV1(value: unknown): DespachoRutaReg
     else vistas.add(boleta.boletaId);
     if (!texto(boleta.numero, 16)) errores.push({ campo: `${campo}.numero`, motivo: 'es obligatorio' });
     if (typeof boleta.ordenId !== 'string' || !ID.test(boleta.ordenId)) errores.push({ campo: `${campo}.ordenId`, motivo: 'debe ser un id positivo en texto' });
+    if (!texto(boleta.productoCodigo, 80)) errores.push({ campo: `${campo}.productoCodigo`, motivo: 'es obligatorio' });
+    if (typeof boleta.unidad !== 'string' || !UNIDADES.has(boleta.unidad)) {
+      errores.push({ campo: `${campo}.unidad`, motivo: 'debe pertenecer al catalogo de unidades' });
+    }
     const items = Array.isArray(boleta.items) ? boleta.items : [];
     if (items.length === 0) errores.push({ campo: `${campo}.items`, motivo: 'debe incluir al menos un item' });
     items.forEach((item: unknown, j: number) => {
@@ -91,6 +97,9 @@ export function validarDespachoRutaRegistradoV1(value: unknown): DespachoRutaReg
 export function validarSalidaInventarioResultadoV1(value: unknown): SalidaInventarioResultadoV1Event {
   const errores: ErrorValidacionSalidaV1[] = [];
   const data = sobre(value, SALIDA_INVENTARIO_RESULTADO_V1, errores);
+  if (esObjeto(value) && value.source !== FUENTE_INVENTARIOS) {
+    errores.push({ campo: 'source', motivo: `debe ser ${FUENTE_INVENTARIOS}` });
+  }
   if (typeof data.rutaId !== 'string' || !ID.test(data.rutaId)) errores.push({ campo: 'data.rutaId', motivo: 'debe ser un id positivo en texto' });
   if (typeof data.requestEventId !== 'string' || !UUID.test(data.requestEventId)) errores.push({ campo: 'data.requestEventId', motivo: 'debe ser un UUID' });
   if (data.estado !== 'ACEPTADA' && data.estado !== 'RECHAZADA') errores.push({ campo: 'data.estado', motivo: 'debe ser ACEPTADA o RECHAZADA' });

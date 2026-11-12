@@ -1,0 +1,39 @@
+{
+  "eventId": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "eventType": "DespachoRutaRegistrado.v1",
+  "occurredAt": "2026-11-11T03:15:00.000Z",
+  "source": "logistica-service",
+  "correlationId": "f7e6d5c4-b3a2-4109-8877-665544332211",
+  "data": {
+    "rutaId": "10",
+    "fechaProgramada": "2026-11-15",
+    "despachadaEn": "2026-11-11T03:15:00.000Z",
+    "despachadaPorUsuarioId": "42",
+    "vehiculoExternoId": "VEH-01",
+    "choferExternoId": "CHO-02",
+    "boletas": [
+      {
+        "boletaId": "1",
+        "numero": "BOL-001",
+        "ordenId": "100",
+        "items": [
+          {
+            "loteReferencia": "LOT-GAL-001",
+            "cantidad": "12.0000"
+          }
+        ]
+      },
+      {
+        "boletaId": "2",
+        "numero": "BOL-002",
+        "ordenId": "100",
+        "items": [
+          {
+            "loteReferencia": "LOT-GAL-002",
+            "cantidad": "5.5000"
+          }
+        ]
+      }
+    ]
+  }
+}

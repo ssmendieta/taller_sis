@@ -1,5 +1,6 @@
 import {
   DESPACHO_RUTA_REGISTRADO_V1_EJEMPLO,
+  SALIDA_INVENTARIO_RECHAZADA_V1_EJEMPLO,
   SALIDA_INVENTARIO_RESULTADO_V1_EJEMPLO,
 } from './inventarios-salida-v1';
 import {
@@ -34,6 +35,8 @@ describe('ABC-385: DespachoRutaRegistrado.v1', () => {
     ['sin boletas', (e: any) => { e.data.boletas = []; }, 'data.boletas'],
     ['boleta repetida', (e: any) => { e.data.boletas.push(structuredClone(e.data.boletas[0])); }, 'data.boletas[1].boletaId'],
     ['boleta sin ítems', (e: any) => { e.data.boletas[0].items = []; }, 'data.boletas[0].items'],
+    ['producto vacío', (e: any) => { e.data.boletas[0].productoCodigo = ' '; }, 'data.boletas[0].productoCodigo'],
+    ['unidad desconocida', (e: any) => { e.data.boletas[0].unidad = 'bulto'; }, 'data.boletas[0].unidad'],
     ['cantidad sin 4 decimales', (e: any) => { e.data.boletas[0].items[0].cantidad = '6'; }, 'data.boletas[0].items[0].cantidad'],
     ['cantidad cero', (e: any) => { e.data.boletas[0].items[0].cantidad = '0.0000'; }, 'data.boletas[0].items[0].cantidad'],
     ['lote vacío', (e: any) => { e.data.boletas[0].items[0].loteReferencia = ' '; }, 'data.boletas[0].items[0].loteReferencia'],
@@ -47,14 +50,12 @@ describe('ABC-385: DespachoRutaRegistrado.v1', () => {
 describe('ABC-385: SalidaInventarioResultado.v1', () => {
   it('acepta una salida ACEPTADA y una RECHAZADA con código', () => {
     expect(validarSalidaInventarioResultadoV1(resultado()).data.estado).toBe('ACEPTADA');
-    const rechazada = resultado();
-    rechazada.data.estado = 'RECHAZADA';
-    rechazada.data.codigoRechazo = 'LOTE_SIN_STOCK';
-    rechazada.data.detalle = 'El lote LOT-GAL-001 no tiene existencias';
+    const rechazada = structuredClone(SALIDA_INVENTARIO_RECHAZADA_V1_EJEMPLO);
     expect(validarSalidaInventarioResultadoV1(rechazada).data.codigoRechazo).toBe('LOTE_SIN_STOCK');
   });
 
   it.each([
+    ['fuente distinta de Inventarios', (e: any) => { e.source = 'logistica-service'; }, 'source'],
     ['estado desconocido', (e: any) => { e.data.estado = 'APROBADA'; }, 'data.estado'],
     ['rechazo sin código', (e: any) => { e.data.estado = 'RECHAZADA'; }, 'data.codigoRechazo'],
     ['aceptada con código', (e: any) => { e.data.codigoRechazo = 'X'; }, 'data.codigoRechazo'],

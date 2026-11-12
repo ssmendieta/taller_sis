@@ -1,0 +1,13 @@
+{
+  "eventId": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+  "eventType": "SalidaInventarioResultado.v1",
+  "occurredAt": "2026-11-11T03:15:02.500Z",
+  "source": "inventarios-service",
+  "correlationId": "f7e6d5c4-b3a2-4109-8877-665544332211",
+  "data": {
+    "rutaId": "10",
+    "requestEventId": "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+    "estado": "ACEPTADA",
+    "procesadoAt": "2026-11-11T03:15:02.480Z"
+  }
+}

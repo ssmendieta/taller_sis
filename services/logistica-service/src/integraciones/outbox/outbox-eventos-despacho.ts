@@ -20,18 +20,33 @@ export class OutboxEventosDespacho implements EventosDespacho {
   async registrarDespacho(manager: EntityManager, despacho: DespachoRegistrado): Promise<void> {
     const filas = await manager.query(
       `SELECT boleta.id::text AS boleta_id, boleta.numero, solicitud.orden_id::text AS orden_id,
-              item.referencia, item.cantidad::text AS cantidad
+              boleta.producto_codigo, boleta.unidad, item.referencia, item.cantidad::text AS cantidad
          FROM boletas_envio boleta
          INNER JOIN solicitudes_salida solicitud ON solicitud.id = boleta.solicitud_salida_id
          INNER JOIN boletas_envio_items item ON item.boleta_id = boleta.id
         WHERE boleta.id = ANY($1::bigint[])
         ORDER BY boleta.id, item.id`,
       [despacho.boletaIds],
-    ) as Array<{ boleta_id: string; numero: string; orden_id: string; referencia: string; cantidad: string }>;
+    ) as Array<{
+      boleta_id: string;
+      numero: string;
+      orden_id: string;
+      producto_codigo: string | null;
+      unidad: string | null;
+      referencia: string;
+      cantidad: string;
+    }>;
 
     const boletas = new Map<string, DespachoRutaRegistradoV1Event['data']['boletas'][number]>();
     for (const fila of filas) {
-      const boleta = boletas.get(fila.boleta_id) ?? { boletaId: fila.boleta_id, numero: fila.numero, ordenId: fila.orden_id, items: [] };
+      const boleta = boletas.get(fila.boleta_id) ?? {
+        boletaId: fila.boleta_id,
+        numero: fila.numero,
+        ordenId: fila.orden_id,
+        productoCodigo: fila.producto_codigo ?? '',
+        unidad: fila.unidad ?? '',
+        items: [],
+      };
       boletas.set(fila.boleta_id, boleta);
       boleta.items.push({ loteReferencia: fila.referencia, cantidad: normalizar(fila.cantidad) });
     }

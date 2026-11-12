@@ -62,6 +62,7 @@ import ObservacionesOrden from "../components/ordenes/ObservacionesOrden.jsx";
 import { PERMISO_REGISTRAR_OBSERVACION } from "../services/observacionesService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import PerdidasMateriaPrima from "../components/ordenes/PerdidasMateriaPrima.jsx";
+import ReprocesosOrden from "../components/ordenes/ReprocesosOrden.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
 import useDisponibilidadOrden from "../hooks/useDisponibilidadOrden.js";
 import "../styles/disponibilidad-orden.css";
@@ -138,6 +139,7 @@ export default function OrdenDetallePage() {
   const [guardandoDefecto, setGuardandoDefecto] = useState(false);
   const [errorDefecto, setErrorDefecto] = useState("");
   const [avisoDefecto, setAvisoDefecto] = useState("");
+  const [totalesReprocesos, setTotalesReprocesos] = useState(null);
 
   // ABC-294: lotes que identifican unidades conformes.
   const [lotes, setLotes] = useState([]);
@@ -352,9 +354,35 @@ export default function OrdenDetallePage() {
     [orden, usuario],
   );
 
-  const calidad = useMemo(
+  const calidadRegistrada = useMemo(
     () => resumenCalidad(total, conformesCalidad, defectosCalidad),
     [total, conformesCalidad, defectosCalidad],
+  );
+
+  // ABC-397: el endpoint de reprocesos devuelve los saldos operativos. Los
+  // registros de calidad permanecen como historial y el total producido no cambia.
+  const calidad = useMemo(() => {
+    if (!totalesReprocesos) return { ...calidadRegistrada, descartadas: 0 };
+
+    const conformes = Number(totalesReprocesos.conformes) || 0;
+    const defectuosos = Number(totalesReprocesos.defectuosas) || 0;
+    const descartadas = Number(totalesReprocesos.descartadas) || 0;
+    const porClasificar = Math.max(
+      (Math.round(total * 10000) -
+        Math.round(conformes * 10000) -
+        Math.round(defectuosos * 10000) -
+        Math.round(descartadas * 10000)) / 10000,
+      0,
+    );
+
+    return { producido: Number(total) || 0, conformes, defectuosos, descartadas, porClasificar };
+  }, [total, calidadRegistrada, totalesReprocesos]);
+
+  const revisionCalidad = useMemo(
+    () => [...conformesCalidad, ...defectosCalidad]
+      .map((resultado) => `${resultado.id}:${resultado.cantidad}`)
+      .join("|"),
+    [conformesCalidad, defectosCalidad],
   );
 
   // Conformes sin asignar = conformes registrados − cantidades ya asignadas a lotes.
@@ -1107,12 +1135,13 @@ export default function OrdenDetallePage() {
 
         <div className="ts-table-wrap">
           <table className="ts-table">
-            <caption>Resumen de unidades producidas, conformes y defectuosas</caption>
+            <caption>Resumen vigente de unidades producidas y su clasificación</caption>
             <thead>
               <tr>
                 <th scope="col">Producidas</th>
                 <th scope="col">Conformes</th>
                 <th scope="col">Defectuosas</th>
+                <th scope="col">Descartadas</th>
                 <th scope="col">Pendientes de clasificación</th>
               </tr>
             </thead>
@@ -1122,6 +1151,7 @@ export default function OrdenDetallePage() {
                 <td>{formatearCantidad(calidad.producido, unidad)}</td>
                 <td>{errorCargaCalidad ? "—" : formatearCantidad(calidad.conformes, unidad)}</td>
                 <td>{errorCargaCalidad ? "—" : formatearCantidad(calidad.defectuosos, unidad)}</td>
+                <td>{errorCargaCalidad ? "—" : formatearCantidad(calidad.descartadas, unidad)}</td>
                 <td>
                   <strong>
                     {errorCargaCalidad ? "—" : formatearCantidad(calidad.porClasificar, unidad)}
@@ -1135,9 +1165,9 @@ export default function OrdenDetallePage() {
         {!errorCargaCalidad && (
           <p className="ts-field-help" role="note" style={{ padding: "0 20px" }}>
             {calidad.porClasificar > 0
-              ? `${formatearCantidad(calidad.producido, unidad)} producidas − ${formatearCantidad(calidad.conformes, unidad)} conformes − ${formatearCantidad(calidad.defectuosos, unidad)} defectuosas = ${formatearCantidad(calidad.porClasificar, unidad)} pendientes de clasificación (aún no registradas como conformes ni como defectuosas).`
+              ? `${formatearCantidad(calidad.producido, unidad)} producidas − ${formatearCantidad(calidad.conformes, unidad)} conformes − ${formatearCantidad(calidad.defectuosos, unidad)} defectuosas − ${formatearCantidad(calidad.descartadas, unidad)} descartadas = ${formatearCantidad(calidad.porClasificar, unidad)} pendientes de clasificación.`
               : calidad.producido > 0
-                ? "No hay unidades pendientes de clasificación: todo lo producido ya está registrado como conforme o defectuoso."
+                ? "No hay unidades pendientes de clasificación: todo lo producido está conforme, defectuoso o descartado."
                 : "La orden todavía no tiene unidades producidas que clasificar."}
           </p>
         )}
@@ -1147,7 +1177,7 @@ export default function OrdenDetallePage() {
             Unidades conformes
           </h3>
           <span>
-            Acumulado: {formatearCantidad(calidad.conformes, unidad)}
+            Saldo vigente: {formatearCantidad(calidad.conformes, unidad)}
           </span>
         </div>
 
@@ -1252,7 +1282,7 @@ export default function OrdenDetallePage() {
             Unidades defectuosas
           </h3>
           <span>
-            Acumulado: {formatearCantidad(calidad.defectuosos, unidad)}
+            Saldo vigente: {formatearCantidad(calidad.defectuosos, unidad)}
           </span>
         </div>
 
@@ -1385,6 +1415,17 @@ export default function OrdenDetallePage() {
           </table>
         </div>
       </div>
+
+      {/* ABC-397: formulario, saldos e historial de reprocesos en la misma orden. */}
+      <ReprocesosOrden
+        ordenId={id}
+        defectos={defectosCalidad}
+        unidad={unidad}
+        permiteRegistrar={permiteCalidad}
+        usuario={usuario}
+        revisionCalidad={revisionCalidad}
+        onTotalesChange={setTotalesReprocesos}
+      />
 
       {/* ABC-294: lotes que identifican unidades conformes de la orden. */}
       <div className="ts-panel" style={{ marginBottom: 16 }}>

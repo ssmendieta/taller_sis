@@ -1,0 +1,245 @@
+classDiagram
+    direction TB
+
+    %% ========================================================
+    %% DIAGRAMA DE CLASES: LOGISTICA-SERVICE (Sprint 3 - ABC-405)
+    %% Base de datos: logistica_db (Esquema relacional TypeORM)
+    %% ========================================================
+
+    %% --- AGREGADO RUTAS Y DESPACHO (ABC-128, ABC-368, ABC-374, ABC-384) ---
+    class Ruta {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint grupo_id FK
+        +date fecha_programada
+        +varchar(80) vehiculo_externo_id
+        +varchar(80) chofer_externo_id
+        +varchar(20) estado
+        +bigint responsable_usuario_id
+        +timestamptz despachada_en
+        +bigint despachada_por_usuario_id
+        +varchar(500) despacho_observacion
+        +timestamptz completada_en
+        +varchar(20) inventario_estado
+        +uuid inventario_resultado_event_id
+        +timestamptz inventario_resultado_en
+        +varchar(100) inventario_codigo_rechazo
+        +varchar(500) inventario_detalle
+        +timestamptz creado_en
+        +timestamptz actualizado_en
+    }
+
+    class RutaParada {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint ruta_id FK
+        +integer secuencia
+        +varchar(250) destino
+        +varchar(20) estado_entrega
+        +timestamptz entrega_actualizada_en
+        +bigint entrega_usuario_id
+        +varchar(500) entrega_observacion
+    }
+
+    class RutaParadaBoleta {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint parada_id FK
+        +bigint boleta_id FK
+    }
+
+    %% --- AGREGADO BOLETAS Y SOLICITUDES DE SALIDA (Sprint 2 + ABC-374 / ABC-390) ---
+    class BoletaEnvio {
+        <<Sprint 2 ampliado S3>>
+        +bigint id PK
+        +bigint solicitud_salida_id FK
+        +varchar(16) numero_boleta UNIQUE
+        +varchar(20) estado
+        +bigint responsable_usuario_id
+        +timestamptz creado_en
+        +timestamptz actualizado_en
+    }
+
+    class BoletaEnvioItem {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint boleta_id FK
+        +varchar(160) descripcion
+        +numeric(14,4) cantidad
+    }
+
+    class BoletaEnvioHistorial {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint boleta_id FK
+        +varchar(20) estado_anterior
+        +varchar(20) estado_nuevo
+        +bigint usuario_actor_id
+        +varchar(500) motivo
+        +timestamptz creado_en
+    }
+
+    class SolicitudSalida {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint orden_id
+        +varchar(250) destino_documental
+        +varchar(500) observaciones
+        +bigint responsable_usuario_id
+        +varchar(20) estado
+        +timestamptz creado_en
+    }
+
+    class SolicitudSalidaItem {
+        <<Sprint 2>>
+        +bigint id PK
+        +bigint solicitud_id FK
+        +varchar(160) descripcion
+        +numeric(14,4) cantidad
+    }
+
+    %% --- AGREGADO AGRUPACIÓN DE SOLICITUDES (ABC-128) ---
+    class GrupoSalida {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +varchar(250) codigo_agrupacion
+        +date fecha_requerida
+        +varchar(80) tipo_carga
+        +varchar(50) unidad_carga
+        +bigint creado_por_usuario_id
+        +bigint deshecho_por_usuario_id
+        +timestamptz deshecho_en
+        +timestamptz creado_en
+    }
+
+    class GrupoSolicitud {
+        <<Nuevo Sprint 3>>
+        +bigint grupo_id PK_FK
+        +bigint solicitud_id PK_FK
+        +timestamptz asociada_en
+        +timestamptz liberada_en
+    }
+
+    %% --- AGREGADO RECURSOS EXTERNOS ERP (ABC-115, ABC-368) ---
+    class RecursoExternoSnapshot {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +date fecha UNIQUE
+        +varchar(50) fuente
+        +timestamptz generado_en
+        +timestamptz sincronizado_en
+        +jsonb payload_original
+    }
+
+    class RecursoExternoVehiculo {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint snapshot_id FK
+        +date fecha
+        +varchar(80) id_externo
+        +varchar(20) placa
+        +varchar(120) tipo
+        +numeric(14,4) capacidad_valor
+        +varchar(20) capacidad_unidad
+        +boolean activo
+    }
+
+    class RecursoExternoChofer {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint snapshot_id FK
+        +date fecha
+        +varchar(80) id_externo
+        +varchar(150) nombre
+        +varchar(10) licencia_categoria
+        +boolean activo
+    }
+
+    %% --- AGREGADO INCIDENCIAS Y REPROGRAMACIÓN (ABC-379) ---
+    class IncidenciaTransporte {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint ruta_id FK
+        +bigint parada_id FK
+        +varchar(30) tipo_incidencia
+        +varchar(500) descripcion
+        +bigint registrada_por_usuario_id
+        +timestamptz registrada_en
+    }
+
+    class ReprogramacionRuta {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +bigint ruta_id FK
+        +bigint incidencia_id FK
+        +date fecha_anterior
+        +date fecha_nueva
+        +varchar(500) motivo
+        +bigint registrada_por_usuario_id
+        +timestamptz registrada_en
+    }
+
+    %% --- AGREGADO INTEGRACIONES ASÍNCRONAS PUB/SUB (ABC-384) ---
+    class EventoOutbox {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +uuid event_id UNIQUE
+        +uuid correlation_id
+        +varchar(120) event_type
+        +varchar(80) aggregate_type
+        +varchar(100) aggregate_id
+        +jsonb payload
+        +varchar(20) estado
+        +integer reintentos
+        +varchar(255) message_id
+        +text ultimo_error
+        +timestamptz proximo_intento_en
+        +uuid bloqueo_token
+        +timestamptz bloqueo_hasta
+        +timestamptz creado_en
+        +timestamptz publicado_en
+    }
+
+    class EventoInbox {
+        <<Nuevo Sprint 3>>
+        +bigint id PK
+        +uuid event_id UNIQUE
+        +uuid correlation_id
+        +varchar(120) event_type
+        +char(64) payload_hash
+        +jsonb payload
+        +varchar(20) estado
+        +varchar(255) message_id
+        +varchar(500) ultimo_error
+        +smallint reintentos
+        +timestamptz proximo_intento_en
+        +timestamptz procesado_en
+    }
+
+    %% --- RELACIONES (TypeORM Foreign Keys & Cardinalidades) ---
+    GrupoSalida "1" *-- "1..*" GrupoSolicitud : agrupaciones
+    SolicitudSalida "1" *-- "0..*" GrupoSolicitud : vinculaciones
+    SolicitudSalida "1" *-- "1..*" SolicitudSalidaItem : items
+
+    SolicitudSalida "1" <-- "0..*" BoletaEnvio : fk_boleta_envio_solicitud
+    BoletaEnvio "1" *-- "1..*" BoletaEnvioItem : items
+    BoletaEnvio "1" *-- "0..*" BoletaEnvioHistorial : historial
+
+    GrupoSalida "0..1" <-- "0..*" Ruta : grupo_id
+    Ruta "1" *-- "1..*" RutaParada : paradas
+    RutaParada "1" *-- "1..*" RutaParadaBoleta : boletas
+    BoletaEnvio "1" <-- "0..*" RutaParadaBoleta : boleta
+
+    RecursoExternoSnapshot "1" *-- "0..*" RecursoExternoVehiculo : vehiculos
+    RecursoExternoSnapshot "1" *-- "0..*" RecursoExternoChofer : choferes
+
+    Ruta "0..*" ..> RecursoExternoVehiculo : vehiculo_externo_id
+    Ruta "0..*" ..> RecursoExternoChofer : chofer_externo_id
+
+    Ruta "1" *-- "0..*" IncidenciaTransporte : fk_incidencia_transporte_ruta
+    RutaParada "0..1" <-- "0..*" IncidenciaTransporte : parada_id
+    Ruta "1" *-- "0..*" ReprogramacionRuta : fk_ruta_reprogramacion_ruta
+    IncidenciaTransporte "0..1" <-- "0..*" ReprogramacionRuta : incidencia_id
+
+    Ruta ..> EventoOutbox : genera inventarios.salida.v1 (ABC-384)
+    Ruta <.. EventoInbox : inventarios.salida.confirmada / rechazada (ABC-384)
