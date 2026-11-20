@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DashboardService } from './dashboard.service';
 
@@ -202,5 +202,114 @@ describe('DashboardService Logística (ABC-328)', () => {
         expect(params).toHaveLength(2);
       });
     });
+  });
+});
+
+describe('DashboardService: metas de KPI y semáforo (ABC-495)', () => {
+  let service: DashboardService;
+  let queryMock: jest.Mock;
+
+  const filaMeta = (kpi: string, extra: Record<string, unknown> = {}) => ({
+    kpi,
+    meta: '95.0000',
+    unidad: '%',
+    umbral_amarillo_pct: '10.00',
+    umbral_rojo_pct: '20.00',
+    sentido: 'MAYOR_ES_MEJOR',
+    actualizado_por: null,
+    actualizado_en: new Date('2026-11-20T10:00:00Z'),
+    ...extra,
+  });
+
+  beforeEach(() => {
+    queryMock = jest.fn();
+    service = new DashboardService({ query: queryMock } as unknown as DataSource);
+  });
+
+  it('lista las metas y convierte los números', async () => {
+    queryMock.mockResolvedValueOnce([filaMeta('ENTREGAS_A_TIEMPO')]);
+    const metas = await service.listarMetas();
+    expect(metas).toEqual([
+      expect.objectContaining({ kpi: 'ENTREGAS_A_TIEMPO', meta: 95, umbralAmarilloPct: 10, umbralRojoPct: 20 }),
+    ]);
+  });
+
+  it('responde 404 si el KPI no existe', async () => {
+    queryMock.mockResolvedValueOnce([filaMeta('ENTREGAS_A_TIEMPO')]);
+    await expect(service.obtenerMeta('NO_EXISTE')).rejects.toThrow(NotFoundException);
+  });
+
+  it('rechaza guardar un KPI que no es de este servicio', async () => {
+    await expect(
+      service.guardarMeta('FPY', { meta: 1, umbralAmarilloPct: 1, umbralRojoPct: 2 }, 7),
+    ).rejects.toThrow(NotFoundException);
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('rechaza umbral rojo menor o igual al amarillo', async () => {
+    await expect(
+      service.guardarMeta('ENTREGAS_A_TIEMPO', { meta: 95, umbralAmarilloPct: 20, umbralRojoPct: 20 }, 7),
+    ).rejects.toThrow(BadRequestException);
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('guarda la meta con el usuario que edita', async () => {
+    queryMock
+      .mockResolvedValueOnce([[], 1])
+      .mockResolvedValueOnce([filaMeta('ENTREGAS_A_TIEMPO', { meta: '90.0000', actualizado_por: '7' })]);
+    const res = await service.guardarMeta(
+      'ENTREGAS_A_TIEMPO',
+      { meta: 90, umbralAmarilloPct: 10, umbralRojoPct: 20 },
+      7,
+    );
+    expect(queryMock.mock.calls[0][1]).toEqual(['ENTREGAS_A_TIEMPO', 90, 10, 20, 7]);
+    expect(res.meta).toBe(90);
+    expect(res.actualizadoPor).toBe(7);
+  });
+
+  it('permite borrar la meta con null', async () => {
+    queryMock
+      .mockResolvedValueOnce([[], 1])
+      .mockResolvedValueOnce([filaMeta('ENTREGAS_A_TIEMPO', { meta: null })]);
+    const res = await service.guardarMeta(
+      'ENTREGAS_A_TIEMPO',
+      { meta: null, umbralAmarilloPct: 10, umbralRojoPct: 20 },
+      7,
+    );
+    expect(res.meta).toBeNull();
+  });
+
+  it('devuelve los KPIs sin color mientras no haya valor calculado', async () => {
+    queryMock.mockResolvedValueOnce([filaMeta('ENTREGAS_A_TIEMPO')]);
+    const res = await service.obtenerKpisConSemaforo();
+    expect(res.kpis[0]).toMatchObject({ kpi: 'ENTREGAS_A_TIEMPO', valor: null, color: null });
+  });
+
+  it.each([
+    [96, 'VERDE'],
+    [80, 'AMARILLO'],
+    [70, 'ROJO'],
+  ])('devuelve el color con valor %p → %s', async (valor, color) => {
+    class ServicioConValor extends DashboardService {
+      protected async obtenerValorKpi(): Promise<number | null> {
+        return valor;
+      }
+    }
+    const s = new ServicioConValor({ query: queryMock } as unknown as DataSource);
+    queryMock.mockResolvedValueOnce([filaMeta('ENTREGAS_A_TIEMPO')]);
+    const res = await s.obtenerKpisConSemaforo();
+    expect(res.kpis[0].color).toBe(color);
+  });
+
+  it('devuelve sin color un KPI sin meta aunque tenga valor', async () => {
+    class ServicioConValor extends DashboardService {
+      protected async obtenerValorKpi(): Promise<number | null> {
+        return 50;
+      }
+    }
+    const s = new ServicioConValor({ query: queryMock } as unknown as DataSource);
+    queryMock.mockResolvedValueOnce([filaMeta('ENTREGAS_A_TIEMPO', { meta: null })]);
+    const res = await s.obtenerKpisConSemaforo();
+    expect(res.kpis[0]).toMatchObject({ meta: null, valor: 50, color: null });
   });
 });

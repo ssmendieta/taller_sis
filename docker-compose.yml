@@ -14,6 +14,21 @@
       - "${PUBSUB_EMULATOR_PORT:-8085}:8085"
     profiles: ["emulator"]
 
+  # ABC-115: ERP de recursos logisticos SIMULADO (no existe un ERP real).
+  erp-recursos-simulator:
+    image: node:20-alpine
+    container_name: erp-recursos-simulator
+    working_dir: /app
+    command: ["node", "index.js"]
+    environment:
+      - PORT=4010
+      - ERP_RECURSOS_TOKEN=${ERP_RECURSOS_TOKEN:-demo-erp-token}
+    volumes:
+      - ./simuladores/erp-recursos:/app
+    ports:
+      - "${ERP_SIMULATOR_PORT:-4010}:4010"
+    profiles: ["full"]
+
   postgres:
     image: postgres:15-alpine
     container_name: taller_postgres

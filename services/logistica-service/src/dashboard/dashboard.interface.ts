@@ -42,3 +42,32 @@ export interface MetricasDashboardLogisticaResponse {
     cantidad_total: number;
   };
 }
+
+// ABC-495: metas de KPI y semáforo.
+import type { SentidoKpi } from './entities/meta-kpi.entity';
+import type { ColorSemaforo } from './semaforo';
+
+export interface MetaKpiResponse {
+  kpi: string;
+  meta: number | null;
+  unidad: string;
+  umbralAmarilloPct: number;
+  umbralRojoPct: number;
+  sentido: SentidoKpi;
+  actualizadoPor: number | null;
+  actualizadoEn: string;
+}
+
+export interface KpiSemaforoResponse {
+  kpi: string;
+  valor: number | null;
+  meta: number | null;
+  unidad: string;
+  sentido: SentidoKpi;
+  desviacionPct: number | null;
+  color: ColorSemaforo | null;
+}
+
+export interface KpisSemaforoResponse {
+  kpis: KpiSemaforoResponse[];
+}

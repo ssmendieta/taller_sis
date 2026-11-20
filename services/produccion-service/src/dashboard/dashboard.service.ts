@@ -1,7 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
+import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
+import { calcularSemaforo } from './semaforo';
+import { KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardResponse, DesglosePerdidaMaterial } from './dashboard.interface';
+
+/** KPIs que este servicio administra (ABC-495). */
+export const KPIS_DEL_SERVICIO: readonly string[] = ['CUMPLIMIENTO_FECHA', 'TIEMPO_CICLO', 'FPY', 'MERMA'];
 
 @Injectable()
 export class DashboardService {
@@ -315,5 +321,107 @@ export class DashboardService {
 
     const filas = await this.dataSource.query(sql, params);
     return filas[0] || null;
+  }
+
+  // ===== ABC-495: metas de KPI y semáforo =====
+
+  private mapearMeta(fila: Record<string, unknown>): MetaKpiResponse {
+    return {
+      kpi: String(fila.kpi),
+      meta: fila.meta === null || fila.meta === undefined ? null : Number(fila.meta),
+      unidad: String(fila.unidad),
+      umbralAmarilloPct: Number(fila.umbral_amarillo_pct),
+      umbralRojoPct: Number(fila.umbral_rojo_pct),
+      sentido: fila.sentido as MetaKpiResponse['sentido'],
+      actualizadoPor:
+        fila.actualizado_por === null || fila.actualizado_por === undefined
+          ? null
+          : Number(fila.actualizado_por),
+      actualizadoEn: new Date(fila.actualizado_en as string | Date).toISOString(),
+    };
+  }
+
+  async listarMetas(): Promise<MetaKpiResponse[]> {
+    const filas: Record<string, unknown>[] = await this.dataSource.query(
+      `SELECT kpi, meta, unidad, umbral_amarillo_pct, umbral_rojo_pct, sentido,
+              actualizado_por, actualizado_en
+         FROM metas_kpi
+        WHERE kpi = ANY($1)
+        ORDER BY kpi`,
+      [KPIS_DEL_SERVICIO],
+    );
+    return (filas || []).map((f) => this.mapearMeta(f));
+  }
+
+  async obtenerMeta(kpi: string): Promise<MetaKpiResponse> {
+    const meta = (await this.listarMetas()).find((m) => m.kpi === kpi);
+    if (!meta) throw new NotFoundException(`El KPI "${kpi}" no existe.`);
+    return meta;
+  }
+
+  async guardarMeta(
+    kpi: string,
+    dto: GuardarMetaKpiDto,
+    usuarioId: number | string | undefined,
+  ): Promise<MetaKpiResponse> {
+    if (!KPIS_DEL_SERVICIO.includes(kpi)) {
+      throw new NotFoundException(`El KPI "${kpi}" no existe.`);
+    }
+    if (dto.umbralRojoPct <= dto.umbralAmarilloPct) {
+      throw new BadRequestException(
+        'El umbral rojo debe ser mayor que el umbral amarillo.',
+      );
+    }
+    const actor = Number(usuarioId);
+    await this.dataSource.query(
+      `UPDATE metas_kpi
+          SET meta = $2,
+              umbral_amarillo_pct = $3,
+              umbral_rojo_pct = $4,
+              actualizado_por = $5,
+              actualizado_en = NOW()
+        WHERE kpi = $1`,
+      [
+        kpi,
+        dto.meta,
+        dto.umbralAmarilloPct,
+        dto.umbralRojoPct,
+        Number.isSafeInteger(actor) && actor > 0 ? actor : null,
+      ],
+    );
+    return this.obtenerMeta(kpi);
+  }
+
+  /**
+   * Valor actual de un KPI. Aún sin cálculo: cada HU de KPI conectará aquí
+   * su consulta. Mientras tanto devuelve null y el KPI sale sin color.
+   */
+  protected async obtenerValorKpi(_kpi: string): Promise<number | null> {
+    return null;
+  }
+
+  async obtenerKpisConSemaforo(): Promise<KpisSemaforoResponse> {
+    const metas = await this.listarMetas();
+    const kpis = await Promise.all(
+      metas.map(async (m) => {
+        const valor = await this.obtenerValorKpi(m.kpi);
+        const { desviacionPct, color } = calcularSemaforo(
+          valor,
+          m.meta,
+          { umbralAmarilloPct: m.umbralAmarilloPct, umbralRojoPct: m.umbralRojoPct },
+          m.sentido,
+        );
+        return {
+          kpi: m.kpi,
+          valor,
+          meta: m.meta,
+          unidad: m.unidad,
+          sentido: m.sentido,
+          desviacionPct,
+          color,
+        };
+      }),
+    );
+    return { kpis };
   }
 }
