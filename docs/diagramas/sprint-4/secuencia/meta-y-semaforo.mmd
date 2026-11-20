@@ -1,0 +1,75 @@
+sequenceDiagram
+    autonumber
+    actor S as Supervisor
+    participant P as Pantalla de metas
+    participant W as Widgets del dashboard
+    participant G as API Gateway
+    participant A as auth-service
+    participant C as DashboardController
+    participant V as DashboardService
+    participant D as produccion_db
+
+    rect rgb(240, 240, 240)
+    Note over S,D: A. Configurar la meta de un KPI
+    S->>P: Abre la pantalla de metas
+    P->>G: GET /api/produccion/dashboard/kpis/metas
+    G->>C: GET /dashboard/kpis/metas
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    Note over C: Exige el permiso ordenes.consultar
+    C->>V: listarMetas()
+    V->>D: SELECT de metas_kpi de los KPI del servicio
+    D-->>V: Filas de metas
+    V-->>P: 200 con metas, umbrales y sentido
+    S->>P: Edita meta y umbrales, y guarda
+    P->>G: PUT /api/produccion/dashboard/kpis/metas/:kpi
+    G->>C: PUT /dashboard/kpis/metas/:kpi
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    alt Sin token, sesión inválida o Auth caído
+        C-->>P: 401 o 503
+    else Sin el permiso kpis.metas.gestionar
+        C-->>P: 403 Forbidden
+    else Body inválido (meta, umbrales fuera de rango o con campos extra)
+        C-->>P: 400 por ValidationPipe
+    else Permiso válido y body válido
+        C->>V: guardarMeta(kpi, dto, usuarioId)
+        alt KPI fuera de los KPI del servicio
+            V-->>P: 404 El KPI no existe
+        else Umbral rojo menor o igual al umbral amarillo
+            V-->>P: 400 Bad Request
+        else Datos válidos
+            V->>D: UPDATE metas_kpi (meta, umbrales, actualizado_por, actualizado_en)
+            D-->>V: Fila actualizada
+            V->>D: SELECT de la meta guardada
+            D-->>V: Meta
+            V-->>P: 200 con la meta actualizada
+        end
+    end
+    P-->>S: Confirmación o mensaje de error
+    end
+
+    rect rgb(240, 240, 240)
+    Note over S,D: B. Ver el semáforo en los widgets
+    S->>W: Abre el dashboard
+    W->>G: GET /api/produccion/dashboard/kpis
+    G->>C: GET /dashboard/kpis
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    Note over C: Exige el permiso ordenes.consultar
+    C->>V: obtenerKpisConSemaforo()
+    V->>D: SELECT de metas_kpi
+    D-->>V: Metas, umbrales y sentido
+    loop Por cada KPI
+        V->>V: obtenerValorKpi(kpi), hoy devuelve null
+        V->>V: calcularSemaforo(valor, meta, umbrales, sentido)
+        alt Sin meta, meta no positiva o sin valor
+            Note over V: desviacionPct null y color null, el KPI sale sin color
+        else Con meta y valor
+            Note over V: Desviación adversa en %: meta menos valor si MAYOR_ES_MEJOR, valor menos meta si MENOR_ES_MEJOR
+            Note over V: Menor que umbral amarillo es VERDE, desde el amarillo es AMARILLO, desde el rojo es ROJO
+        end
+    end
+    V-->>W: 200 con kpis: kpi, valor, meta, unidad, sentido, desviacionPct y color
+    W-->>S: Widget con el color del semáforo
+    end
