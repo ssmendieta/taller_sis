@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    actor E as Encargado de Producción
+    participant PR as produccion-service
+    participant DB as produccion_db
+    participant PUB as OutboxPublicadorService
+    participant T as Topic Pub/Sub (PUBSUB_TOPIC_ID)
+    participant S as Suscripción de prueba (Inventarios simulado)
+
+    Note over PR,DB: Estimado: endpoint y aggregateType pendientes de ABC-438 y ABC-439
+    E->>PR: registrar lote conforme de la orden
+    PR->>DB: BEGIN
+    PR->>DB: INSERT lote (código, cantidad conforme, fecha)
+    PR->>DB: INSERT eventos_outbox (ProductoTerminadoIngresado.v1, estado PENDIENTE, intentos 0)
+    alt el evento ya existe para el lote (aggregateType + aggregateId + eventType)
+        PR->>DB: ROLLBACK
+        PR-->>E: 409 sin evento duplicado
+    else primer registro del lote
+        PR->>DB: COMMIT
+        PR-->>E: 201 lote creado (el aviso se publica aparte)
+    end
+
+    loop cada OUTBOX_POLL_INTERVAL_MS (5 s)
+        PUB->>DB: reclamar pendientes vencidos y marcar PROCESANDO con lease de 30 s
+        PUB->>PUB: validarProductoTerminadoIngresadoV1(payload)
+        PUB->>T: publish(payload, eventId)
+        alt publicación confirmada
+            T-->>PUB: messageId
+            PUB->>DB: UPDATE a PUBLICADO (messageId, publicado_en)
+        else error de publicación
+            T--xPUB: error
+            PUB->>DB: UPDATE a PENDIENTE (ultimo_error, proximo_intento_en = ahora + min(5 s x 2^(n-1), 300 s))
+            Note over PUB,DB: Reintento con el mismo eventId y los mismos datos, sin límite de intentos
+        end
+    end
+
+    T->>S: entrega del mensaje (al menos una vez)
+    alt eventId nuevo
+        S->>S: registrar eventId y procesar
+    else eventId ya procesado
+        S->>S: ignorar duplicado
+    end
+    S-->>T: ACK
+
+    Note over PUB,S: Si se pierde el ACK o la confirmación, el aviso se publica otra vez. El broker no garantiza entrega única, por eso la idempotencia es del receptor por eventId
