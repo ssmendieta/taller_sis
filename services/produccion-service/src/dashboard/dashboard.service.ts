@@ -55,6 +55,7 @@ export class DashboardService {
       perdidasTotalesRow,
       perdidasDesgloseRows,
       observacionesRow,
+      fpyRow,
     ] = await Promise.all([
       this.consultarOrdenes(fechaDesde, fechaHasta),
       this.consultarCalidad(fechaDesde, fechaHasta),
@@ -62,6 +63,7 @@ export class DashboardService {
       this.consultarPerdidasTotales(fechaDesde, fechaHasta),
       this.consultarPerdidasDesglose(fechaDesde, fechaHasta),
       this.consultarObservaciones(fechaDesde, fechaHasta),
+      this.consultarFpy(fechaDesde, fechaHasta),
     ]);
 
     const totalOrdenes = Number(ordenesRow?.total ?? 0);
@@ -79,6 +81,10 @@ export class DashboardService {
       totalEvaluado > 0 ? Number(((unidadesConformes / totalEvaluado) * 100).toFixed(2)) : 0;
     const porcentajeDefectuosas =
       totalEvaluado > 0 ? Number(((unidadesDefectuosas / totalEvaluado) * 100).toFixed(2)) : 0;
+
+    // ABC-470: FPY = conformes a la primera (sin reproceso) / evaluadas; null = sin datos.
+    const { fpy, conformesPrimera, recuperadas, porcentajeConformesFinal } =
+      this.calcularFpy(fpyRow);
 
     const cantidadProducidaTotal = Number(avancesRow?.cantidad_producida_total ?? 0);
     const totalRegistrosAvance = Number(avancesRow?.total_avances ?? 0);
@@ -128,6 +134,10 @@ export class DashboardService {
         total_evaluado: totalEvaluado,
         porcentaje_conformes: porcentajeConformes,
         porcentaje_defectuosas: porcentajeDefectuosas,
+        fpy,
+        unidades_conformes_primera: conformesPrimera,
+        unidades_recuperadas: recuperadas,
+        porcentaje_conformes_final: porcentajeConformesFinal,
       },
       avance_global: {
         cantidad_solicitada_total: cantidadSolicitadaTotal,
@@ -202,6 +212,55 @@ export class DashboardService {
         COALESCE(SUM(cantidad) FILTER (WHERE tipo = 'DEFECTUOSO'), 0)::numeric AS defectuosos,
         COALESCE(SUM(cantidad), 0)::numeric AS total
       FROM resultados_conformes
+      ${whereClause}
+    `;
+
+    const filas = await this.dataSource.query(sql, params);
+    return filas[0] || null;
+  }
+
+  /**
+   * ABC-470: unidades evaluadas por primera vez en el periodo (resultados de calidad)
+   * y, de ellas, las conformes a la primera. Una unidad que pasó por reproceso no
+   * cuenta como conforme a la primera; las recuperadas se informan aparte.
+   */
+  private calcularFpy(fila: Record<string, unknown> | null) {
+    const evaluadas = Number(fila?.evaluadas ?? 0);
+    const conformesPrimera = Number(fila?.conformes_primera ?? 0);
+    const recuperadas = Number(fila?.recuperadas ?? 0);
+    const pct = (n: number) => (evaluadas > 0 ? Number(((n / evaluadas) * 100).toFixed(2)) : null);
+    return {
+      fpy: pct(conformesPrimera),
+      conformesPrimera,
+      recuperadas,
+      porcentajeConformesFinal: pct(conformesPrimera + recuperadas),
+    };
+  }
+
+  private async consultarFpy(desde: Date | null, hasta: Date | null) {
+    const params: unknown[] = [];
+    const condiciones: string[] = [];
+    if (desde) {
+      params.push(desde);
+      condiciones.push(`r.fecha_hora >= $${params.length}`);
+    }
+    if (hasta) {
+      params.push(hasta);
+      condiciones.push(`r.fecha_hora <= $${params.length}`);
+    }
+    const whereClause = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+
+    const sql = `
+      SELECT
+        COALESCE(SUM(r.cantidad) FILTER (
+          WHERE r.tipo = 'CONFORME'
+            AND NOT EXISTS (SELECT 1 FROM reprocesos p WHERE p.resultado_calidad_id = r.id)
+        ), 0)::numeric AS conformes_primera,
+        COALESCE(SUM(r.cantidad), 0)::numeric AS evaluadas,
+        COALESCE(SUM(
+          (SELECT COALESCE(SUM(p.cantidad_recuperada), 0) FROM reprocesos p WHERE p.resultado_calidad_id = r.id)
+        ), 0)::numeric AS recuperadas
+      FROM resultados_conformes r
       ${whereClause}
     `;
 
@@ -393,10 +452,13 @@ export class DashboardService {
   }
 
   /**
-   * Valor actual de un KPI. Aún sin cálculo: cada HU de KPI conectará aquí
-   * su consulta. Mientras tanto devuelve null y el KPI sale sin color.
+   * Valor actual de un KPI. Cada HU de KPI conecta aquí su consulta; los KPIs
+   * sin cálculo devuelven null y salen sin color. FPY: ABC-470 (histórico, sin filtro).
    */
-  protected async obtenerValorKpi(_kpi: string): Promise<number | null> {
+  protected async obtenerValorKpi(kpi: string): Promise<number | null> {
+    if (kpi === 'FPY') {
+      return this.calcularFpy(await this.consultarFpy(null, null)).fpy;
+    }
     return null;
   }
 
