@@ -5,6 +5,7 @@ import {
   DISPONIBILIDAD_MATERIAL_SOLICITADA_V1_EJEMPLO,
   SOLICITUD_MATERIAL_ALMACEN_V1_EJEMPLO,
 } from './inventario-almacen-v1';
+import { PRODUCTO_TERMINADO_INGRESADO_V1_EJEMPLO } from './producto-terminado-ingresado-v1';
 
 describe('ABC-249/ABC-277: contratos salientes en el topic unico', () => {
   it('publica todos los eventos salientes mediante el mismo PUBSUB_TOPIC_ID', async () => {
@@ -12,7 +13,8 @@ describe('ABC-249/ABC-277: contratos salientes en el topic unico', () => {
       .fn()
       .mockResolvedValueOnce('message-contabilidad')
       .mockResolvedValueOnce('message-disponibilidad')
-      .mockResolvedValueOnce('message-almacen');
+      .mockResolvedValueOnce('message-almacen')
+      .mockResolvedValueOnce('message-producto-terminado');
     const topic = jest.fn().mockReturnValue({ publishMessage });
     const publisher = new PubSubPublisherService(
       {
@@ -27,6 +29,7 @@ describe('ABC-249/ABC-277: contratos salientes en el topic unico', () => {
       PRODUCCION_CERRADA_V1_EJEMPLO,
       DISPONIBILIDAD_MATERIAL_SOLICITADA_V1_EJEMPLO,
       SOLICITUD_MATERIAL_ALMACEN_V1_EJEMPLO,
+      PRODUCTO_TERMINADO_INGRESADO_V1_EJEMPLO,
     ];
 
     const resultados = [];
@@ -34,11 +37,13 @@ describe('ABC-249/ABC-277: contratos salientes en el topic unico', () => {
       resultados.push(await publisher.publish(evento));
     }
 
-    expect(topic).toHaveBeenCalledTimes(3);
+    expect(topic).toHaveBeenCalledTimes(4);
     expect(topic).toHaveBeenNthCalledWith(1, 'topic-unico-configurado');
     expect(topic).toHaveBeenNthCalledWith(2, 'topic-unico-configurado');
     expect(topic).toHaveBeenNthCalledWith(3, 'topic-unico-configurado');
+    expect(topic).toHaveBeenNthCalledWith(4, 'topic-unico-configurado');
     expect(resultados.map((resultado) => resultado.topicId)).toEqual([
+      'topic-unico-configurado',
       'topic-unico-configurado',
       'topic-unico-configurado',
       'topic-unico-configurado',
@@ -51,6 +56,7 @@ describe('ABC-249/ABC-277: contratos salientes en el topic unico', () => {
       'ProduccionCerrada.v1',
       'DisponibilidadMaterialSolicitada.v1',
       'SolicitudMaterialAlmacen.v1',
+      'ProductoTerminadoIngresado.v1',
     ]);
   });
 });
