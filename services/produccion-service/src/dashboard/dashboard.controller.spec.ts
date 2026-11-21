@@ -29,6 +29,10 @@ describe('DashboardController (ABC-324)', () => {
       total_evaluado: 200,
       porcentaje_conformes: 95,
       porcentaje_defectuosas: 5,
+      fpy: 95,
+      unidades_conformes_primera: 190,
+      unidades_recuperadas: 0,
+      porcentaje_conformes_final: 95,
     },
     avance_global: {
       cantidad_solicitada_total: 500,

@@ -98,6 +98,10 @@ describe('DashboardService (ABC-324)', () => {
         total_evaluado: 0,
         porcentaje_conformes: 0,
         porcentaje_defectuosas: 0,
+        fpy: null,
+        unidades_conformes_primera: 0,
+        unidades_recuperadas: 0,
+        porcentaje_conformes_final: null,
       });
 
       expect(resultado.avance_global).toEqual({
@@ -243,6 +247,48 @@ describe('DashboardService (ABC-324)', () => {
   });
 });
 
+describe('DashboardService: FPY excluyendo reprocesos (ABC-470)', () => {
+  const crear = (fila: Record<string, number>) => {
+    const query = jest.fn(async (sql: string, _params?: unknown[]) =>
+      sql.includes('FROM reprocesos p') ? [fila] : [],
+    );
+    return { service: new DashboardService({ query } as unknown as DataSource), query };
+  };
+
+  it('sin reprocesos: FPY y % final coinciden', async () => {
+    const { service } = crear({ conformes_primera: 90, evaluadas: 100, recuperadas: 0 });
+    const { calidad } = await service.obtenerMetricas();
+    expect(calidad.fpy).toBe(90);
+    expect(calidad.porcentaje_conformes_final).toBe(90);
+  });
+
+  it('con reprocesos: el FPY no cuenta las recuperadas y difiere del % final', async () => {
+    const { service } = crear({ conformes_primera: 80, evaluadas: 100, recuperadas: 10 });
+    const { calidad } = await service.obtenerMetricas();
+    expect(calidad.fpy).toBe(80);
+    expect(calidad.unidades_recuperadas).toBe(10);
+    expect(calidad.porcentaje_conformes_final).toBe(90);
+    expect(calidad.fpy).not.toBe(calidad.porcentaje_conformes_final);
+  });
+
+  it('sin datos: FPY null sin dividir entre cero', async () => {
+    const { service } = crear({ conformes_primera: 0, evaluadas: 0, recuperadas: 0 });
+    const { calidad } = await service.obtenerMetricas();
+    expect(calidad.fpy).toBeNull();
+    expect(calidad.porcentaje_conformes_final).toBeNull();
+  });
+
+  it('filtro de periodo: pasa las fechas a la consulta del FPY', async () => {
+    const { service, query } = crear({ conformes_primera: 5, evaluadas: 10, recuperadas: 0 });
+    await service.obtenerMetricas({ desde: '2026-10-01', hasta: '2026-10-31' });
+    const llamada = query.mock.calls.find((c) => (c[0] as string).includes('FROM reprocesos p'))!;
+    expect(llamada[0]).toContain('r.fecha_hora >= $1');
+    expect(llamada[0]).toContain('r.fecha_hora <= $2');
+    expect(llamada[1]).toHaveLength(2);
+    expect(llamada[1][0]).toBeInstanceOf(Date);
+  });
+});
+
 describe('DashboardService: metas de KPI y semáforo (ABC-495)', () => {
   let service: DashboardService;
   let queryMock: jest.Mock;
@@ -318,7 +364,24 @@ describe('DashboardService: metas de KPI y semáforo (ABC-495)', () => {
   });
 
   it('devuelve los KPIs sin color mientras no haya valor calculado', async () => {
-    queryMock.mockResolvedValueOnce([filaMeta('FPY')]);
+    queryMock
+      .mockResolvedValueOnce([filaMeta('MERMA')])
+    const res = await service.obtenerKpisConSemaforo();
+    expect(res.kpis[0]).toMatchObject({ kpi: 'MERMA', valor: null, color: null });
+  });
+
+  it('calcula el valor del FPY y su color (ABC-470)', async () => {
+    queryMock
+      .mockResolvedValueOnce([filaMeta('FPY')])
+      .mockResolvedValueOnce([{ conformes_primera: 96, evaluadas: 100, recuperadas: 2 }]);
+    const res = await service.obtenerKpisConSemaforo();
+    expect(res.kpis[0]).toMatchObject({ kpi: 'FPY', valor: 96, color: 'VERDE' });
+  });
+
+  it('FPY sin evaluadas queda sin valor ni color', async () => {
+    queryMock
+      .mockResolvedValueOnce([filaMeta('FPY')])
+      .mockResolvedValueOnce([{ conformes_primera: 0, evaluadas: 0, recuperadas: 0 }]);
     const res = await service.obtenerKpisConSemaforo();
     expect(res.kpis[0]).toMatchObject({ kpi: 'FPY', valor: null, color: null });
   });

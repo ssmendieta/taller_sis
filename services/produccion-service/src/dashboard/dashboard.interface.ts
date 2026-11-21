@@ -32,6 +32,12 @@ export interface MetricasDashboardResponse {
     total_evaluado: number;
     porcentaje_conformes: number;
     porcentaje_defectuosas: number;
+    /** ABC-470: % conformes a la primera, sin reprocesos. null = sin datos. */
+    fpy: number | null;
+    unidades_conformes_primera: number;
+    unidades_recuperadas: number;
+    /** % conformes tras reprocesos (primera + recuperadas). null = sin datos. */
+    porcentaje_conformes_final: number | null;
   };
   avance_global: {
     cantidad_solicitada_total: number;
