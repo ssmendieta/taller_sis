@@ -1,0 +1,97 @@
+sequenceDiagram
+    autonumber
+    actor S as Supervisor
+    participant U as Interfaz (dashboard)
+    participant G as API Gateway
+    participant A as auth-service
+    participant C as DashboardController
+    participant V as DashboardService
+    participant D as produccion_db
+
+    rect rgb(240, 240, 240)
+    Note over S,D: A. Detectar el KPI en rojo y registrar el aviso
+    S->>U: Abre el dashboard
+    U->>G: GET /api/produccion/dashboard/kpis
+    G->>C: GET /dashboard/kpis
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    alt Sin token, sesión inválida o Auth caído
+        C-->>U: 401 o 503
+    else Sin el permiso ordenes.consultar
+        C-->>U: 403 Forbidden
+    else Permiso válido
+        C->>V: obtenerKpisConSemaforo()
+        V->>D: SELECT de metas_kpi
+        D-->>V: Metas, umbrales y sentido
+        loop Por cada KPI
+            V->>V: obtenerValorKpi(kpi)
+            V->>V: calcularSemaforo(valor, meta, umbrales, sentido)
+            alt Sin color o sin valor (KPI sin cálculo o sin meta)
+                Note over V: No toca el estado ni crea aviso
+            else Hay color
+                V->>D: UPDATE metas_kpi SET ultimo_color si cambió e INSERT en avisos_kpi si el nuevo color es ROJO (una sola sentencia)
+                alt Cambió a ROJO (antes VERDE, AMARILLO o sin estado)
+                    D-->>V: Aviso creado con kpi, valor, meta, fecha y leido = false
+                else Rojo sostenido (ultimo_color ya era ROJO)
+                    D-->>V: 0 filas, no se crea aviso nuevo
+                else Cambió a VERDE o AMARILLO
+                    D-->>V: Se actualiza ultimo_color, sin aviso
+                end
+            end
+        end
+        V-->>U: 200 con KPI, valor, meta, desviación y color
+    end
+    U-->>S: Widgets con el semáforo
+    end
+
+    rect rgb(240, 240, 240)
+    Note over S,D: B. Consultar los avisos desde la interfaz
+    U->>G: GET /api/produccion/dashboard/kpis/avisos/sin-leer
+    G->>C: GET /dashboard/kpis/avisos/sin-leer
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    Note over C: Exige el permiso ordenes.consultar
+    C->>V: contarAvisosSinLeer()
+    V->>D: SELECT COUNT(*) de avisos_kpi con leido = false
+    D-->>V: total
+    V-->>U: 200 con total
+    S->>U: Abre la lista de avisos
+    U->>G: GET /api/produccion/dashboard/kpis/avisos?leido=false
+    G->>C: GET /dashboard/kpis/avisos
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    alt Filtro leido distinto de true o false
+        C-->>U: 400 Bad Request
+    else Filtro válido
+        C->>V: listarAvisos(leido)
+        V->>D: SELECT de avisos_kpi ORDER BY fecha DESC, id DESC
+        D-->>V: Avisos
+        V-->>U: 200 con id, kpi, valor, meta, fecha y leido
+    end
+    U-->>S: Lista de avisos con KPI, valor y meta
+    end
+
+    rect rgb(240, 240, 240)
+    Note over S,D: C. Marcar el aviso como leído
+    S->>U: Abre el detalle del aviso
+    U->>G: PATCH /api/produccion/dashboard/kpis/avisos/:id/leido
+    G->>C: PATCH /dashboard/kpis/avisos/:id/leido
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    alt id no numérico
+        C-->>U: 400 por ParseIntPipe
+    else Sin permiso ordenes.consultar
+        C-->>U: 403 Forbidden
+    else Permiso válido
+        C->>V: marcarAvisoLeido(id)
+        V->>D: UPDATE avisos_kpi SET leido = TRUE WHERE id y kpi del servicio RETURNING
+        alt Aviso inexistente
+            D-->>V: 0 filas
+            V-->>U: 404 El aviso no existe
+        else Aviso encontrado
+            D-->>V: Aviso actualizado
+            V-->>U: 200 con el aviso leido = true
+        end
+    end
+    U-->>S: El contador de sin leer baja
+    end
