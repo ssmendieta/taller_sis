@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
-import { AvisoKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, AvisosSinLeerResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardResponse, DesglosePerdidaMaterial } from './dashboard.interface';
 
 /** KPIs que este servicio administra (ABC-495). */
@@ -552,5 +552,16 @@ export class DashboardService {
       throw new NotFoundException(`El aviso ${id} no existe.`);
     }
     return this.mapearAviso(resultado[0]);
+  }
+
+  /** ABC-526: avisos pendientes; los marcados como leídos dejan de contarse. */
+  async contarAvisosSinLeer(): Promise<AvisosSinLeerResponse> {
+    const filas: Record<string, unknown>[] = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS total
+         FROM avisos_kpi
+        WHERE leido = FALSE AND kpi = ANY($1)`,
+      [KPIS_DEL_SERVICIO],
+    );
+    return { total: Number(filas?.[0]?.total ?? 0) };
   }
 }
