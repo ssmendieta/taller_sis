@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
-import { KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardLogisticaResponse } from './dashboard.interface';
 
 /** KPIs que este servicio administra (ABC-495). */
@@ -335,6 +335,7 @@ export class DashboardService {
           { umbralAmarilloPct: m.umbralAmarilloPct, umbralRojoPct: m.umbralRojoPct },
           m.sentido,
         );
+        await this.registrarAvisoSiCambioARojo(m.kpi, valor, m.meta, color);
         return {
           kpi: m.kpi,
           valor,
@@ -347,5 +348,71 @@ export class DashboardService {
       }),
     );
     return { kpis };
+  }
+
+  // ===== ABC-500: avisos de KPI en rojo =====
+
+  /**
+   * Guarda el color como último estado conocido y, solo si cambió a ROJO, registra
+   * un aviso. Una sola sentencia: si dos consultas concurrentes ven el mismo cambio,
+   * solo una cumple `IS DISTINCT FROM` y crea el aviso. KPIs sin color no cambian estado.
+   */
+  protected async registrarAvisoSiCambioARojo(
+    kpi: string,
+    valor: number | null,
+    meta: number | null,
+    color: string | null,
+  ): Promise<void> {
+    if (color === null || valor === null) return;
+    await this.dataSource.query(
+      `WITH cambio AS (
+         UPDATE metas_kpi
+            SET ultimo_color = $2::varchar
+          WHERE kpi = $1
+            AND ultimo_color IS DISTINCT FROM $2::varchar
+        RETURNING kpi
+       )
+       INSERT INTO avisos_kpi (kpi, valor, meta)
+       SELECT $1, $3, $4 FROM cambio WHERE $2::varchar = 'ROJO'`,
+      [kpi, color, valor, meta],
+    );
+  }
+
+  private mapearAviso(fila: Record<string, unknown>): AvisoKpiResponse {
+    return {
+      id: Number(fila.id),
+      kpi: String(fila.kpi),
+      valor: Number(fila.valor),
+      meta: fila.meta === null || fila.meta === undefined ? null : Number(fila.meta),
+      fecha: new Date(fila.fecha as string | Date).toISOString(),
+      leido: Boolean(fila.leido),
+    };
+  }
+
+  async listarAvisos(leido?: boolean): Promise<AvisoKpiResponse[]> {
+    const filas: Record<string, unknown>[] = await this.dataSource.query(
+      `SELECT id, kpi, valor, meta, fecha, leido
+         FROM avisos_kpi
+        WHERE kpi = ANY($1)
+          AND ($2::boolean IS NULL OR leido = $2::boolean)
+        ORDER BY fecha DESC, id DESC`,
+      [KPIS_DEL_SERVICIO, leido ?? null],
+    );
+    return (filas || []).map((f) => this.mapearAviso(f));
+  }
+
+  async marcarAvisoLeido(id: number): Promise<AvisoKpiResponse> {
+    const filas: Record<string, unknown>[] = await this.dataSource.query(
+      `UPDATE avisos_kpi SET leido = TRUE
+        WHERE id = $1 AND kpi = ANY($2)
+        RETURNING id, kpi, valor, meta, fecha, leido`,
+      [id, KPIS_DEL_SERVICIO],
+    );
+    // Postgres devuelve [filas, cantidad] en UPDATE ... RETURNING con TypeORM.
+    const resultado = Array.isArray(filas?.[0]) ? (filas[0] as unknown as Record<string, unknown>[]) : filas;
+    if (!resultado || resultado.length === 0) {
+      throw new NotFoundException(`El aviso ${id} no existe.`);
+    }
+    return this.mapearAviso(resultado[0]);
   }
 }

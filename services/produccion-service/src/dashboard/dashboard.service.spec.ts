@@ -414,3 +414,111 @@ describe('DashboardService: metas de KPI y semáforo (ABC-495)', () => {
     expect(res.kpis[0]).toMatchObject({ meta: null, valor: 50, color: null });
   });
 });
+
+const KPI = 'FPY';
+
+describe('DashboardService: avisos de KPI en rojo (ABC-500)', () => {
+  let ultimoColor: string | null;
+  let avisos: { id: number; kpi: string; valor: number; meta: number | null; fecha: Date; leido: boolean }[];
+  let valorActual: number | null;
+  let queryMock: jest.Mock;
+  let service: DashboardService;
+
+  const filaMeta = () => ({
+    kpi: KPI,
+    meta: '95.0000',
+    unidad: '%',
+    umbral_amarillo_pct: '10.00',
+    umbral_rojo_pct: '20.00',
+    sentido: 'MAYOR_ES_MEJOR',
+    actualizado_por: null,
+    actualizado_en: new Date('2026-11-20T10:00:00Z'),
+  });
+
+  beforeEach(() => {
+    ultimoColor = null;
+    avisos = [];
+    valorActual = 96;
+    queryMock = jest.fn(async (sql: string, params: unknown[]) => {
+      if (sql.includes('WITH cambio')) {
+        const [kpi, color, valor, meta] = params as [string, string, number, number | null];
+        if (ultimoColor !== color) {
+          ultimoColor = color;
+          if (color === 'ROJO') {
+            avisos.push({ id: avisos.length + 1, kpi, valor, meta, fecha: new Date(), leido: false });
+          }
+        }
+        return [];
+      }
+      if (sql.includes('FROM avisos_kpi')) {
+        const [, leido] = params as [string[], boolean | null];
+        return avisos.filter((a) => leido === null || a.leido === leido);
+      }
+      if (sql.includes('UPDATE avisos_kpi')) {
+        const aviso = avisos.find((a) => a.id === (params as number[])[0]);
+        if (aviso) aviso.leido = true;
+        return aviso ? [aviso] : [];
+      }
+      return [filaMeta()];
+    });
+    class ServicioConValor extends DashboardService {
+      protected async obtenerValorKpi(): Promise<number | null> {
+        return valorActual;
+      }
+    }
+    service = new ServicioConValor({ query: queryMock } as unknown as DataSource);
+  });
+
+  it('verde a rojo: registra un aviso con KPI, valor, meta y sin leer', async () => {
+    await service.obtenerKpisConSemaforo();
+    valorActual = 70;
+    await service.obtenerKpisConSemaforo();
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0]).toMatchObject({ kpi: KPI, valor: 70, meta: 95, leido: false });
+  });
+
+  it('rojo sostenido: no genera avisos nuevos', async () => {
+    valorActual = 70;
+    await service.obtenerKpisConSemaforo();
+    await service.obtenerKpisConSemaforo();
+    valorActual = 65;
+    await service.obtenerKpisConSemaforo();
+    expect(avisos).toHaveLength(1);
+  });
+
+  it('rojo, verde y rojo: avisa de nuevo al volver a rojo', async () => {
+    valorActual = 70;
+    await service.obtenerKpisConSemaforo();
+    valorActual = 96;
+    await service.obtenerKpisConSemaforo();
+    valorActual = 60;
+    await service.obtenerKpisConSemaforo();
+    expect(avisos).toHaveLength(2);
+  });
+
+  it('amarillo no genera aviso', async () => {
+    valorActual = 80;
+    await service.obtenerKpisConSemaforo();
+    expect(avisos).toHaveLength(0);
+  });
+
+  it('un KPI sin valor/color no toca el estado ni avisa', async () => {
+    valorActual = null;
+    await service.obtenerKpisConSemaforo();
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes('WITH cambio'))).toBe(false);
+  });
+
+  it('lista avisos y filtra por leído', async () => {
+    valorActual = 70;
+    await service.obtenerKpisConSemaforo();
+    expect(await service.listarAvisos(false)).toHaveLength(1);
+    await service.marcarAvisoLeido(1);
+    expect(await service.listarAvisos(false)).toHaveLength(0);
+    expect(await service.listarAvisos(true)).toHaveLength(1);
+    expect((await service.listarAvisos())[0]).toMatchObject({ id: 1, kpi: KPI, leido: true });
+  });
+
+  it('marcar como leído un aviso inexistente da NotFound', async () => {
+    await expect(service.marcarAvisoLeido(99)).rejects.toThrow(NotFoundException);
+  });
+});

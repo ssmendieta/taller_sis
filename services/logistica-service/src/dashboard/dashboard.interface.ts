@@ -71,3 +71,13 @@ export interface KpiSemaforoResponse {
 export interface KpisSemaforoResponse {
   kpis: KpiSemaforoResponse[];
 }
+
+// ABC-500: avisos de KPI en rojo.
+export interface AvisoKpiResponse {
+  id: number;
+  kpi: string;
+  valor: number;
+  meta: number | null;
+  fecha: string;
+  leido: boolean;
+}

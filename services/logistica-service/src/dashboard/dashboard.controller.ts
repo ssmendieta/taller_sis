@@ -2,7 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  BadRequestException,
   Param,
+  ParseIntPipe,
+  Patch,
   Put,
   Query,
   Req,
@@ -16,7 +19,7 @@ import { PERMISO_CONSULTAR_RUTAS } from '../rutas/rutas.controller';
 import { DashboardService } from './dashboard.service';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
-import { KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardLogisticaResponse } from './dashboard.interface';
 
 // ABC-328: Métricas e indicadores del dashboard de logística (ABC-107).
@@ -66,6 +69,22 @@ export class DashboardController {
     @Req() req: { usuarioId?: number | string },
   ): Promise<MetaKpiResponse> {
     return this.dashboardService.guardarMeta(kpi, dto, req.usuarioId);
+  }
+
+  // ABC-500: avisos de KPI en rojo.
+  @Get('kpis/avisos')
+  @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
+  listarAvisos(@Query('leido') leido?: string): Promise<AvisoKpiResponse[]> {
+    if (leido !== undefined && leido !== 'true' && leido !== 'false') {
+      throw new BadRequestException('El filtro "leido" debe ser true o false.');
+    }
+    return this.dashboardService.listarAvisos(leido === undefined ? undefined : leido === 'true');
+  }
+
+  @Patch('kpis/avisos/:id/leido')
+  @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
+  marcarAvisoLeido(@Param('id', ParseIntPipe) id: number): Promise<AvisoKpiResponse> {
+    return this.dashboardService.marcarAvisoLeido(id);
   }
 
   @Get('kpis')

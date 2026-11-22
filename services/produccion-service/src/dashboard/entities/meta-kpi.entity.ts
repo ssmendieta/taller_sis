@@ -33,6 +33,10 @@ export class MetaKpi {
   @Column({ name: 'actualizado_por', type: 'bigint', nullable: true })
   actualizadoPor: string | null;
 
+  /** Último color calculado; permite avisar una sola vez por cambio a rojo (ABC-500). */
+  @Column({ name: 'ultimo_color', type: 'varchar', length: 10, nullable: true })
+  ultimoColor: string | null;
+
   @UpdateDateColumn({ name: 'actualizado_en', type: 'timestamptz', default: () => 'NOW()' })
   actualizadoEn: Date;
 }
