@@ -81,3 +81,8 @@ export interface AvisoKpiResponse {
   fecha: string;
   leido: boolean;
 }
+
+// ABC-526: contador de avisos de KPI sin leer.
+export interface AvisosSinLeerResponse {
+  total: number;
+}

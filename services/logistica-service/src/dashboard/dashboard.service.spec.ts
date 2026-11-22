@@ -349,6 +349,9 @@ describe('DashboardService: avisos de KPI en rojo (ABC-500)', () => {
         }
         return [];
       }
+      if (sql.includes('COUNT(*)')) {
+        return [{ total: avisos.filter((a) => !a.leido).length }];
+      }
       if (sql.includes('FROM avisos_kpi')) {
         const [, leido] = params as [string[], boolean | null];
         return avisos.filter((a) => leido === null || a.leido === leido);
@@ -419,5 +422,38 @@ describe('DashboardService: avisos de KPI en rojo (ABC-500)', () => {
 
   it('marcar como leído un aviso inexistente da NotFound', async () => {
     await expect(service.marcarAvisoLeido(99)).rejects.toThrow(NotFoundException);
+  });
+
+  it('no repetición (ABC-526): un KPI en rojo en varios cálculos registra un solo aviso', async () => {
+    for (const v of [70, 65, 60, 68, 55]) {
+      valorActual = v;
+      await service.obtenerKpisConSemaforo();
+    }
+    expect(avisos).toHaveLength(1);
+    expect(await service.contarAvisosSinLeer()).toEqual({ total: 1 });
+  });
+
+  it('marcar como leído baja el contador y no se re-avisa mientras siga en rojo (ABC-526)', async () => {
+    valorActual = 70;
+    await service.obtenerKpisConSemaforo();
+    expect(await service.contarAvisosSinLeer()).toEqual({ total: 1 });
+    await service.marcarAvisoLeido(1);
+    expect(await service.contarAvisosSinLeer()).toEqual({ total: 0 });
+    valorActual = 62;
+    await service.obtenerKpisConSemaforo();
+    await service.obtenerKpisConSemaforo();
+    expect(avisos).toHaveLength(1);
+    expect(await service.contarAvisosSinLeer()).toEqual({ total: 0 });
+  });
+
+  it('volver a rojo tras verde crea otro aviso y suma al contador (ABC-526)', async () => {
+    valorActual = 70;
+    await service.obtenerKpisConSemaforo();
+    await service.marcarAvisoLeido(1);
+    valorActual = 96;
+    await service.obtenerKpisConSemaforo();
+    valorActual = 60;
+    await service.obtenerKpisConSemaforo();
+    expect(await service.contarAvisosSinLeer()).toEqual({ total: 1 });
   });
 });

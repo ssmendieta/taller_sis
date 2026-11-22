@@ -18,7 +18,7 @@ import { PermisoProduccionGuard, PERMISO_PRODUCCION } from '../auth/permiso-prod
 import { DashboardService } from './dashboard.service';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
-import { AvisoKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, AvisosSinLeerResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardResponse } from './dashboard.interface';
 
 // ABC-324: Métricas e indicadores del dashboard de producción (ABC-106).
@@ -78,6 +78,13 @@ export class DashboardController {
       throw new BadRequestException('El filtro "leido" debe ser true o false.');
     }
     return this.dashboardService.listarAvisos(leido === undefined ? undefined : leido === 'true');
+  }
+
+  // ABC-526: cantidad de avisos pendientes (sin leer).
+  @Get('kpis/avisos/sin-leer')
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.consultar')
+  contarAvisosSinLeer(): Promise<AvisosSinLeerResponse> {
+    return this.dashboardService.contarAvisosSinLeer();
   }
 
   @Patch('kpis/avisos/:id/leido')
