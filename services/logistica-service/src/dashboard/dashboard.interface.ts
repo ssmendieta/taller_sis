@@ -10,6 +10,7 @@ export interface MetricasDashboardLogisticaResponse {
     boletas_emitidas: number;
     rutas_en_curso: number;
     rutas_planificadas: number;
+    /** @deprecated Compatibilidad del widget anterior; ABC-479 usa tiempo_atencion. */
     porcentaje_entregas_completadas: number;
     total_incidencias: number;
   };
@@ -31,6 +32,7 @@ export interface MetricasDashboardLogisticaResponse {
     entregadas: number;
     pendientes: number;
     anuladas: number;
+    /** @deprecated Compatibilidad del widget anterior; no es el KPI TIEMPO_ATENCION. */
     porcentaje_efectividad: number;
   };
   incidencias: {
@@ -44,6 +46,15 @@ export interface MetricasDashboardLogisticaResponse {
     cantidad_total: number;
   };
   uso_capacidad: UsoCapacidadResponse;
+  tiempo_atencion: TiempoAtencionResponse;
+}
+
+// ABC-478: cada solicitud completamente entregada aporta una observación.
+export interface TiempoAtencionResponse {
+  /** null = sin solicitudes con entrega real válida en el periodo. */
+  promedio_horas: number | null;
+  solicitudes_entregadas: number;
+  unidad: 'horas';
 }
 
 // ABC-490: uso de capacidad (carga / capacidad) de las rutas despachadas.

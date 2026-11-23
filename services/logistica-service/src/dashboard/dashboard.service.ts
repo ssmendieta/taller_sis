@@ -5,7 +5,7 @@ import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
 import { calcularUsoCapacidad, FilaUsoCapacidad } from './uso-capacidad';
 import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
-import { MetricasDashboardLogisticaResponse } from './dashboard.interface';
+import { MetricasDashboardLogisticaResponse, TiempoAtencionResponse } from './dashboard.interface';
 
 /** KPIs que este servicio administra (ABC-495). */
 export const KPIS_DEL_SERVICIO: readonly string[] = ['TIEMPO_ATENCION', 'ENTREGAS_A_TIEMPO', 'INCIDENCIAS_RUTA', 'USO_CAPACIDAD'];
@@ -55,12 +55,13 @@ export class DashboardService {
   async obtenerMetricas(filtro: FiltroDashboardDto = {}): Promise<MetricasDashboardLogisticaResponse> {
     const { fechaDesde, fechaHasta, strDesde, strHasta } = this.parsearFechas(filtro);
 
-    const [boletasRow, rutasRow, entregasRow, cargaRow, usoCapacidadFilas] = await Promise.all([
+    const [boletasRow, rutasRow, entregasRow, cargaRow, usoCapacidadFilas, tiempoAtencion] = await Promise.all([
       this.consultarBoletas(fechaDesde, fechaHasta),
       this.consultarRutas(strDesde, strHasta),
       this.consultarEntregas(strDesde, strHasta),
       this.consultarCarga(fechaDesde, fechaHasta),
       this.consultarUsoCapacidad(strDesde, strHasta),
+      this.consultarTiempoAtencion(fechaDesde, fechaHasta),
     ]);
 
     const totalBoletas = Number(boletasRow?.total ?? 0);
@@ -130,6 +131,49 @@ export class DashboardService {
         cantidad_total: cantidadTotalCarga,
       },
       uso_capacidad: calcularUsoCapacidad(usoCapacidadFilas),
+      tiempo_atencion: tiempoAtencion,
+    };
+  }
+
+  /**
+   * ABC-478: primera entrega válida de cada boleta; la última de esas entregas
+   * completa la solicitud. Una solicitud cuenta una vez, aunque tenga varias
+   * boletas o intentos de reparto. El periodo se aplica después de completarla.
+   */
+  private async consultarTiempoAtencion(desde: Date | null, hasta: Date | null): Promise<TiempoAtencionResponse> {
+    const filas = await this.dataSource.query(`
+      WITH entregas_por_boleta AS (
+        SELECT b.id AS boleta_id, b.solicitud_salida_id,
+               MIN(p.entregada_en) FILTER (
+                 WHERE b.estado = 'EMITIDA' AND p.estado_entrega = 'ENTREGADA'
+                   AND r.estado IN ('DESPACHADA', 'COMPLETADA')
+                   AND p.entregada_en >= s.creado_en
+               ) AS entregada_en
+          FROM boletas_envio b
+          INNER JOIN solicitudes_salida s ON s.id = b.solicitud_salida_id
+          LEFT JOIN rutas_paradas_boletas pb ON pb.boleta_id = b.id
+          LEFT JOIN rutas_paradas p ON p.id = pb.parada_id
+          LEFT JOIN rutas r ON r.id = p.ruta_id
+         WHERE b.estado <> 'ANULADA'
+         GROUP BY b.id, b.solicitud_salida_id
+      ), solicitudes_entregadas AS (
+        SELECT s.id, s.creado_en, MAX(e.entregada_en) AS entregada_en
+          FROM solicitudes_salida s
+          INNER JOIN entregas_por_boleta e ON e.solicitud_salida_id = s.id
+         GROUP BY s.id, s.creado_en
+        HAVING BOOL_AND(e.entregada_en IS NOT NULL)
+      )
+      SELECT COUNT(*)::int AS solicitudes_entregadas,
+             ROUND(AVG(EXTRACT(EPOCH FROM (entregada_en - creado_en)) / 3600), 2) AS promedio_horas
+        FROM solicitudes_entregadas
+       WHERE ($1::timestamptz IS NULL OR entregada_en >= $1::timestamptz)
+         AND ($2::timestamptz IS NULL OR entregada_en <= $2::timestamptz)
+    `, [desde, hasta]);
+    const fila = filas?.[0];
+    return {
+      promedio_horas: fila?.promedio_horas == null ? null : Number(fila.promedio_horas),
+      solicitudes_entregadas: Number(fila?.solicitudes_entregadas ?? 0),
+      unidad: 'horas',
     };
   }
 
@@ -363,6 +407,9 @@ export class DashboardService {
    * tienen cálculo devuelven null y salen sin color. USO_CAPACIDAD: ABC-490 (histórico).
    */
   protected async obtenerValorKpi(kpi: string): Promise<number | null> {
+    if (kpi === 'TIEMPO_ATENCION') {
+      return (await this.consultarTiempoAtencion(null, null)).promedio_horas;
+    }
     if (kpi === 'USO_CAPACIDAD') {
       return calcularUsoCapacidad(await this.consultarUsoCapacidad(null, null)).porcentaje;
     }
