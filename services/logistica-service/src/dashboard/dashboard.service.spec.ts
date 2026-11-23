@@ -41,6 +41,7 @@ describe('DashboardService Logística (ABC-328)', () => {
   describe('Estado vacío (sin datos)', () => {
     it('devuelve métricas con ceros, sin NaN ni divisiones entre cero cuando la base está vacía', async () => {
       queryMock.mockImplementation(async (sql: string) => {
+        if (sql.includes('recursos_externos_vehiculos')) return [];
         if (sql.includes('boletas_envio_items')) {
           return [{ total_items: 0, cantidad_total: 0 }];
         }
@@ -110,6 +111,7 @@ describe('DashboardService Logística (ABC-328)', () => {
   describe('Cálculo de indicadores con datos reales de prueba', () => {
     it('calcula indicadores de boletas, rutas, entregas, incidencias y volumen de carga correctamente', async () => {
       queryMock.mockImplementation(async (sql: string) => {
+        if (sql.includes('recursos_externos_vehiculos')) return [];
         if (sql.includes('boletas_envio_items')) {
           return [{ total_items: 15, cantidad_total: 450.5 }];
         }
@@ -194,7 +196,7 @@ describe('DashboardService Logística (ABC-328)', () => {
         hasta: '2026-10-31',
       });
 
-      expect(queryMock).toHaveBeenCalledTimes(4);
+      expect(queryMock).toHaveBeenCalledTimes(5);
       queryMock.mock.calls.forEach((llamada) => {
         const sql = llamada[0] as string;
         const params = llamada[1] as unknown[];
@@ -455,5 +457,91 @@ describe('DashboardService: avisos de KPI en rojo (ABC-500)', () => {
     valorActual = 60;
     await service.obtenerKpisConSemaforo();
     expect(await service.contarAvisosSinLeer()).toEqual({ total: 1 });
+  });
+});
+
+describe('DashboardService: uso de capacidad (ABC-490)', () => {
+  const fila = (extra: Record<string, unknown> = {}) => ({
+    ruta_id: '1', fecha: '2026-11-10', estado: 'DESPACHADA', vehiculo_externo_id: 'VEH-01', placa: '2345-ABC',
+    capacidad_valor: '1500.0000', capacidad_unidad: 'kg', boleta_id: '10', unidad: 'kg', cantidad: '300.0000', ...extra,
+  });
+  let filas: Record<string, unknown>[];
+  let queryMock: jest.Mock;
+  let service: DashboardService;
+  const uso = async (filtro = {}) => (await service.obtenerMetricas(filtro)).uso_capacidad;
+
+  beforeEach(() => {
+    queryMock = jest.fn(async (sql: string) => (sql.includes('recursos_externos_vehiculos') ? filas : []));
+    service = new DashboardService({ query: queryMock } as unknown as DataSource);
+  });
+
+  it('unidades compatibles: suma la carga de la ruta y la divide entre la capacidad', async () => {
+    filas = [fila(), fila({ boleta_id: '11', cantidad: '450.5000' })];
+    const res = await uso();
+    expect(res).toMatchObject({ porcentaje: 50.03, rutas_calculables: 1, rutas_no_calculables: 0 });
+    expect(res.por_ruta[0]).toMatchObject({
+      calculable: true, porcentaje: 50.03, motivo: null,
+      carga: { valor: '750.5000', unidad: 'kg' }, capacidad: { valor: '1500.0000', unidad: 'kg' },
+    });
+  });
+
+  it('agrupa por vehículo y promedia las rutas calculables', async () => {
+    filas = [
+      fila(), // 20 %
+      fila({ ruta_id: '2', cantidad: '900.0000' }), // 60 %
+      fila({ ruta_id: '3', vehiculo_externo_id: 'VEH-02', placa: 'X', capacidad_valor: '100.0000', capacidad_unidad: 'caja', unidad: 'caja', cantidad: '100.0000' }),
+      fila({ ruta_id: '4', unidad: 'l' }), // no calculable: no entra en el promedio
+    ];
+    const res = await uso();
+    expect(res).toMatchObject({ porcentaje: 60, rutas_calculables: 3, rutas_no_calculables: 1 });
+    expect(res.por_vehiculo).toEqual([
+      { vehiculo_externo_id: 'VEH-01', placa: '2345-ABC', porcentaje: 40, rutas_calculables: 2, rutas_no_calculables: 1 },
+      { vehiculo_externo_id: 'VEH-02', placa: 'X', porcentaje: 100, rutas_calculables: 1, rutas_no_calculables: 0 },
+    ]);
+  });
+
+  it.each([
+    ['incompatible con la capacidad', { unidad: 'l' }, 'UNIDAD_INCOMPATIBLE'],
+    ['g contra kg tampoco se convierte', { unidad: 'g' }, 'CARGA_NO_CALCULABLE'],
+    ['unidad desconocida', { unidad: null }, 'CARGA_NO_CALCULABLE'],
+    ['boleta sin ítems', { cantidad: null }, 'CARGA_NO_CALCULABLE'],
+    ['ruta sin boletas', { boleta_id: null, unidad: null, cantidad: null }, 'CARGA_NO_CALCULABLE'],
+    ['capacidad faltante', { placa: null, capacidad_valor: null, capacidad_unidad: null }, 'CAPACIDAD_FALTANTE'],
+    ['capacidad en cero', { capacidad_valor: '0.0000' }, 'CAPACIDAD_FALTANTE'],
+  ])('no calculable: %s', async (_caso, extra, motivo) => {
+    filas = [fila(extra)];
+    const res = await uso();
+    expect(res).toMatchObject({ porcentaje: null, rutas_calculables: 0, rutas_no_calculables: 1 });
+    expect(res.por_ruta[0]).toMatchObject({ calculable: false, porcentaje: null, motivo });
+    expect(res.por_ruta[0].detalle).toBeTruthy();
+  });
+
+  it('no calculable: la carga mezcla unidades', async () => {
+    filas = [fila(), fila({ boleta_id: '11', unidad: 'caja' })];
+    expect((await uso()).por_ruta[0]).toMatchObject({ calculable: false, carga: null, motivo: 'CARGA_NO_CALCULABLE' });
+  });
+
+  it('sin rutas despachadas: sin datos', async () => {
+    filas = [];
+    expect(await uso()).toEqual({ porcentaje: null, rutas_calculables: 0, rutas_no_calculables: 0, por_vehiculo: [], por_ruta: [] });
+  });
+
+  it('filtra por período y solo toma rutas que salieron', async () => {
+    filas = [];
+    await uso({ desde: '2026-11-01', hasta: '2026-11-10' });
+    const [sql, params] = queryMock.mock.calls.find(([q]) => q.includes('recursos_externos_vehiculos'))!;
+    expect(params).toEqual(['2026-11-01', '2026-11-10']);
+    expect(sql).toContain("r.estado IN ('DESPACHADA','COMPLETADA')");
+  });
+
+  it('el semáforo usa el valor calculado de USO_CAPACIDAD', async () => {
+    filas = [fila({ cantidad: '1200.0000' })];
+    const meta = {
+      kpi: 'USO_CAPACIDAD', meta: '80.0000', unidad: '%', umbral_amarillo_pct: '10.00', umbral_rojo_pct: '20.00',
+      sentido: 'MAYOR_ES_MEJOR', actualizado_por: null, actualizado_en: new Date('2026-11-20T10:00:00Z'),
+    };
+    queryMock.mockImplementation(async (sql: string) =>
+      sql.includes('recursos_externos_vehiculos') ? filas : sql.includes('WITH cambio') ? [] : [meta]);
+    expect((await service.obtenerKpisConSemaforo()).kpis[0]).toMatchObject({ valor: 80, color: 'VERDE' });
   });
 });

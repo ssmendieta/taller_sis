@@ -119,6 +119,9 @@ describe('Dashboard HTTP Logística (ABC-328): GET /dashboard/metricas', () => {
     expect(body).toHaveProperty('entregas');
     expect(body).toHaveProperty('incidencias');
     expect(body).toHaveProperty('volumen_carga');
+    expect(body.uso_capacidad).toEqual({
+      porcentaje: null, rutas_calculables: 0, rutas_no_calculables: 0, por_vehiculo: [], por_ruta: [],
+    });
   });
 
   it('rechaza con 400 cuando "desde" es posterior a "hasta"', async () => {

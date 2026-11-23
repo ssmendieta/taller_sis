@@ -46,6 +46,13 @@ describe('DashboardController Logística (ABC-328)', () => {
       total_items: 12,
       cantidad_total: 300,
     },
+    uso_capacidad: {
+      porcentaje: null,
+      rutas_calculables: 0,
+      rutas_no_calculables: 0,
+      por_vehiculo: [],
+      por_ruta: [],
+    },
   };
 
   beforeEach(() => {

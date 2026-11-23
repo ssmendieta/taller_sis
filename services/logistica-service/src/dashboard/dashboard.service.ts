@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
+import { calcularUsoCapacidad, FilaUsoCapacidad } from './uso-capacidad';
 import { AvisoKpiResponse, AvisosSinLeerResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardLogisticaResponse } from './dashboard.interface';
 
@@ -54,11 +55,12 @@ export class DashboardService {
   async obtenerMetricas(filtro: FiltroDashboardDto = {}): Promise<MetricasDashboardLogisticaResponse> {
     const { fechaDesde, fechaHasta, strDesde, strHasta } = this.parsearFechas(filtro);
 
-    const [boletasRow, rutasRow, entregasRow, cargaRow] = await Promise.all([
+    const [boletasRow, rutasRow, entregasRow, cargaRow, usoCapacidadFilas] = await Promise.all([
       this.consultarBoletas(fechaDesde, fechaHasta),
       this.consultarRutas(strDesde, strHasta),
       this.consultarEntregas(strDesde, strHasta),
       this.consultarCarga(fechaDesde, fechaHasta),
+      this.consultarUsoCapacidad(strDesde, strHasta),
     ]);
 
     const totalBoletas = Number(boletasRow?.total ?? 0);
@@ -127,6 +129,7 @@ export class DashboardService {
         total_items: totalItems,
         cantidad_total: cantidadTotalCarga,
       },
+      uso_capacidad: calcularUsoCapacidad(usoCapacidadFilas),
     };
   }
 
@@ -249,6 +252,45 @@ export class DashboardService {
 
   // ===== ABC-495: metas de KPI y semáforo =====
 
+  /**
+   * ABC-490: carga de cada ruta que salió (DESPACHADA o COMPLETADA) y capacidad de su
+   * vehículo en la copia del ERP de la misma fecha. La unidad de la carga es la que la
+   * boleta guardó al emitirse. Una parada anulada antes del despacho no se cargó y no suma;
+   * anulada después, sí viajó. El período filtra por la fecha programada de la ruta.
+   */
+  private async consultarUsoCapacidad(desdeStr: string | null, hastaStr: string | null): Promise<FilaUsoCapacidad[]> {
+    const sql = `
+      SELECT
+        r.id::text AS ruta_id,
+        TO_CHAR(r.fecha_programada, 'YYYY-MM-DD') AS fecha,
+        r.estado,
+        r.vehiculo_externo_id,
+        v.placa,
+        v.capacidad_valor::text AS capacidad_valor,
+        v.capacidad_unidad,
+        rb.boleta_id::text AS boleta_id,
+        b.unidad,
+        i.cantidad::text AS cantidad
+      FROM rutas r
+      LEFT JOIN recursos_externos_vehiculos v
+        ON v.fecha = r.fecha_programada AND v.id_externo = r.vehiculo_externo_id
+      LEFT JOIN (
+        SELECT DISTINCT p.ruta_id, pb.boleta_id
+        FROM rutas_paradas p
+        INNER JOIN rutas pr ON pr.id = p.ruta_id
+        INNER JOIN rutas_paradas_boletas pb ON pb.parada_id = p.id
+        WHERE p.estado_entrega <> 'ANULADA' OR p.entrega_actualizada_en >= pr.despachada_en
+      ) rb ON rb.ruta_id = r.id
+      LEFT JOIN boletas_envio b ON b.id = rb.boleta_id
+      LEFT JOIN boletas_envio_items i ON i.boleta_id = b.id
+      WHERE r.estado IN ('DESPACHADA','COMPLETADA')
+        AND ($1::date IS NULL OR r.fecha_programada >= $1::date)
+        AND ($2::date IS NULL OR r.fecha_programada <= $2::date)
+      ORDER BY r.fecha_programada, r.id, rb.boleta_id, i.id
+    `;
+    return (await this.dataSource.query(sql, [desdeStr, hastaStr])) || [];
+  }
+
   private mapearMeta(fila: Record<string, unknown>): MetaKpiResponse {
     return {
       kpi: String(fila.kpi),
@@ -317,10 +359,13 @@ export class DashboardService {
   }
 
   /**
-   * Valor actual de un KPI. Aún sin cálculo: cada HU de KPI conectará aquí
-   * su consulta. Mientras tanto devuelve null y el KPI sale sin color.
+   * Valor actual de un KPI. Cada HU de KPI conecta aquí su consulta; los que aún no
+   * tienen cálculo devuelven null y salen sin color. USO_CAPACIDAD: ABC-490 (histórico).
    */
-  protected async obtenerValorKpi(_kpi: string): Promise<number | null> {
+  protected async obtenerValorKpi(kpi: string): Promise<number | null> {
+    if (kpi === 'USO_CAPACIDAD') {
+      return calcularUsoCapacidad(await this.consultarUsoCapacidad(null, null)).porcentaje;
+    }
     return null;
   }
 

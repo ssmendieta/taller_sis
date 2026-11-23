@@ -1,3 +1,5 @@
+import type { CapacidadV1 } from '../recursos-externos/dto/recursos-logisticos-v1';
+
 export interface MetricasDashboardLogisticaResponse {
   periodo: {
     desde: string | null;
@@ -41,6 +43,43 @@ export interface MetricasDashboardLogisticaResponse {
     total_items: number;
     cantidad_total: number;
   };
+  uso_capacidad: UsoCapacidadResponse;
+}
+
+// ABC-490: uso de capacidad (carga / capacidad) de las rutas despachadas.
+export type MotivoUsoNoCalculable = 'CARGA_NO_CALCULABLE' | 'CAPACIDAD_FALTANTE' | 'UNIDAD_INCOMPATIBLE';
+
+export interface UsoCapacidadRuta {
+  ruta_id: string;
+  fecha: string;
+  estado: string;
+  vehiculo_externo_id: string;
+  placa: string | null;
+  carga: CapacidadV1 | null;
+  capacidad: CapacidadV1 | null;
+  calculable: boolean;
+  /** null = no calculable; ver motivo y detalle. */
+  porcentaje: number | null;
+  motivo: MotivoUsoNoCalculable | null;
+  detalle: string | null;
+}
+
+export interface UsoCapacidadVehiculo {
+  vehiculo_externo_id: string;
+  placa: string | null;
+  /** null = sin rutas calculables. */
+  porcentaje: number | null;
+  rutas_calculables: number;
+  rutas_no_calculables: number;
+}
+
+export interface UsoCapacidadResponse {
+  /** null = sin datos (ninguna ruta calculable). */
+  porcentaje: number | null;
+  rutas_calculables: number;
+  rutas_no_calculables: number;
+  por_vehiculo: UsoCapacidadVehiculo[];
+  por_ruta: UsoCapacidadRuta[];
 }
 
 // ABC-495: metas de KPI y semáforo.
