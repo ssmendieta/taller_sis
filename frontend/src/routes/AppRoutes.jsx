@@ -24,6 +24,8 @@ import RutaDetallePage from "../pages/RutaDetallePage.jsx";
 import DashboardLogisticaPage from "../pages/DashboardLogisticaPage.jsx";
 import DashboardProduccionPage from "../pages/DashboardProduccionPage.jsx";
 import DetalleKpiPage from "../pages/DetalleKpiPage.jsx";
+import MetasKpiPage from "../pages/MetasKpiPage.jsx";
+import { PERMISO_GESTIONAR_METAS } from "../services/metasKpi.js";
 import DemandasPage from "../pages/DemandasPage.jsx";
 import { PERMISO_CONSULTAR_DEMANDAS } from "../services/demandasService.js";
 import { PERMISO_HISTORIAL_PRODUCCION } from "../services/historialProduccionService.js";
@@ -121,6 +123,7 @@ export default function AppRoutes() {
       {/* Páginas autenticadas */}
       <Route element={<MainLayout><Outlet /></MainLayout>}>
         <Route path="/" element={<InicioRedirect />} />
+        <Route path="/kpis/metas" element={privada(<MetasKpiPage />, [PERMISO_GESTIONAR_METAS])} />
 
         <Route
           path="/ordenes"
