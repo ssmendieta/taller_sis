@@ -22,6 +22,8 @@ import ReportesProduccionPage from "../pages/ReportesProduccionPage.jsx";
 import ReportesLogisticosPage from "../pages/ReportesLogisticosPage.jsx";
 import RutaDetallePage from "../pages/RutaDetallePage.jsx";
 import DashboardLogisticaPage from "../pages/DashboardLogisticaPage.jsx";
+import DashboardProduccionPage from "../pages/DashboardProduccionPage.jsx";
+import DetalleKpiPage from "../pages/DetalleKpiPage.jsx";
 import DemandasPage from "../pages/DemandasPage.jsx";
 import { PERMISO_CONSULTAR_DEMANDAS } from "../services/demandasService.js";
 import { PERMISO_HISTORIAL_PRODUCCION } from "../services/historialProduccionService.js";
@@ -228,6 +230,10 @@ export default function AppRoutes() {
           path="/logistica/dashboard"
           element={privada(<DashboardLogisticaPage />, [PERMISO_CONSULTAR_RUTAS])}
         />
+        {/* ABC-513: registros detrás de un KPI. */}
+        <Route path="/logistica/kpis/:kpi" element={privada(<DetalleKpiPage area="logistica" />, [PERMISO_CONSULTAR_RUTAS])} />
+        <Route path="/produccion/kpis/:kpi" element={privada(<DetalleKpiPage area="produccion" />, ["ordenes.consultar"])} />
+        <Route path="/produccion/dashboard" element={privada(<DashboardProduccionPage />, ["ordenes.consultar"])} />
         <Route
           path="/logistica/rutas/historial"
           element={privada(<HistorialLogisticoPage />, [PERMISO_CONSULTAR_RUTAS])}
