@@ -21,6 +21,7 @@ import { RutaParadaBoleta } from './ruta-parada-boleta.entity';
 @Check('ck_ruta_parada_estado_entrega', "estado_entrega IN ('PENDIENTE','ENTREGADA','ANULADA')")
 @Check('ck_ruta_parada_entrega_autor', "estado_entrega = 'PENDIENTE' OR (entrega_actualizada_en IS NOT NULL AND entrega_usuario_id > 0)")
 @Check('ck_ruta_parada_entrega_observacion', "entrega_observacion IS NULL OR (estado_entrega <> 'PENDIENTE' AND LENGTH(BTRIM(entrega_observacion)) > 0)")
+@Check('ck_ruta_parada_entregada_en', "entregada_en IS NULL OR estado_entrega = 'ENTREGADA'")
 export class RutaParada {
   @PrimaryGeneratedColumn('identity', { type: 'bigint', generatedIdentity: 'ALWAYS' })
   id!: string;
@@ -49,6 +50,10 @@ export class RutaParada {
 
   @Column({ name: 'entrega_observacion', type: 'varchar', length: 500, nullable: true })
   entregaObservacion!: string | null;
+
+  // ABC-453: hora real de entrega; solo existe en paradas ENTREGADA.
+  @Column({ name: 'entregada_en', type: 'timestamptz', nullable: true })
+  entregadaEn!: Date | null;
 
   @OneToMany(() => RutaParadaBoleta, (documento) => documento.parada, { cascade: false })
   boletas!: RutaParadaBoleta[];
