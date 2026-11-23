@@ -4,6 +4,8 @@ import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity
 import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad.enum';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { Lote } from './entities/lote.entity';
+import { crearEventoProductoTerminadoIngresado } from '../integraciones/outbox/crear-evento-producto-terminado-ingresado';
+import { ESTADO_OUTBOX_PENDIENTE, EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 
 export interface CrearLoteInput {
   ordenId: number;
@@ -80,10 +82,21 @@ export class LotesService {
         if (unidadesEscaladas(asignados.total) + unidadesEscaladas(dto.cantidad.toFixed(4)) > unidadesEscaladas(conformes.total)) {
           throw new ConflictException('La cantidad supera los conformes disponibles sin asignar de la orden');
         }
-        return manager.save(Lote, {
+        const lote = await manager.save(Lote, {
           codigo, ordenId: String(dto.ordenId), cantidad: dto.cantidad.toFixed(4),
           responsableUsuarioId: String(usuarioId),
         });
+        const evento = crearEventoProductoTerminadoIngresado(lote, orden);
+        await manager.save(EventoOutbox, {
+          eventId: evento.eventId,
+          correlationId: evento.correlationId,
+          eventType: evento.eventType,
+          aggregateType: 'Lote',
+          aggregateId: lote.id,
+          payload: evento,
+          estado: ESTADO_OUTBOX_PENDIENTE,
+        });
+        return lote;
       });
     } catch (error) {
       const dbError = error?.driverError ?? error;

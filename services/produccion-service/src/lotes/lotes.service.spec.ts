@@ -5,6 +5,8 @@ import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { Lote } from './entities/lote.entity';
 import { LotesService } from './lotes.service';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
+import { validarProductoTerminadoIngresadoV1 } from '../integraciones/contratos/producto-terminado-ingresado-v1.validator';
 
 describe('ABC-294: regla de asignacion de conformes a lotes', () => {
   const conformes = {
@@ -27,7 +29,7 @@ describe('ABC-294: regla de asignacion de conformes a lotes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     transaction.mockImplementation(async (callback) => callback(manager));
-    manager.findOne.mockResolvedValue({ id: 1 });
+    manager.findOne.mockResolvedValue({ id: 1, codigo: 'ORD-1', producto_id: 3 });
     existsBy.mockResolvedValue(false);
     conformes.getRawOne.mockResolvedValue({ total: '23.0000' });
     asignados.getRawOne.mockResolvedValue({ total: '0.0000' });
@@ -44,6 +46,12 @@ describe('ABC-294: regla de asignacion de conformes a lotes', () => {
     expect(conformes.andWhere).toHaveBeenCalledWith('resultado.tipo = :tipo', { tipo: TipoResultadoCalidad.CONFORME });
     expect(manager.save).toHaveBeenCalledWith(Lote, {
       codigo: 'L-001', ordenId: '1', cantidad: '23.0000', responsableUsuarioId: '42',
+    });
+    const aviso = manager.save.mock.calls.find(([entity]) => entity === EventoOutbox)[1];
+    expect(aviso).toMatchObject({ aggregateType: 'Lote', aggregateId: result.id, estado: 'PENDIENTE' });
+    expect(validarProductoTerminadoIngresadoV1(aviso.payload).data).toMatchObject({
+      loteId: result.id, loteCodigo: 'L-001', ordenId: 1, ordenCodigo: 'ORD-1',
+      productoId: '3', cantidadConforme: '23.0000', fechaIngreso: result.fechaHora.toISOString(),
     });
   });
 

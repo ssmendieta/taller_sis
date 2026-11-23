@@ -7,6 +7,7 @@ import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { Lote } from './entities/lote.entity';
 import { LotesController } from './lotes.controller';
 import { LotesService } from './lotes.service';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 
 // ORD-0001 tiene 20 conformes (ABC-82). La cuenta de Producción registra calidad;
 // la de consulta solo puede ver la orden.
@@ -36,7 +37,8 @@ describe('ABC-294: API para crear y consultar lotes', () => {
   const manager = {
     findOne: jest.fn(async (_entidad: unknown, { where }: { where: { id: number } }) => (where.id === ORDEN.id ? ORDEN : null)),
     getRepository: (entidad: unknown) => (entidad === Lote ? repositorioLotes : { createQueryBuilder: () => total(() => conformes) }),
-    save: jest.fn(async (_entidad: unknown, datos: Omit<(typeof lotes)[number], 'id' | 'fechaHora'>) => {
+    save: jest.fn(async (entidad: unknown, datos: any) => {
+      if (entidad === EventoOutbox) return { ...datos };
       const lote = { id: String(lotes.length + 1), ...datos, fechaHora: new Date() };
       lotes.push(lote);
       return lote;
