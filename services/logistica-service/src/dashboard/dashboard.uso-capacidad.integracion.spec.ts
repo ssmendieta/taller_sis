@@ -8,6 +8,7 @@ import { CrearRutas1710000000005 } from '../database/migrations/1710000000005-Cr
 import { EstadosDespachoEntrega1710000000006 } from '../database/migrations/1710000000006-EstadosDespachoEntrega';
 import { CrearRespaldoRecursosLogisticos1710000000007 } from '../database/migrations/1710000000007-CrearRespaldoRecursosLogisticos';
 import { ProductoUnidadBoleta1710000000013 } from '../database/migrations/1710000000013-ProductoUnidadBoleta';
+import { HoraRealEntregaParada1710000000016 } from '../database/migrations/1710000000016-HoraRealEntregaParada';
 import { DashboardService } from './dashboard.service';
 
 dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
@@ -40,6 +41,7 @@ describeConPostgres('ABC-490: uso de capacidad con PostgreSQL real', () => {
       migrations: [
         CrearSolicitudesSalida1710000000001, CrearBoletasEnvio1710000000002, CrearRutas1710000000005,
         EstadosDespachoEntrega1710000000006, CrearRespaldoRecursosLogisticos1710000000007, ProductoUnidadBoleta1710000000013,
+        HoraRealEntregaParada1710000000016,
       ],
       migrationsTableName: 'migrations_abc490',
       extra: { options: `-c search_path=${schema}` },

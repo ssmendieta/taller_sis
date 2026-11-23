@@ -7,6 +7,7 @@ describe('DashboardController Logística (ABC-328)', () => {
   let serviceMock: { obtenerMetricas: jest.Mock };
 
   const mockRespuesta: MetricasDashboardLogisticaResponse = {
+    tiempo_atencion: { promedio_horas: null, solicitudes_entregadas: 0, unidad: 'horas' },
     periodo: { desde: '2026-10-01', hasta: '2026-10-31' },
     resumen: {
       total_boletas: 10,

@@ -1,0 +1,27 @@
+sequenceDiagram
+    participant W as TarjetasKpi
+    participant F as Servicio frontend
+    participant C as DashboardController
+    participant S as DashboardService
+    participant DB as PostgreSQL
+    W->>F: obtenerKpisLogistica()
+    F->>C: GET /api/logistica/dashboard/kpis
+    Note over C: Permiso logistica.rutas.consultar
+    C->>S: obtenerKpisConSemaforo()
+    S->>DB: listarMetas()
+    DB-->>S: Metas, unidades y umbrales
+    S->>S: obtenerValorKpi(TIEMPO_ATENCION)
+    S->>DB: consultarTiempoAtencion(null, null)
+    Note over DB: solicitudes_salida y boletas_envio
+    Note over DB: rutas_paradas_boletas, rutas_paradas y rutas
+    Note over DB: Primera entrega valida por boleta activa
+    Note over DB: Solicitud completa: ultima de esas entregas
+    Note over DB: AVG(entrega final - creado_en) en horas
+    DB-->>S: promedio_horas, solicitudes_entregadas
+    S->>S: calcularSemaforo(valor, meta, umbrales)
+    S->>DB: registrarAvisoSiCambioARojo() si hay color y valor
+    DB-->>S: Estado actualizado; aviso solo al cambiar a ROJO
+    S-->>C: kpis con valor, meta, unidad y color
+    C-->>F: HTTP 200 con kpis
+    F-->>W: datos.kpis
+    Note over W: Mostrar horas o Sin datos cuando valor es null

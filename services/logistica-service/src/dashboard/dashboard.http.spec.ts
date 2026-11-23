@@ -151,6 +151,16 @@ describe('Dashboard HTTP Logística (ABC-328): GET /dashboard/metricas', () => {
       hasta: '2026-10-31',
     });
   });
+
+  it('ABC-478: publica horas y sin datos como null, sin confundirlo con cero', async () => {
+    const vacio = await consultarMetricas();
+    expect(vacio.body.tiempo_atencion).toEqual({ promedio_horas: null, solicitudes_entregadas: 0, unidad: 'horas' });
+    queryMock.mockImplementation(async (sql: string) => sql.includes('WITH entregas_por_boleta')
+      ? [{ promedio_horas: '12.50', solicitudes_entregadas: 2 }] : []);
+    const res = await consultarMetricas('desde=2026-11-01&hasta=2026-11-20');
+    expect(res.status).toBe(200);
+    expect(res.body.tiempo_atencion).toEqual({ promedio_horas: 12.5, solicitudes_entregadas: 2, unidad: 'horas' });
+  });
 });
 
 describe('Dashboard HTTP (ABC-495): metas de KPI y semáforo', () => {

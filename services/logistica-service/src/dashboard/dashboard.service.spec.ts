@@ -2,6 +2,52 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { DashboardService } from './dashboard.service';
 
+describe('ABC-478: contrato del tiempo de atención', () => {
+  const query = jest.fn();
+  const service = new DashboardService({ query } as unknown as DataSource);
+
+  beforeEach(() => query.mockReset());
+
+  it.each([
+    ['12.50', 2, 12.5],
+    ['0.00', 1, 0],
+    [null, 0, null],
+  ])('mapea promedio %s y %s solicitudes sin sustituir null por cero', async (promedio, cantidad, esperado) => {
+    query.mockImplementation(async (sql: string) => sql.includes('WITH entregas_por_boleta')
+      ? [{ promedio_horas: promedio, solicitudes_entregadas: cantidad }] : []);
+    expect((await service.obtenerMetricas()).tiempo_atencion).toEqual({
+      promedio_horas: esperado, solicitudes_entregadas: cantidad, unidad: 'horas',
+    });
+  });
+
+  it('envía los límites UTC de la entrega real, incluidos los filtros abiertos', async () => {
+    query.mockResolvedValue([]);
+    for (const [filtro, esperado] of [
+      [{ desde: '2026-11-01', hasta: '2026-11-02' }, [new Date('2026-11-01T00:00:00Z'), new Date('2026-11-02T23:59:59.999Z')]],
+      [{ desde: '2026-11-01' }, [new Date('2026-11-01T00:00:00Z'), null]],
+      [{ hasta: '2026-11-02' }, [null, new Date('2026-11-02T23:59:59.999Z')]],
+    ] as const) {
+      query.mockClear();
+      await service.obtenerMetricas(filtro);
+      const llamada = query.mock.calls.find(([sql]) => sql.includes('WITH entregas_por_boleta'));
+      expect(llamada?.[1]).toEqual(esperado);
+    }
+  });
+
+  it('usa el mismo promedio en el semáforo TIEMPO_ATENCION', async () => {
+    query.mockImplementation(async (sql: string) => {
+      if (sql.includes('FROM metas_kpi')) return [{ kpi: 'TIEMPO_ATENCION', meta: '24', unidad: 'horas',
+        sentido: 'MENOR_ES_MEJOR', umbral_amarillo_pct: 10, umbral_rojo_pct: 20,
+        actualizado_en: '2026-11-01T00:00:00Z', actualizado_por: null }];
+      if (sql.includes('WITH entregas_por_boleta')) return [{ promedio_horas: '12.50', solicitudes_entregadas: 2 }];
+      return [];
+    });
+    expect((await service.obtenerKpisConSemaforo()).kpis[0]).toMatchObject({
+      kpi: 'TIEMPO_ATENCION', valor: 12.5, unidad: 'horas', color: 'VERDE',
+    });
+  });
+});
+
 describe('DashboardService Logística (ABC-328)', () => {
   let service: DashboardService;
   let queryMock: jest.Mock;
@@ -196,7 +242,7 @@ describe('DashboardService Logística (ABC-328)', () => {
         hasta: '2026-10-31',
       });
 
-      expect(queryMock).toHaveBeenCalledTimes(5);
+      expect(queryMock).toHaveBeenCalledTimes(6);
       queryMock.mock.calls.forEach((llamada) => {
         const sql = llamada[0] as string;
         const params = llamada[1] as unknown[];
