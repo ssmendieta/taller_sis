@@ -110,6 +110,9 @@ td.ts-actions .ts-btn { margin: 0 0 4px 6px; }
 .ts-badge--inactivo { background: #f1f1f2; color: var(--ts-secondary); border-color: #ddd; }
 .ts-badge--DISPONIBLE, .ts-badge--suficiente { background: var(--ts-success-bg); color: var(--ts-success); border-color: var(--ts-success-border); }
 .ts-badge--INSUFICIENTE { background: var(--ts-warning-bg); color: var(--ts-warning); border-color: var(--ts-warning-border); }
+.ts-badge--VERDE { background: var(--ts-success-bg); color: var(--ts-success); border-color: var(--ts-success-border); }
+.ts-badge--AMARILLO { background: var(--ts-warning-bg); color: var(--ts-warning); border-color: var(--ts-warning-border); }
+.ts-badge--ROJO { background: var(--ts-danger-bg); color: var(--ts-danger); border-color: var(--ts-danger-border); }
 .ts-badge--FALTANTE { background: var(--ts-danger-bg); color: var(--ts-danger); border-color: var(--ts-danger-border); }
 
 /* Semáforo de materiales: icono + texto */

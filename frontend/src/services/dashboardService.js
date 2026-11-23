@@ -54,3 +54,24 @@ export async function obtenerMetricasDashboard(filtros = {}) {
   await exigirOk(response, "Error al obtener las métricas del dashboard de producción.");
   return await response.json();
 }
+
+// ABC-497: valor, meta y color del semáforo de cada KPI (todo el historial).
+export async function obtenerKpisProduccion() {
+  const response = await fetch(`${apiConfig.apiUrl}/api/produccion/dashboard/kpis`, { headers: encabezados() });
+  await exigirOk(response, "Error al obtener los KPIs.");
+  return await response.json();
+}
+
+// ABC-513: registros que componen un KPI, con filtro opcional de período.
+export async function obtenerDetalleKpiProduccion(kpi, filtros = {}) {
+  const params = new URLSearchParams();
+  if (filtros?.desde) params.append("desde", filtros.desde);
+  if (filtros?.hasta) params.append("hasta", filtros.hasta);
+  const consulta = params.toString();
+  const response = await fetch(
+    `${apiConfig.apiUrl}/api/produccion/dashboard/kpis/${encodeURIComponent(kpi)}/detalle${consulta ? `?${consulta}` : ""}`,
+    { headers: encabezados() },
+  );
+  await exigirOk(response, "Error al obtener el detalle del KPI.");
+  return await response.json();
+}

@@ -3,6 +3,7 @@ import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import PageHeader from "../components/ui/PageHeader.jsx";
+import TarjetasKpi from "../components/kpis/TarjetasKpi.jsx";
 import WidgetsDashboardLogistica from "../components/logistica/dashboard/WidgetsDashboardLogistica.jsx";
 import { FORMATO_TITULO } from "../constants/marca.js";
 
@@ -24,6 +25,7 @@ export default function DashboardLogisticaPage() {
         titulo={<span id="dash-logistica-titulo">Tablero logístico</span>}
         descripcion="Boletas, rutas y entregas del período seleccionado."
       />
+      <TarjetasKpi area="logistica" />
       <WidgetsDashboardLogistica />
     </section>
   );

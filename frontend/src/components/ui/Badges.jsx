@@ -40,3 +40,20 @@ export function BarraAvance({ acumulado = 0, solicitada = 0 }) {
     </span>
   );
 }
+
+const SEMAFORO = {
+  VERDE: { icono: "✓", texto: "En meta" },
+  AMARILLO: { icono: "!", texto: "Cerca de la meta" },
+  ROJO: { icono: "✕", texto: "Fuera de meta" },
+};
+
+// ABC-497: el color siempre va con ícono y texto; sin color del backend no se pinta nada.
+export function BadgeSemaforo({ color }) {
+  const info = SEMAFORO[color];
+  if (!info) return null;
+  return (
+    <span className={`ts-badge ts-badge--${color}`}>
+      <span aria-hidden="true">{info.icono}</span>{info.texto}
+    </span>
+  );
+}
