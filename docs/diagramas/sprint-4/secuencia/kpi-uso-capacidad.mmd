@@ -1,0 +1,70 @@
+sequenceDiagram
+    autonumber
+    actor E as Encargado de Logística
+    participant W as Widget del dashboard
+    participant F as dashboardLogisticaService.js
+    participant G as API Gateway
+    participant A as auth-service
+    participant C as DashboardController
+    participant V as DashboardService
+    participant U as calcularUsoCapacidad
+    participant R as Rutas y boletas
+    participant X as Recursos logísticos (copia del ERP)
+    Note over R,X: Ambos están en logistica_db
+
+    rect rgb(240, 240, 240)
+    Note over E,X: A. Consultar el uso de capacidad con filtro de periodo
+    E->>W: Abre el dashboard o elige un periodo
+    W->>F: obtenerMetricasDashboardLogistica({ desde, hasta })
+    F->>G: GET /api/logistica/dashboard/metricas?desde&hasta
+    G->>C: GET /dashboard/metricas
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    alt Sin token, sesión inválida o Auth caído
+        C-->>F: 401 o 503
+    else Sin el permiso logistica.rutas.consultar
+        C-->>F: 403 Forbidden
+    else Fecha inválida o desde posterior a hasta
+        C-->>F: 400 Bad Request
+    else Solicitud válida
+        C->>V: obtenerMetricas(filtro)
+        V->>R: consultarUsoCapacidad: rutas DESPACHADA o COMPLETADA del periodo con sus boletas, unidad y cantidades
+        R->>X: LEFT JOIN por vehículo y fecha programada
+        X-->>R: Placa, capacidad y unidad, o nulos
+        R-->>V: Una fila por ítem de carga
+        V->>U: calcularUsoCapacidad(filas)
+        loop Por cada ruta
+            U->>U: calcularCarga(boletas, ítems) sin convertir unidades
+            alt Sin carga, unidad desconocida o unidades mezcladas
+                Note over U: No calculable: CARGA_NO_CALCULABLE
+            else Sin capacidad para el vehículo en esa fecha
+                Note over U: No calculable: CAPACIDAD_FALTANTE
+            else Carga y capacidad en unidades distintas
+                Note over U: No calculable: UNIDAD_INCOMPATIBLE, sin convertir ni estimar
+            else Unidades compatibles
+                Note over U: porcentaje = carga / capacidad x 100
+            end
+        end
+        U->>U: Media de las rutas calculables, por vehículo y general
+        alt Ninguna ruta calculable
+            Note over U: porcentaje = null (sin datos)
+        end
+        U-->>V: porcentaje, conteos, por_vehiculo y por_ruta
+        V-->>F: 200 con uso_capacidad
+    end
+    F-->>W: Datos de métricas o Error con el mensaje
+    W-->>E: Porcentaje, "no calculable", "sin datos" o error
+    end
+
+    rect rgb(240, 240, 240)
+    Note over E,X: B. Consultar el semáforo (histórico, sin filtro)
+    G->>C: GET /dashboard/kpis (con el mismo permiso)
+    C->>V: obtenerKpisConSemaforo()
+    V->>V: listarMetas() y obtenerValorKpi("USO_CAPACIDAD")
+    V->>R: consultarUsoCapacidad(null, null)
+    R-->>V: Filas de rutas con la capacidad de la copia del ERP
+    V->>U: calcularUsoCapacidad(filas)
+    U-->>V: porcentaje o null
+    V->>V: calcularSemaforo(porcentaje, meta, umbrales, MAYOR_ES_MEJOR)
+    V-->>G: 200 con valor, meta y color (null si no hay valor o meta)
+    end
