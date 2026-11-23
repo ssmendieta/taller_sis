@@ -62,6 +62,20 @@ export async function obtenerKpisLogistica() {
   return await response.json();
 }
 
+export async function obtenerMetasKpiLogistica() {
+  const response = await fetch(`${apiConfig.apiUrl}/api/logistica/dashboard/kpis/metas`, { headers: encabezados() });
+  await exigirOk(response, "No se pudieron cargar las metas de Logística.");
+  return response.json();
+}
+
+export async function guardarMetaKpiLogistica(kpi, datos) {
+  const response = await fetch(`${apiConfig.apiUrl}/api/logistica/dashboard/kpis/metas/${encodeURIComponent(kpi)}`, {
+    method: "PUT", headers: encabezados({ "Content-Type": "application/json" }), body: JSON.stringify(datos),
+  });
+  await exigirOk(response, "No se pudo guardar la meta de Logística.");
+  return response.json();
+}
+
 // ABC-513: registros que componen un KPI, con filtro opcional de período.
 export async function obtenerDetalleKpiLogistica(kpi, filtros = {}) {
   const params = new URLSearchParams();

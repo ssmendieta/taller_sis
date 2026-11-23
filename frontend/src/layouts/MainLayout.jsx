@@ -5,6 +5,7 @@ import Logo from "../components/Logo.jsx";
 import { NOMBRE_SISTEMA } from "../constants/marca.js";
 import { cerrarSesionServidor } from "../services/auth.js";
 import { tienePermiso } from "../services/permisos.js";
+import { PERMISO_GESTIONAR_METAS } from "../services/metasKpi.js";
 import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
@@ -37,6 +38,7 @@ export default function MainLayout({ children }) {
   const { usuario, salir } = useSesion();
   const [abierto, setAbierto] = useState(false);
   const puedeOrdenes = tienePermiso(usuario, "ordenes.consultar");
+  const puedeMetas = tienePermiso(usuario, PERMISO_GESTIONAR_METAS);
   const puedeRecetas = tienePermiso(usuario, "recetas.gestionar");
   const puedeSolicitarMateriales = tienePermiso(usuario, "materiales.solicitar");
   const puedeRoles = tienePermiso(usuario, "roles_permisos.gestionar");
@@ -68,6 +70,7 @@ export default function MainLayout({ children }) {
           <button type="button" className="menu-toggle" aria-expanded={abierto} aria-label={abierto ? "Cerrar menú" : "Abrir menú"} onClick={() => setAbierto((v) => !v)}>☰</button>
         </div>
         <nav className="navbar" aria-label="Navegación principal">
+          {puedeMetas && <Link className={activo("/kpis/metas")} to="/kpis/metas" onClick={() => setAbierto(false)}><IconoNavegacion nombre="tablero" />Metas de KPI</Link>}
           {puedeOrdenes && <Link className={activo("/ordenes")} to="/ordenes" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Órdenes</Link>}
           {puedeOrdenes && <Link className={activo("/produccion/dashboard")} to="/produccion/dashboard" onClick={() => setAbierto(false)}><IconoNavegacion nombre="tablero" />Tablero de producción</Link>}
           {puedeOrdenes && <Link className={activo("/produccion/historial")} to="/produccion/historial" onClick={() => setAbierto(false)}><IconoNavegacion nombre="ordenes" />Historial de producción</Link>}

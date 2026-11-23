@@ -10,6 +10,9 @@ import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710
 import { ResultadosConformes1710000000014 } from '../database/migrations/1710000000014-ResultadosConformes';
 import { TipoResultadoCalidad1710000000015 } from '../database/migrations/1710000000015-TipoResultadoCalidad';
 import { Lotes1710000000016 } from '../database/migrations/1710000000016-Lotes';
+import { EventosOutbox1710000000017 } from '../database/migrations/1710000000017-EventosOutbox';
+import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
+import { validarProductoTerminadoIngresadoV1 } from '../integraciones/contratos/producto-terminado-ingresado-v1.validator';
 import { AvancesProduccion } from '../avances_produccion/entities/avances_produccion.entity';
 import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity';
 import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad.enum';
@@ -45,7 +48,7 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
   const httpFetch = global.fetch;
   const options = (): PostgresConnectionOptions => ({
     ...(AppDataSource.options as PostgresConnectionOptions), schema,
-    entities: [Lote, OrdenProduccion, ResultadoConforme, AvancesProduccion], migrations: [],
+    entities: [Lote, OrdenProduccion, ResultadoConforme, AvancesProduccion, EventoOutbox], migrations: [],
   });
 
   beforeAll(async () => {
@@ -61,6 +64,7 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
       await new ResultadosConformes1710000000014().up(runner);
       await new TipoResultadoCalidad1710000000015().up(runner);
       await new Lotes1710000000016().up(runner);
+      await new EventosOutbox1710000000017().up(runner);
       await runner.query("INSERT INTO recetas (producto_codigo,producto_nombre) VALUES ('R1','Producto')");
       await runner.commitTransaction();
       schemaCreado = true;
@@ -102,6 +106,46 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
       tipo: TipoResultadoCalidad.DEFECTUOSO, causaDefecto: 'Sellado incompleto' }, 43);
     return Number(orden.id);
   }
+
+  it('ABC-438: persiste un evento válido por lote con sus datos exactos, también tras reconectar', async () => {
+    const ordenId = await prepararOrden();
+    const lote = await service.create({ ordenId, codigo: 'L-OUTBOX-VALIDO', cantidad: 1.2345 }, 42);
+    await source.destroy();
+    await source.initialize();
+    const avisos = await source.getRepository(EventoOutbox).findBy({ aggregateType: 'Lote', aggregateId: lote.id });
+    expect(avisos).toHaveLength(1);
+    const evento = validarProductoTerminadoIngresadoV1(avisos[0].payload);
+    expect(avisos[0]).toMatchObject({ eventId: evento.eventId, correlationId: evento.correlationId,
+      eventType: evento.eventType, estado: 'PENDIENTE', intentos: 0, messageId: null });
+    expect(evento.data).toEqual({ loteId: lote.id, loteCodigo: lote.codigo, ordenId,
+      ordenCodigo: (await source.getRepository(OrdenProduccion).findOneByOrFail({ id: ordenId })).codigo,
+      productoId: '1', cantidadConforme: '1.2345', fechaIngreso: lote.fechaHora.toISOString() });
+    await expect(service.create({ ordenId, codigo: lote.codigo, cantidad: 1 }, 42)).rejects.toMatchObject({ status: 409 });
+    expect(await source.getRepository(EventoOutbox).countBy({ aggregateType: 'Lote', aggregateId: lote.id })).toBe(1);
+  });
+
+  it('ABC-438: un fallo del outbox revierte el lote en la misma transacción', async () => {
+    const ordenId = await prepararOrden();
+    const anteriores = await source.getRepository(EventoOutbox).count();
+    await source.query(`ALTER TABLE "${schema}".eventos_outbox ADD CONSTRAINT ck_abc438_fallo
+      CHECK (payload #>> '{data,loteCodigo}' <> 'L-OUTBOX-FALLA')`);
+    try {
+      await expect(service.create({ ordenId, codigo: 'L-OUTBOX-FALLA', cantidad: 2 }, 42))
+        .rejects.toMatchObject({ driverError: { code: '23514' } });
+      expect(await source.getRepository(Lote).countBy({ codigo: 'L-OUTBOX-FALLA' })).toBe(0);
+      expect(await source.getRepository(EventoOutbox).count()).toBe(anteriores);
+    } finally {
+      await source.query(`ALTER TABLE "${schema}".eventos_outbox DROP CONSTRAINT ck_abc438_fallo`);
+    }
+  });
+
+  it('ABC-438: un lote rechazado por exceder los conformes no deja un aviso', async () => {
+    const ordenId = await prepararOrden([2]);
+    const anteriores = await source.getRepository(EventoOutbox).count();
+    await expect(service.create({ ordenId, codigo: 'L-OUTBOX-EXCESO', cantidad: 3 }, 42)).rejects.toMatchObject({ status: 409 });
+    expect(await source.getRepository(Lote).countBy({ codigo: 'L-OUTBOX-EXCESO' })).toBe(0);
+    expect(await source.getRepository(EventoOutbox).count()).toBe(anteriores);
+  });
 
   it('asigna 23 conformes de registros 10+13 y persiste responsable y fecha tras reconectar', async () => {
     const ordenId = await prepararOrden();
@@ -164,6 +208,7 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
     const lotes = await source.getRepository(Lote).findBy({ ordenId: String(ordenId) });
     expect(lotes).toHaveLength(1);
     expect(lotes[0].cantidad).toBe('14.0000');
+    expect(await source.getRepository(EventoOutbox).countBy({ aggregateType: 'Lote', aggregateId: lotes[0].id })).toBe(1);
   });
 
   it('la unicidad en BD protege el codigo simultaneo en ordenes distintas y devuelve 409', async () => {

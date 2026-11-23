@@ -62,6 +62,20 @@ export async function obtenerKpisProduccion() {
   return await response.json();
 }
 
+export async function obtenerMetasKpiProduccion() {
+  const response = await fetch(`${apiConfig.apiUrl}/api/produccion/dashboard/kpis/metas`, { headers: encabezados() });
+  await exigirOk(response, "No se pudieron cargar las metas de Producción.");
+  return response.json();
+}
+
+export async function guardarMetaKpiProduccion(kpi, datos) {
+  const response = await fetch(`${apiConfig.apiUrl}/api/produccion/dashboard/kpis/metas/${encodeURIComponent(kpi)}`, {
+    method: "PUT", headers: encabezados({ "Content-Type": "application/json" }), body: JSON.stringify(datos),
+  });
+  await exigirOk(response, "No se pudo guardar la meta de Producción.");
+  return response.json();
+}
+
 // ABC-513: registros que componen un KPI, con filtro opcional de período.
 export async function obtenerDetalleKpiProduccion(kpi, filtros = {}) {
   const params = new URLSearchParams();
