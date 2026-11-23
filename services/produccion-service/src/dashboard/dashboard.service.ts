@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
-import { AvisoKpiResponse, AvisosSinLeerResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardResponse, DesglosePerdidaMaterial } from './dashboard.interface';
 
 /** KPIs que este servicio administra (ABC-495). */
@@ -237,7 +237,18 @@ export class DashboardService {
     };
   }
 
-  private async consultarFpy(desde: Date | null, hasta: Date | null) {
+  // Criterio único del FPY: lo usan el KPI y su detalle (ABC-512) para que coincidan.
+  private static readonly COLUMNAS_FPY = `
+        COALESCE(SUM(r.cantidad) FILTER (
+          WHERE r.tipo = 'CONFORME'
+            AND NOT EXISTS (SELECT 1 FROM reprocesos p WHERE p.resultado_calidad_id = r.id)
+        ), 0)::numeric AS conformes_primera,
+        COALESCE(SUM(r.cantidad), 0)::numeric AS evaluadas,
+        COALESCE(SUM(
+          (SELECT COALESCE(SUM(p.cantidad_recuperada), 0) FROM reprocesos p WHERE p.resultado_calidad_id = r.id)
+        ), 0)::numeric AS recuperadas`;
+
+  private filtroFpy(desde: Date | null, hasta: Date | null) {
     const params: unknown[] = [];
     const condiciones: string[] = [];
     if (desde) {
@@ -248,18 +259,13 @@ export class DashboardService {
       params.push(hasta);
       condiciones.push(`r.fecha_hora <= $${params.length}`);
     }
-    const whereClause = condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '';
+    return { params, whereClause: condiciones.length ? `WHERE ${condiciones.join(' AND ')}` : '' };
+  }
 
+  private async consultarFpy(desde: Date | null, hasta: Date | null) {
+    const { params, whereClause } = this.filtroFpy(desde, hasta);
     const sql = `
-      SELECT
-        COALESCE(SUM(r.cantidad) FILTER (
-          WHERE r.tipo = 'CONFORME'
-            AND NOT EXISTS (SELECT 1 FROM reprocesos p WHERE p.resultado_calidad_id = r.id)
-        ), 0)::numeric AS conformes_primera,
-        COALESCE(SUM(r.cantidad), 0)::numeric AS evaluadas,
-        COALESCE(SUM(
-          (SELECT COALESCE(SUM(p.cantidad_recuperada), 0) FROM reprocesos p WHERE p.resultado_calidad_id = r.id)
-        ), 0)::numeric AS recuperadas
+      SELECT ${DashboardService.COLUMNAS_FPY}
       FROM resultados_conformes r
       ${whereClause}
     `;
@@ -486,6 +492,67 @@ export class DashboardService {
       }),
     );
     return { kpis };
+  }
+
+  // ===== ABC-512: detalle de un KPI =====
+
+  async obtenerDetalleKpi(kpi: string, filtro: FiltroDashboardDto = {}): Promise<DetalleKpiResponse> {
+    if (!KPIS_DEL_SERVICIO.includes(kpi)) {
+      throw new NotFoundException(`El KPI "${kpi}" no existe.`);
+    }
+    const { fechaDesde, fechaHasta } = this.parsearFechas(filtro);
+    const base = {
+      kpi,
+      periodo: { desde: filtro.desde || null, hasta: filtro.hasta || null },
+      disponible: true,
+      valor: null,
+      unidad: '%',
+      registros: [],
+    };
+    // Los demás KPIs conectan aquí su detalle cuando tengan cálculo.
+    if (kpi !== 'FPY') return { ...base, disponible: false, unidad: null };
+
+    const { params, whereClause } = this.filtroFpy(fechaDesde, fechaHasta);
+    const [ordenes, causas]: Record<string, unknown>[][] = await Promise.all([
+      this.dataSource.query(
+        `SELECT o.id::text AS id, o.codigo, o.estado, ${DashboardService.COLUMNAS_FPY}
+           FROM resultados_conformes r
+           INNER JOIN ordenes_produccion o ON o.id = r.orden_id
+           ${whereClause}
+          GROUP BY o.id, o.codigo, o.estado
+          ORDER BY o.id`,
+        params,
+      ),
+      this.dataSource.query(
+        `SELECT BTRIM(r.causa_defecto) AS causa, SUM(r.cantidad)::numeric AS cantidad
+           FROM resultados_conformes r
+           ${whereClause ? `${whereClause} AND` : 'WHERE'} r.tipo = 'DEFECTUOSO'
+          GROUP BY BTRIM(r.causa_defecto)
+          ORDER BY SUM(r.cantidad) DESC, BTRIM(r.causa_defecto)`,
+        params,
+      ),
+    ]);
+    // Cantidades con 4 decimales: se redondea para no arrastrar errores de coma flotante.
+    const sumar = (filas: Record<string, unknown>[], campo: string) =>
+      Number(filas.reduce((total, f) => total + Number(f[campo] ?? 0), 0).toFixed(4));
+    return {
+      ...base,
+      valor: this.calcularFpy({
+        evaluadas: sumar(ordenes, 'evaluadas'),
+        conformes_primera: sumar(ordenes, 'conformes_primera'),
+      }).fpy,
+      registros: ordenes.map((f) => ({
+        tipo: 'ORDEN' as const,
+        id: String(f.id),
+        codigo: String(f.codigo),
+        estado: String(f.estado),
+        valor: this.calcularFpy(f).fpy,
+        conformes_primera: Number(f.conformes_primera),
+        evaluadas: Number(f.evaluadas),
+      })),
+      causas_defecto: causas.map((f) => ({ causa: String(f.causa), cantidad: Number(f.cantidad) })),
+      unidades_defectuosas: sumar(causas, 'cantidad'),
+    };
   }
 
   // ===== ABC-500: avisos de KPI en rojo =====

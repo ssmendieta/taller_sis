@@ -545,3 +545,43 @@ describe('DashboardService: uso de capacidad (ABC-490)', () => {
     expect((await service.obtenerKpisConSemaforo()).kpis[0]).toMatchObject({ valor: 80, color: 'VERDE' });
   });
 });
+
+describe('DashboardService: detalle de KPI (ABC-512)', () => {
+  const fila = (extra: Record<string, unknown> = {}) => ({
+    ruta_id: '1', fecha: '2026-11-10', estado: 'DESPACHADA', vehiculo_externo_id: 'VEH-01', placa: 'AAA',
+    capacidad_valor: '100.0000', capacidad_unidad: 'kg', boleta_id: '10', unidad: 'kg', cantidad: '30.0000', ...extra,
+  });
+  const crear = (filas: unknown[]) => {
+    const query = jest.fn(async (sql: string) => (sql.includes('recursos_externos_vehiculos') ? filas : []));
+    return { service: new DashboardService({ query } as unknown as DataSource), query };
+  };
+
+  it('USO_CAPACIDAD: el valor coincide con el del dashboard y con la media de sus registros', async () => {
+    const { service } = crear([fila(), fila({ ruta_id: '2', cantidad: '70.0000' }), fila({ ruta_id: '3', unidad: 'l' })]);
+    const filtro = { desde: '2026-11-01', hasta: '2026-11-30' };
+    const res = await service.obtenerDetalleKpi('USO_CAPACIDAD', filtro);
+    expect(res.valor).toBe((await service.obtenerMetricas(filtro)).uso_capacidad.porcentaje);
+    expect(res).toMatchObject({ disponible: true, valor: 50, periodo: filtro });
+    expect(res.registros.map((r) => [r.tipo, r.id, r.estado, r.valor, r.motivo])).toEqual([
+      ['RUTA', '1', 'DESPACHADA', 30, null],
+      ['RUTA', '2', 'DESPACHADA', 70, null],
+      ['RUTA', '3', 'DESPACHADA', null, 'UNIDAD_INCOMPATIBLE'],
+    ]);
+  });
+
+  it('sin registros: detalle vacío', async () => {
+    expect(await crear([]).service.obtenerDetalleKpi('USO_CAPACIDAD')).toMatchObject({ disponible: true, valor: null, registros: [] });
+  });
+
+  it('KPI sin cálculo todavía: no disponible y sin consultar', async () => {
+    const { service, query } = crear([]);
+    expect(await service.obtenerDetalleKpi('ENTREGAS_A_TIEMPO')).toMatchObject({ disponible: false, valor: null, registros: [] });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('KPI inválido da 404 y rango invertido da 400', async () => {
+    const { service } = crear([]);
+    await expect(service.obtenerDetalleKpi('FPY')).rejects.toThrow(NotFoundException);
+    await expect(service.obtenerDetalleKpi('USO_CAPACIDAD', { desde: '2026-02-01', hasta: '2026-01-01' })).rejects.toThrow(BadRequestException);
+  });
+});

@@ -97,6 +97,19 @@ describe('Dashboard HTTP Logística (ABC-328): GET /dashboard/metricas', () => {
     };
   }
 
+  it('ABC-512: GET /dashboard/kpis/:kpi/detalle exige permiso, valida el KPI y responde', async () => {
+    const pedir = (ruta: string, token?: string) =>
+      httpFetch(`${base}/dashboard/kpis/${ruta}`, token ? { headers: { authorization: `Bearer ${token}` } } : {});
+    queryMock.mockResolvedValue([]);
+    expect((await pedir('USO_CAPACIDAD/detalle')).status).toBe(401);
+    expect((await pedir('USO_CAPACIDAD/detalle', 'operadorSinPermiso')).status).toBe(403);
+    expect((await pedir('NO_EXISTE/detalle', 'encargadoLogistica')).status).toBe(404);
+    expect((await pedir('USO_CAPACIDAD/detalle?otro=1', 'encargadoLogistica')).status).toBe(400);
+    const res = await pedir('USO_CAPACIDAD/detalle?desde=2026-01-01', 'encargadoLogistica');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ kpi: 'USO_CAPACIDAD', valor: null, registros: [] });
+  });
+
   it('rechaza con 401 si no se envía encabezado de autorización', async () => {
     const res = await consultarMetricas('', null);
     expect(res.status).toBe(401);

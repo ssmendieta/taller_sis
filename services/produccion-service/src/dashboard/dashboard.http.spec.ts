@@ -97,6 +97,19 @@ describe('Dashboard HTTP (ABC-324): GET /dashboard/metricas', () => {
     };
   }
 
+  it('ABC-512: GET /dashboard/kpis/:kpi/detalle exige permiso, valida el KPI y responde', async () => {
+    const pedir = (ruta: string, token?: string) =>
+      httpFetch(`${base}/dashboard/kpis/${ruta}`, token ? { headers: { authorization: `Bearer ${token}` } } : {});
+    queryMock.mockResolvedValue([]);
+    expect((await pedir('FPY/detalle')).status).toBe(401);
+    expect((await pedir('FPY/detalle', 'operadorSinPermiso')).status).toBe(403);
+    expect((await pedir('NO_EXISTE/detalle', 'supervisor')).status).toBe(404);
+    expect((await pedir('FPY/detalle?otro=1', 'supervisor')).status).toBe(400);
+    const res = await pedir('FPY/detalle?desde=2026-01-01', 'supervisor');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ kpi: 'FPY', valor: null, registros: [] });
+  });
+
   it('rechaza con 401 si no se envía encabezado de autorización', async () => {
     const res = await consultarMetricas('', null);
     expect(res.status).toBe(401);

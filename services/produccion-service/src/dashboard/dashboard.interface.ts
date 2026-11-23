@@ -101,3 +101,36 @@ export interface AvisoKpiResponse {
 export interface AvisosSinLeerResponse {
   total: number;
 }
+
+// ABC-512: registros que componen el valor de un KPI.
+export interface DetalleKpiResponse {
+  kpi: string;
+  periodo: { desde: string | null; hasta: string | null };
+  /** false = el KPI existe pero este servicio todavía no lo calcula. */
+  disponible: boolean;
+  /** Mismo valor que el KPI en ese periodo; null = sin datos. */
+  valor: number | null;
+  unidad: string | null;
+  registros: RegistroKpi[];
+  /** Solo FPY: defectos del periodo por causa, de mayor a menor. */
+  causas_defecto?: CausaDefecto[];
+  /** Solo FPY: total de unidades defectuosas (igual a la suma de las causas). */
+  unidades_defectuosas?: number;
+}
+
+export interface RegistroKpi {
+  tipo: 'ORDEN';
+  id: string;
+  codigo: string;
+  estado: string;
+  /** FPY de la orden, en %. */
+  valor: number | null;
+  /** Aporte al KPI: conformes a la primera sobre evaluadas. */
+  conformes_primera: number;
+  evaluadas: number;
+}
+
+export interface CausaDefecto {
+  causa: string;
+  cantidad: number;
+}

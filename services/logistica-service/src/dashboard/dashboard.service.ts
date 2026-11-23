@@ -4,7 +4,7 @@ import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
 import { calcularUsoCapacidad, FilaUsoCapacidad } from './uso-capacidad';
-import { AvisoKpiResponse, AvisosSinLeerResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardLogisticaResponse } from './dashboard.interface';
 
 /** KPIs que este servicio administra (ABC-495). */
@@ -393,6 +393,38 @@ export class DashboardService {
       }),
     );
     return { kpis };
+  }
+
+  // ===== ABC-512: detalle de un KPI =====
+
+  async obtenerDetalleKpi(kpi: string, filtro: FiltroDashboardDto = {}): Promise<DetalleKpiResponse> {
+    if (!KPIS_DEL_SERVICIO.includes(kpi)) {
+      throw new NotFoundException(`El KPI "${kpi}" no existe.`);
+    }
+    const { strDesde, strHasta } = this.parsearFechas(filtro);
+    const base = {
+      kpi,
+      periodo: { desde: filtro.desde || null, hasta: filtro.hasta || null },
+      disponible: true,
+      valor: null,
+      unidad: '%',
+      registros: [],
+    };
+    // Los demás KPIs conectan aquí su detalle cuando tengan cálculo.
+    if (kpi !== 'USO_CAPACIDAD') return { ...base, disponible: false, unidad: null };
+
+    const uso = calcularUsoCapacidad(await this.consultarUsoCapacidad(strDesde, strHasta));
+    return {
+      ...base,
+      valor: uso.porcentaje,
+      registros: uso.por_ruta.map(({ ruta_id, porcentaje, calculable: _calculable, ...ruta }) => ({
+        tipo: 'RUTA' as const,
+        id: ruta_id,
+        codigo: `Ruta ${ruta_id}`,
+        valor: porcentaje,
+        ...ruta,
+      })),
+    };
   }
 
   // ===== ABC-500: avisos de KPI en rojo =====

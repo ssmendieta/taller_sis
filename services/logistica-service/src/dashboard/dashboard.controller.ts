@@ -19,7 +19,7 @@ import { PERMISO_CONSULTAR_RUTAS } from '../rutas/rutas.controller';
 import { DashboardService } from './dashboard.service';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
-import { AvisoKpiResponse, AvisosSinLeerResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardLogisticaResponse } from './dashboard.interface';
 
 // ABC-328: Métricas e indicadores del dashboard de logística (ABC-107).
@@ -92,6 +92,16 @@ export class DashboardController {
   @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
   marcarAvisoLeido(@Param('id', ParseIntPipe) id: number): Promise<AvisoKpiResponse> {
     return this.dashboardService.marcarAvisoLeido(id);
+  }
+
+  // ABC-512: registros detrás de un KPI, con el mismo criterio de su cálculo.
+  @Get('kpis/:kpi/detalle')
+  @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
+  obtenerDetalleKpi(
+    @Param('kpi') kpi: string,
+    @Query() query: FiltroDashboardDto,
+  ): Promise<DetalleKpiResponse> {
+    return this.dashboardService.obtenerDetalleKpi(kpi, query);
   }
 
   @Get('kpis')

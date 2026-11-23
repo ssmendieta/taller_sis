@@ -558,3 +558,48 @@ describe('DashboardService: avisos de KPI en rojo (ABC-500)', () => {
     expect(await service.contarAvisosSinLeer()).toEqual({ total: 1 });
   });
 });
+
+describe('DashboardService: detalle de KPI (ABC-512)', () => {
+  const crear = (ordenes: object[], causas: object[]) => {
+    const query = jest.fn(async (sql: string, _params?: unknown[]) =>
+      sql.includes('AS causa') ? causas : sql.includes('o.codigo') ? ordenes : []);
+    return { service: new DashboardService({ query } as unknown as DataSource), query };
+  };
+
+  it('FPY: el valor sale de la suma de los registros y las causas suman las defectuosas', async () => {
+    const { service } = crear(
+      [
+        { id: '1', codigo: 'OP-1', estado: 'FINALIZADA', conformes_primera: '80.0000', evaluadas: '100.0000', recuperadas: '0' },
+        { id: '2', codigo: 'OP-2', estado: 'EN_PRODUCCION', conformes_primera: '10.0000', evaluadas: '20.0000', recuperadas: '0' },
+      ],
+      [{ causa: 'Rayado', cantidad: '20' }, { causa: 'Golpe', cantidad: '10' }],
+    );
+    const res = await service.obtenerDetalleKpi('FPY');
+    expect(res).toMatchObject({ disponible: true, valor: 75, unidad: '%', unidades_defectuosas: 30 });
+    expect(res.registros).toEqual([
+      { tipo: 'ORDEN', id: '1', codigo: 'OP-1', estado: 'FINALIZADA', valor: 80, conformes_primera: 80, evaluadas: 100 },
+      { tipo: 'ORDEN', id: '2', codigo: 'OP-2', estado: 'EN_PRODUCCION', valor: 50, conformes_primera: 10, evaluadas: 20 },
+    ]);
+    expect(res.causas_defecto).toEqual([{ causa: 'Rayado', cantidad: 20 }, { causa: 'Golpe', cantidad: 10 }]);
+  });
+
+  it('FPY sin registros: detalle vacío', async () => {
+    const { service } = crear([], []);
+    expect(await service.obtenerDetalleKpi('FPY', { desde: '2026-01-01' })).toEqual({
+      kpi: 'FPY', periodo: { desde: '2026-01-01', hasta: null }, disponible: true, valor: null, unidad: '%',
+      registros: [], causas_defecto: [], unidades_defectuosas: 0,
+    });
+  });
+
+  it('KPI sin cálculo todavía: no disponible y sin consultar', async () => {
+    const { service, query } = crear([], []);
+    expect(await service.obtenerDetalleKpi('MERMA')).toMatchObject({ disponible: false, valor: null, registros: [] });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('KPI inválido da 404 y rango invertido da 400', async () => {
+    const { service } = crear([], []);
+    await expect(service.obtenerDetalleKpi('USO_CAPACIDAD')).rejects.toThrow(NotFoundException);
+    await expect(service.obtenerDetalleKpi('FPY', { desde: '2026-02-01', hasta: '2026-01-01' })).rejects.toThrow(BadRequestException);
+  });
+});

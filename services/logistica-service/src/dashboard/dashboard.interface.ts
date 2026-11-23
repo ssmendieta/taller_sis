@@ -125,3 +125,31 @@ export interface AvisoKpiResponse {
 export interface AvisosSinLeerResponse {
   total: number;
 }
+
+// ABC-512: registros que componen el valor de un KPI.
+export interface DetalleKpiResponse {
+  kpi: string;
+  periodo: { desde: string | null; hasta: string | null };
+  /** false = el KPI existe pero este servicio todavía no lo calcula. */
+  disponible: boolean;
+  /** Mismo valor que el KPI en ese periodo; null = sin datos. */
+  valor: number | null;
+  unidad: string | null;
+  registros: RegistroKpi[];
+}
+
+export interface RegistroKpi {
+  tipo: 'RUTA';
+  id: string;
+  codigo: string;
+  estado: string;
+  /** Uso de capacidad de la ruta, en %; null = no calculable. */
+  valor: number | null;
+  fecha: string;
+  vehiculo_externo_id: string;
+  placa: string | null;
+  carga: CapacidadV1 | null;
+  capacidad: CapacidadV1 | null;
+  motivo: MotivoUsoNoCalculable | null;
+  detalle: string | null;
+}
