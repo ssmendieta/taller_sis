@@ -344,6 +344,63 @@ describe('DashboardService: tiempo de ciclo promedio (ABC-466)', () => {
   });
 });
 
+describe('DashboardService: cumplimiento de fecha (ABC-462)', () => {
+  const crear = (fila: Record<string, unknown> | null) => {
+    const query = jest.fn(async (sql: string, _params?: unknown[]) =>
+      sql.includes('AS a_tiempo') ? (fila ? [fila] : []) : [],
+    );
+    return { service: new DashboardService({ query } as unknown as DataSource), query };
+  };
+
+  it('todas a tiempo: devuelve 100%', async () => {
+    const { service } = crear({ total_finalizadas: 4, a_tiempo: 4 });
+    const { cumplimiento_fecha } = await service.obtenerMetricas();
+    expect(cumplimiento_fecha).toEqual({
+      porcentaje: 100,
+      a_tiempo: 4,
+      total_finalizadas: 4,
+      unidad: '%',
+    });
+  });
+
+  it('combinación a tiempo y tarde: calcula el porcentaje exacto a 2 decimales', async () => {
+    const { service } = crear({ total_finalizadas: 3, a_tiempo: 2 });
+    const { cumplimiento_fecha } = await service.obtenerMetricas();
+    expect(cumplimiento_fecha).toEqual({
+      porcentaje: 66.67,
+      a_tiempo: 2,
+      total_finalizadas: 3,
+      unidad: '%',
+    });
+  });
+
+  it('sin órdenes finalizadas: devuelve porcentaje null ("sin datos")', async () => {
+    const { service } = crear({ total_finalizadas: 0, a_tiempo: 0 });
+    const { cumplimiento_fecha } = await service.obtenerMetricas();
+    expect(cumplimiento_fecha).toEqual({
+      porcentaje: null,
+      a_tiempo: 0,
+      total_finalizadas: 0,
+      unidad: '%',
+    });
+  });
+
+  it('filtro de periodo: filtra por estado FINALIZADA, fechas no nulas y rango finalizada_en', async () => {
+    const { service, query } = crear({ total_finalizadas: 2, a_tiempo: 1 });
+    await service.obtenerMetricas({ desde: '2026-11-01', hasta: '2026-11-30' });
+    const llamada = query.mock.calls.find((c) => (c[0] as string).includes('AS a_tiempo'))!;
+    expect(llamada[0]).toContain("estado = 'FINALIZADA'");
+    expect(llamada[0]).toContain('finalizada_en IS NOT NULL');
+    expect(llamada[0]).toContain('fecha_programada IS NOT NULL');
+    expect(llamada[0]).toContain('finalizada_en::date <= fecha_programada');
+    expect(llamada[0]).toContain('finalizada_en >= $1');
+    expect(llamada[0]).toContain('finalizada_en <= $2');
+    expect(llamada[1]).toHaveLength(2);
+    expect(llamada[1][0]).toBeInstanceOf(Date);
+    expect(llamada[1][1]).toBeInstanceOf(Date);
+  });
+});
+
 describe('DashboardService: metas de KPI y semáforo (ABC-495)', () => {
   let service: DashboardService;
   let queryMock: jest.Mock;

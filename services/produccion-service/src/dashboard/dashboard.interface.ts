@@ -62,6 +62,13 @@ export interface MetricasDashboardResponse {
     ordenes_evaluadas: number;
     unidad: 'horas';
   };
+  /** ABC-462: porcentaje de órdenes finalizadas en o antes de su fecha requerida. null = sin datos. */
+  cumplimiento_fecha: {
+    porcentaje: number | null;
+    a_tiempo: number;
+    total_finalizadas: number;
+    unidad: '%';
+  };
 }
 
 // ABC-495: metas de KPI y semáforo.

@@ -56,6 +56,12 @@ describe('DashboardController (ABC-324)', () => {
       ordenes_evaluadas: 1,
       unidad: 'horas',
     },
+    cumplimiento_fecha: {
+      porcentaje: 100,
+      a_tiempo: 1,
+      total_finalizadas: 1,
+      unidad: '%',
+    },
   };
 
   beforeEach(() => {
