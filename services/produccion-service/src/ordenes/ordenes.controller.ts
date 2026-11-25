@@ -19,6 +19,7 @@ import {
 
 import { OrdenesService, UsuarioAutenticadoProduccion } from './ordenes.service';
 import { CreateOrdenDto } from './dto/create-orden.dto';
+import { CrearOrdenDesdeDemandaDto } from './dto/crear-orden-desde-demanda.dto';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { PermisoProduccionGuard, PERMISO_PRODUCCION } from '../auth/permiso-produccion.guard';
 import { MaterialCalculationService } from '../material-calculation/material-calculation.service';
@@ -41,6 +42,19 @@ export class OrdenesController {
     @Req() request: { usuarioAutenticado: UsuarioAutenticadoProduccion },
   ) {
     return this.ordenesService.create(createOrdenDto, request.usuarioAutenticado);
+  }
+
+  // ABC-444: crea una orden heredando producto, cantidad y fecha requerida desde una demanda.
+  @Post('desde-demanda/:demandaId')
+  @UseGuards(PermisoProduccionGuard)
+  @SetMetadata(PERMISO_PRODUCCION, 'ordenes.crear')
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+  crearDesdeDemanda(
+    @Param('demandaId') demandaId: string,
+    @Body() dto: CrearOrdenDesdeDemandaDto,
+    @Req() request: { usuarioAutenticado: UsuarioAutenticadoProduccion },
+  ) {
+    return this.ordenesService.crearDesdeDemanda(demandaId, dto, request.usuarioAutenticado);
   }
 
   @Get()

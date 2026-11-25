@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,8 +16,10 @@ import { EstadoOrden } from './estado-orden.enum';
 import { esTransicionValida } from './estado-orden.transiciones';
 import { CambiarEstadoOrdenDto } from './cambiar-estado-orden.dto';
 import { CreateOrdenDto } from './dto/create-orden.dto';
+import { CrearOrdenDesdeDemandaDto } from './dto/crear-orden-desde-demanda.dto';
 import { Inventario } from '../inventario/entities/inventario.entity';
 import { RecetasService } from '../recetas/recetas.service';
+import { DemandaService } from '../demanda/demanda.service';
 import { multiplicarMateriales } from '../material-calculation/material-calculation.service';
 import {
   ESTADO_CONSULTA_DISPONIBILIDAD_PENDIENTE,
@@ -61,30 +64,17 @@ export class OrdenesService {
     @InjectRepository(Inventario)
     private readonly inventarioRepository: Repository<Inventario>,
     private readonly recetasService: RecetasService,
+    @Optional()
+    private readonly demandaService?: DemandaService,
   ) {}
 
   async create(
     createOrdenDto: CreateOrdenDto,
     usuarioAutenticado?: UsuarioAutenticadoProduccion,
   ): Promise<OrdenProduccion> {
-    const responsableId = Number(usuarioAutenticado?.sub);
-    if (!Number.isSafeInteger(responsableId) || responsableId < 1) {
-      throw new UnauthorizedException('Debe iniciar sesión para crear órdenes');
-    }
-    const cantidad = Number(createOrdenDto.cantidad);
-    if (!Number.isFinite(cantidad) || cantidad <= 0) {
-      throw new BadRequestException('La cantidad debe ser mayor a cero');
-    }
-    if (!/^\d+(\.\d{1,4})?$/.test(String(createOrdenDto.cantidad))) {
-      throw new BadRequestException('La cantidad admite como máximo 4 decimales');
-    }
-    const fecha = String(createOrdenDto.fecha_programada ?? '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-      throw new BadRequestException('Debe proporcionar una fecha programada válida');
-    }
-    if (fecha < hoyLocal()) {
-      throw new BadRequestException('La fecha programada no puede ser anterior a hoy');
-    }
+    const { responsableId, nombre } = this.validarResponsable(usuarioAutenticado);
+    const cantidad = this.validarCantidad(createOrdenDto.cantidad);
+    const fecha = this.validarFechaProgramada(createOrdenDto.fecha_programada);
     const recetaId = Number(createOrdenDto.producto_id);
     if (!Number.isSafeInteger(recetaId) || recetaId < 1) {
       throw new BadRequestException('El producto es obligatorio y debe ser un ID válido');
@@ -102,7 +92,107 @@ export class OrdenesService {
       throw new ConflictException('La receta indicada está inactiva');
     }
 
-    const nombre = nombreVisible(usuarioAutenticado?.nombre, responsableId);
+    return this.persistirOrden({
+      recetaId,
+      cantidad,
+      fecha,
+      responsableId,
+      nombre,
+      demandaId: null,
+    });
+  }
+
+  // ABC-444 (ABC-412): crea la orden heredando producto, cantidad y fecha requerida de una demanda.
+  async crearDesdeDemanda(
+    demandaId: string,
+    dto?: CrearOrdenDesdeDemandaDto,
+    usuarioAutenticado?: UsuarioAutenticadoProduccion,
+  ): Promise<OrdenProduccion> {
+    const { responsableId, nombre } = this.validarResponsable(usuarioAutenticado);
+    const idLimpio = String(demandaId ?? '').trim();
+    if (!/^[1-9]\d*$/.test(idLimpio)) {
+      throw new BadRequestException('El identificador de demanda no es válido');
+    }
+    if (!this.demandaService) {
+      throw new BadRequestException('El servicio de demandas no está disponible');
+    }
+
+    const demanda = await this.demandaService.obtenerParaOrden(idLimpio);
+    const items = demanda.items ?? [];
+    if (items.length === 0) {
+      throw new BadRequestException('La demanda no tiene productos para generar una orden');
+    }
+
+    const codigoSolicitado = dto?.producto_codigo?.trim();
+    let item = items[0];
+    if (codigoSolicitado) {
+      const encontrado = items.find((it) => it.productoCodigo === codigoSolicitado);
+      if (!encontrado) {
+        throw new NotFoundException(`La demanda ${idLimpio} no incluye el producto '${codigoSolicitado}'`);
+      }
+      item = encontrado;
+    } else if (items.length > 1) {
+      throw new BadRequestException('La demanda tiene múltiples productos; especifique producto_codigo');
+    }
+
+    const cantidad = this.validarCantidad(item.cantidad);
+    const fecha = this.validarFechaProgramada(demanda.fechaRequerida);
+    const receta = await this.recetasService.findActivaPorProductoCodigo(item.productoCodigo);
+
+    return this.persistirOrden({
+      recetaId: receta.id,
+      cantidad,
+      fecha,
+      responsableId,
+      nombre,
+      demandaId: demanda.id,
+    });
+  }
+
+  private validarResponsable(usuarioAutenticado?: UsuarioAutenticadoProduccion): {
+    responsableId: number;
+    nombre: string;
+  } {
+    const responsableId = Number(usuarioAutenticado?.sub);
+    if (!Number.isSafeInteger(responsableId) || responsableId < 1) {
+      throw new UnauthorizedException('Debe iniciar sesión para crear órdenes');
+    }
+    return {
+      responsableId,
+      nombre: nombreVisible(usuarioAutenticado?.nombre, responsableId),
+    };
+  }
+
+  private validarCantidad(cantidadRaw: number | string): number {
+    const cantidad = Number(cantidadRaw);
+    if (!Number.isFinite(cantidad) || cantidad <= 0) {
+      throw new BadRequestException('La cantidad debe ser mayor a cero');
+    }
+    if (!/^\d+(\.\d{1,4})?$/.test(String(cantidadRaw))) {
+      throw new BadRequestException('La cantidad admite como máximo 4 decimales');
+    }
+    return cantidad;
+  }
+
+  private validarFechaProgramada(fechaRaw: string | undefined): string {
+    const fecha = String(fechaRaw ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      throw new BadRequestException('Debe proporcionar una fecha programada válida');
+    }
+    if (fecha < hoyLocal()) {
+      throw new BadRequestException('La fecha programada no puede ser anterior a hoy');
+    }
+    return fecha;
+  }
+
+  private async persistirOrden(datos: {
+    recetaId: number;
+    cantidad: number;
+    fecha: string;
+    responsableId: number;
+    nombre: string;
+    demandaId: string | null;
+  }): Promise<OrdenProduccion> {
     for (let intento = 0; intento < 2; intento += 1) {
       const codigo = await this.generarCodigo();
       try {
@@ -111,12 +201,13 @@ export class OrdenesService {
             OrdenProduccion,
             manager.create(OrdenProduccion, {
               codigo,
-              producto_id: recetaId,
-              cantidad,
-              fecha_programada: fecha,
+              producto_id: datos.recetaId,
+              cantidad: datos.cantidad,
+              fecha_programada: datos.fecha,
               estado: 'PENDIENTE',
-              responsable_id: responsableId,
-              responsable_nombre: nombre,
+              responsable_id: datos.responsableId,
+              responsable_nombre: datos.nombre,
+              demanda_id: datos.demandaId,
             }),
           );
           await manager.save(
@@ -125,8 +216,8 @@ export class OrdenesService {
               ordenId: orden.id,
               estadoAnterior: null,
               estadoNuevo: 'PENDIENTE',
-              usuarioResponsableId: responsableId,
-              usuarioResponsableNombre: nombre,
+              usuarioResponsableId: datos.responsableId,
+              usuarioResponsableNombre: datos.nombre,
               motivo: null,
             }),
           );

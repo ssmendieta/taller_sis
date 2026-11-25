@@ -56,6 +56,20 @@ export class RecetasService {
     return this.toResponse(receta);
   }
 
+  // ABC-444: resuelve la receta activa por código de producto (ej. desde DemandaItem).
+  async findActivaPorProductoCodigo(productoCodigo: string) {
+    const codigo = (productoCodigo ?? '').trim();
+    const receta = await this.recetaRepository.findOne({
+      where: { productoCodigo: codigo, activa: true },
+    });
+
+    if (!receta) {
+      throw new NotFoundException(`No existe una receta activa para el producto '${codigo}'`);
+    }
+
+    return receta;
+  }
+
   // POST /recetas — crea la receta junto con su lista de materiales.
   // producto_codigo: si se omite se autogenera PRD-0001 secuencial y único;
   // si se recibe se respeta y se valida unicidad (compatibilidad).
