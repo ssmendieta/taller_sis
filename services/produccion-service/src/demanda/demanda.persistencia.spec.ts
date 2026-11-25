@@ -4,11 +4,12 @@ import { Demandas1710000000024 } from '../database/migrations/1710000000024-Dema
 import { EstadoConfirmadaDemanda1710000000026 } from '../database/migrations/1710000000026-EstadoConfirmadaDemanda';
 import { DemandaItem } from './entities/demanda-item.entity';
 import { Demanda, ESTADO_DEMANDA_CONFIRMADA, ESTADO_DEMANDA_RECIBIDA } from './entities/demanda.entity';
+import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { DemandaNoEncontradaError, ProcesadorDemandaService } from './procesador-demanda.service';
 
 describe('ABC-355: metadatos de Demanda y sus ítems', () => {
   it('registra origen, id externo, fecha, estado RECIBIDA e ítems con cantidad decimal', async () => {
-    const source = new DataSource({ type: 'postgres', entities: [Demanda, DemandaItem] });
+    const source = new DataSource({ type: 'postgres', entities: [Demanda, DemandaItem, OrdenProduccion] });
     await (source as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
     const demanda = source.getMetadata(Demanda);
     const item = source.getMetadata(DemandaItem);
@@ -44,7 +45,7 @@ describe('ABC-355: migración de demandas', () => {
 
 describe('ABC-364: metadatos de estado CONFIRMADA y campos de confirmación', () => {
   it('soporta estado CONFIRMADA, columnas de fecha y correlación nullable', async () => {
-    const source = new DataSource({ type: 'postgres', entities: [Demanda, DemandaItem] });
+    const source = new DataSource({ type: 'postgres', entities: [Demanda, DemandaItem, OrdenProduccion] });
     await (source as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
     const demanda = source.getMetadata(Demanda);
 

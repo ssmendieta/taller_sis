@@ -7,10 +7,12 @@ import { SolicitudesMaterial1710000000012 } from '../database/migrations/1710000
 import { EventosInbox1710000000019 } from '../database/migrations/1710000000019-EventosInbox';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { SolicitudMaterialItem } from './entities/solicitud-material-item.entity';
 
-const entities = [Material, OrdenProduccion, SolicitudMaterial, SolicitudMaterialItem];
+const entities = [Material, OrdenProduccion, Demanda, DemandaItem, SolicitudMaterial, SolicitudMaterialItem];
 
 describe('SolicitudMaterial: metadatos TypeORM', () => {
   it('registra las relaciones, el estado inicial y la cantidad decimal', async () => {

@@ -11,6 +11,8 @@ import { ResultadosConformes1710000000014 } from '../database/migrations/1710000
 import { TipoResultadoCalidad1710000000015 } from '../database/migrations/1710000000015-TipoResultadoCalidad';
 import { Reprocesos1710000000027 } from '../database/migrations/1710000000027-Reprocesos';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { Reproceso } from './entities/reproceso.entity';
 import { ReprocesosService } from './reprocesos.service';
 
@@ -18,7 +20,7 @@ describe('ABC-395: entidad y migracion de reprocesos', () => {
   it('modela cantidades, autor, fecha y relaciones con orden y calidad', async () => {
     const source = new DataSource({
       type: 'postgres',
-      entities: [Reproceso, ResultadoConforme, OrdenProduccion],
+      entities: [Reproceso, ResultadoConforme, OrdenProduccion, Demanda, DemandaItem],
     });
     await (source as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
 
@@ -71,7 +73,7 @@ describeReal('ABC-395: persistencia real de reprocesos', () => {
     source = new DataSource({
       ...(AppDataSource.options as PostgresConnectionOptions),
       schema,
-      entities: [Reproceso, ResultadoConforme, OrdenProduccion, AvancesProduccion],
+      entities: [Reproceso, ResultadoConforme, OrdenProduccion, Demanda, DemandaItem, AvancesProduccion],
       migrations: [],
     });
     await source.initialize();

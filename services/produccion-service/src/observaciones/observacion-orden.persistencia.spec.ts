@@ -2,11 +2,13 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { ObservacionesOrden1710000000023 } from '../database/migrations/1710000000023-ObservacionesOrden';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { ObservacionOrden } from './entities/observacion-orden.entity';
 
 describe('ABC-321: metadatos de ObservacionOrden', () => {
   it('registra relación con la orden, tipo, autor y fecha automática', async () => {
-    const source = new DataSource({ type: 'postgres', entities: [ObservacionOrden, OrdenProduccion] });
+    const source = new DataSource({ type: 'postgres', entities: [ObservacionOrden, OrdenProduccion, Demanda, DemandaItem] });
     await (source as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
     const metadata = source.getMetadata(ObservacionOrden);
 

@@ -13,6 +13,8 @@ import { TypeOrmOutboxStore } from '../integraciones/outbox/typeorm-outbox.store
 import { PubSubPublisherService } from '../integraciones/pubsub/pubsub-publisher.service';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { SolicitudMaterial } from './entities/solicitud-material.entity';
 import { SolicitudMaterialItem } from './entities/solicitud-material-item.entity';
 import { SolicitudesMaterialService } from './solicitudes-material.service';
@@ -28,7 +30,7 @@ describeReal('ABC-73: transacciones reales de solicitudes', () => {
 
   beforeAll(async () => {
     source = new DataSource({ ...(AppDataSource.options as PostgresConnectionOptions), schema, migrations: [],
-      entities: [SolicitudMaterial, SolicitudMaterialItem, OrdenProduccion, Material, EventoOutbox] });
+      entities: [SolicitudMaterial, SolicitudMaterialItem, OrdenProduccion, Demanda, DemandaItem, Material, EventoOutbox] });
     await source.initialize();
     const runner = source.createQueryRunner();
     await runner.startTransaction();

@@ -12,6 +12,8 @@ import { EventosInbox1710000000019 } from '../../database/migrations/17100000000
 import { ResultadoContableCierre1710000000021 } from '../../database/migrations/1710000000021-ResultadoContableCierre';
 import { ConfirmacionesDemandaPendientes1710000000028 } from '../../database/migrations/1710000000028-ConfirmacionesDemandaPendientes';
 import { OrdenProduccion } from '../../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../../demanda/entities/demanda.entity';
+import { DemandaItem } from '../../demanda/entities/demanda-item.entity';
 import { REGISTRO_CONTABLE_RESULTADO_V1_EJEMPLO } from '../contratos/contabilidad-v1';
 import { crearEventoProduccionCerrada } from '../outbox/crear-evento-produccion-cerrada';
 import { EventoOutbox } from '../outbox/entities/evento-outbox.entity';
@@ -32,7 +34,7 @@ describeReal('ABC-252: resultado contable atomico en PostgreSQL', () => {
       ...(AppDataSource.options as PostgresConnectionOptions),
       schema,
       migrations: [],
-      entities: [CierreProduccion, OrdenProduccion, EventoOutbox, EventoInbox],
+      entities: [CierreProduccion, OrdenProduccion, Demanda, DemandaItem, EventoOutbox, EventoInbox],
     });
     await source.initialize();
     const runner = source.createQueryRunner();
@@ -149,7 +151,7 @@ describeReal('ABC-252: resultado contable atomico en PostgreSQL', () => {
       ...(AppDataSource.options as PostgresConnectionOptions),
       schema,
       migrations: [],
-      entities: [CierreProduccion, OrdenProduccion, EventoOutbox, EventoInbox],
+      entities: [CierreProduccion, OrdenProduccion, Demanda, DemandaItem, EventoOutbox, EventoInbox],
     });
     await source.initialize();
     processor = new ProcesadorResultadoContableService(source);

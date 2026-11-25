@@ -18,13 +18,15 @@ import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity
 import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad.enum';
 import { CalidadService } from '../calidad/calidad.service';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { Lote } from './entities/lote.entity';
 import { LotesService } from './lotes.service';
 import { LotesModule } from './lotes.module';
 
 describe('ABC-294: modelo de lote', () => {
   it('registra orden, cantidad conforme, codigo unico, responsable y fecha automatica', async () => {
-    const source = new DataSource({ type: 'postgres', entities: [Lote, OrdenProduccion] });
+    const source = new DataSource({ type: 'postgres', entities: [Lote, OrdenProduccion, Demanda, DemandaItem] });
     await (source as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
     const metadata = source.getMetadata(Lote);
     expect(metadata.uniques.map((unique) => unique.name)).toContain('uq_lotes_codigo');
@@ -48,7 +50,7 @@ describeReal('ABC-294: persistencia y asignacion atomica de lotes', () => {
   const httpFetch = global.fetch;
   const options = (): PostgresConnectionOptions => ({
     ...(AppDataSource.options as PostgresConnectionOptions), schema,
-    entities: [Lote, OrdenProduccion, ResultadoConforme, AvancesProduccion, EventoOutbox], migrations: [],
+    entities: [Lote, OrdenProduccion, Demanda, DemandaItem, ResultadoConforme, AvancesProduccion, EventoOutbox], migrations: [],
   });
 
   beforeAll(async () => {

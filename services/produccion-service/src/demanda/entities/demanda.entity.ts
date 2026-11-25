@@ -1,4 +1,5 @@
 import { Check, Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, Unique } from 'typeorm';
+import { OrdenProduccion } from '../../ordenes/entities/orden-produccion.entity';
 import { DemandaItem } from './demanda-item.entity';
 
 export const ORIGENES_DEMANDA = ['VENTAS', 'FACTURACION'] as const;
@@ -43,6 +44,10 @@ export class Demanda {
 
   @OneToMany(() => DemandaItem, (item) => item.demanda, { cascade: false })
   items: DemandaItem[];
+
+  // ABC-443 (ABC-412): órdenes generadas a partir de esta demanda.
+  @OneToMany(() => OrdenProduccion, (orden) => orden.demanda, { cascade: false })
+  ordenes?: OrdenProduccion[];
 
   @CreateDateColumn({ name: 'recibida_en', type: 'timestamptz', default: () => 'NOW()' })
   recibidaEn: Date;

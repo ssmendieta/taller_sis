@@ -6,12 +6,14 @@ import { ProduccionSchema1710000000002 } from '../database/migrations/1710000000
 import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710000000007-OrdenesCodigoSecuencia';
 import { ResultadosConformes1710000000014 } from '../database/migrations/1710000000014-ResultadosConformes';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { ResultadoConforme } from './entities/resultado-conforme.entity';
 import { AvancesProduccion } from '../avances_produccion/entities/avances_produccion.entity';
 import { CalidadService } from './calidad.service';
 import { TipoResultadoCalidad1710000000015 } from '../database/migrations/1710000000015-TipoResultadoCalidad';
 
-const entities = [ResultadoConforme, OrdenProduccion, AvancesProduccion];
+const entities = [ResultadoConforme, OrdenProduccion, Demanda, DemandaItem, AvancesProduccion];
 
 describe('ABC-82: metadatos de ResultadoConforme', () => {
   it('registra relacion, campos obligatorios, fecha automatica y precision', async () => {
