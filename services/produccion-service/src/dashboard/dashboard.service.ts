@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
+import { EstadoOrden } from '../ordenes/estado-orden.enum';
 import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardResponse, DesglosePerdidaMaterial } from './dashboard.interface';
 
@@ -56,6 +57,7 @@ export class DashboardService {
       perdidasDesgloseRows,
       observacionesRow,
       fpyRow,
+      tiempoCicloRow,
     ] = await Promise.all([
       this.consultarOrdenes(fechaDesde, fechaHasta),
       this.consultarCalidad(fechaDesde, fechaHasta),
@@ -64,6 +66,7 @@ export class DashboardService {
       this.consultarPerdidasDesglose(fechaDesde, fechaHasta),
       this.consultarObservaciones(fechaDesde, fechaHasta),
       this.consultarFpy(fechaDesde, fechaHasta),
+      this.consultarTiempoCiclo(fechaDesde, fechaHasta),
     ]);
 
     const totalOrdenes = Number(ordenesRow?.total ?? 0);
@@ -156,6 +159,7 @@ export class DashboardService {
         total_incidencias: totalIncidencias,
         total: totalObservacionesEIncidencias,
       },
+      tiempo_ciclo: this.calcularTiempoCiclo(tiempoCicloRow),
     };
   }
 
@@ -268,6 +272,56 @@ export class DashboardService {
       SELECT ${DashboardService.COLUMNAS_FPY}
       FROM resultados_conformes r
       ${whereClause}
+    `;
+
+    const filas = await this.dataSource.query(sql, params);
+    return filas[0] || null;
+  }
+
+  /**
+   * ABC-466: tiempo de ciclo promedio (en horas) de órdenes FINALIZADA con fechas de inicio y fin.
+   * Si no hay órdenes finalizadas en el periodo, devuelve promedio_horas: null ("sin datos").
+   */
+  private calcularTiempoCiclo(fila: Record<string, unknown> | null) {
+    const ordenesEvaluadas = Number(fila?.ordenes_evaluadas ?? 0);
+    const rawPromedio = fila?.promedio_horas;
+    const promedioHoras =
+      ordenesEvaluadas > 0 &&
+      rawPromedio !== null &&
+      rawPromedio !== undefined &&
+      Number.isFinite(Number(rawPromedio))
+        ? Number(Number(rawPromedio).toFixed(2))
+        : null;
+    return {
+      promedio_horas: promedioHoras,
+      ordenes_evaluadas: ordenesEvaluadas,
+      unidad: 'horas' as const,
+    };
+  }
+
+  private async consultarTiempoCiclo(desde: Date | null, hasta: Date | null) {
+    const params: unknown[] = [];
+    const condiciones: string[] = [
+      `estado = '${EstadoOrden.FINALIZADA}'`,
+      'iniciada_en IS NOT NULL',
+      'finalizada_en IS NOT NULL',
+      'finalizada_en >= iniciada_en',
+    ];
+    if (desde) {
+      params.push(desde);
+      condiciones.push(`finalizada_en >= $${params.length}`);
+    }
+    if (hasta) {
+      params.push(hasta);
+      condiciones.push(`finalizada_en <= $${params.length}`);
+    }
+
+    const sql = `
+      SELECT
+        COUNT(*)::int AS ordenes_evaluadas,
+        AVG(EXTRACT(EPOCH FROM (finalizada_en - iniciada_en)) / 3600.0)::numeric AS promedio_horas
+      FROM ordenes_produccion
+      WHERE ${condiciones.join(' AND ')}
     `;
 
     const filas = await this.dataSource.query(sql, params);
@@ -464,6 +518,9 @@ export class DashboardService {
   protected async obtenerValorKpi(kpi: string): Promise<number | null> {
     if (kpi === 'FPY') {
       return this.calcularFpy(await this.consultarFpy(null, null)).fpy;
+    }
+    if (kpi === 'TIEMPO_CICLO') {
+      return this.calcularTiempoCiclo(await this.consultarTiempoCiclo(null, null)).promedio_horas;
     }
     return null;
   }

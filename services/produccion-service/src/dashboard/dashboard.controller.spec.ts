@@ -51,6 +51,11 @@ describe('DashboardController (ABC-324)', () => {
       total_incidencias: 1,
       total: 3,
     },
+    tiempo_ciclo: {
+      promedio_horas: 24,
+      ordenes_evaluadas: 1,
+      unidad: 'horas',
+    },
   };
 
   beforeEach(() => {

@@ -56,6 +56,12 @@ export interface MetricasDashboardResponse {
     total_incidencias: number;
     total: number;
   };
+  /** ABC-466: tiempo de ciclo promedio de las órdenes finalizadas (horas). null = sin datos. */
+  tiempo_ciclo: {
+    promedio_horas: number | null;
+    ordenes_evaluadas: number;
+    unidad: 'horas';
+  };
 }
 
 // ABC-495: metas de KPI y semáforo.
