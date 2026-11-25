@@ -289,6 +289,61 @@ describe('DashboardService: FPY excluyendo reprocesos (ABC-470)', () => {
   });
 });
 
+describe('DashboardService: tiempo de ciclo promedio (ABC-466)', () => {
+  const crear = (fila: Record<string, unknown> | null) => {
+    const query = jest.fn(async (sql: string, _params?: unknown[]) =>
+      sql.includes('EXTRACT(EPOCH FROM (finalizada_en - iniciada_en))') ? (fila ? [fila] : []) : [],
+    );
+    return { service: new DashboardService({ query } as unknown as DataSource), query };
+  };
+
+  it('una orden finalizada: devuelve su duración en horas redondeada a 2 decimales', async () => {
+    const { service } = crear({ ordenes_evaluadas: 1, promedio_horas: '12.5' });
+    const { tiempo_ciclo } = await service.obtenerMetricas();
+    expect(tiempo_ciclo).toEqual({
+      promedio_horas: 12.5,
+      ordenes_evaluadas: 1,
+      unidad: 'horas',
+    });
+  });
+
+  it('varias órdenes finalizadas: devuelve el promedio en horas', async () => {
+    const { service } = crear({ ordenes_evaluadas: 3, promedio_horas: '24.333333' });
+    const { tiempo_ciclo } = await service.obtenerMetricas();
+    expect(tiempo_ciclo).toEqual({
+      promedio_horas: 24.33,
+      ordenes_evaluadas: 3,
+      unidad: 'horas',
+    });
+  });
+
+  it('sin órdenes finalizadas: devuelve promedio_horas null ("sin datos")', async () => {
+    const { service } = crear({ ordenes_evaluadas: 0, promedio_horas: null });
+    const { tiempo_ciclo } = await service.obtenerMetricas();
+    expect(tiempo_ciclo).toEqual({
+      promedio_horas: null,
+      ordenes_evaluadas: 0,
+      unidad: 'horas',
+    });
+  });
+
+  it('filtro de periodo: filtra por estado FINALIZADA, fechas no nulas y rango finalizada_en', async () => {
+    const { service, query } = crear({ ordenes_evaluadas: 2, promedio_horas: '10' });
+    await service.obtenerMetricas({ desde: '2026-11-01', hasta: '2026-11-30' });
+    const llamada = query.mock.calls.find((c) =>
+      (c[0] as string).includes('EXTRACT(EPOCH FROM (finalizada_en - iniciada_en))'),
+    )!;
+    expect(llamada[0]).toContain("estado = 'FINALIZADA'");
+    expect(llamada[0]).toContain('iniciada_en IS NOT NULL');
+    expect(llamada[0]).toContain('finalizada_en IS NOT NULL');
+    expect(llamada[0]).toContain('finalizada_en >= $1');
+    expect(llamada[0]).toContain('finalizada_en <= $2');
+    expect(llamada[1]).toHaveLength(2);
+    expect(llamada[1][0]).toBeInstanceOf(Date);
+    expect(llamada[1][1]).toBeInstanceOf(Date);
+  });
+});
+
 describe('DashboardService: metas de KPI y semáforo (ABC-495)', () => {
   let service: DashboardService;
   let queryMock: jest.Mock;

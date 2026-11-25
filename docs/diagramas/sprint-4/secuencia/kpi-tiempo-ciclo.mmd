@@ -1,0 +1,75 @@
+sequenceDiagram
+    autonumber
+    actor S as Supervisor
+    participant W as Widget del dashboard
+    participant F as dashboardService.js (frontend)
+    participant G as API Gateway
+    participant A as auth-service
+    participant C as DashboardController
+    participant V as DashboardService
+    participant O as ordenes_produccion (produccion_db)
+
+    rect rgb(240, 240, 240)
+    Note over S,O: A. Consultar el tiempo de ciclo promedio con filtro de periodo
+    S->>W: Abre el dashboard o elige un periodo
+    W->>F: obtenerMetricasDashboard({ desde, hasta })
+    F->>G: GET /api/produccion/dashboard/metricas?desde&hasta
+    G->>C: GET /dashboard/metricas
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    Note over C: Exige el permiso ordenes.consultar
+    alt Sin token, sesión inválida o Auth caído
+        C-->>F: 401 o 503
+    else Sin el permiso ordenes.consultar
+        C-->>F: 403 Forbidden
+    else Query inválida (campos extra)
+        C-->>F: 400 por ValidationPipe
+    else Permiso válido
+        C->>V: obtenerMetricas(filtro)
+        V->>V: parsearFechas(filtro)
+        alt Fecha inválida o desde posterior a hasta
+            V-->>F: 400 Bad Request
+        else Rango válido
+            par Consultas en paralelo (Promise.all)
+                V->>V: consultarOrdenes, consultarCalidad, consultarAvances, consultarPerdidas, consultarObservaciones y consultarFpy
+            and consultarTiempoCiclo(desde, hasta)
+                V->>O: COUNT(*) y AVG(EXTRACT(EPOCH FROM (finalizada_en - iniciada_en)) / 3600.0) donde estado = FINALIZADA, fechas no nulas y rango finalizada_en
+                O-->>V: Una fila con ordenes_evaluadas y promedio_horas
+            end
+            V->>V: calcularTiempoCiclo(fila)
+            alt ordenes_evaluadas igual a 0
+                Note over V: promedio_horas queda en null (sin datos)
+            else ordenes_evaluadas mayor que 0
+                Note over V: promedio_horas redondeado a 2 decimales (unidad: horas)
+            end
+            V-->>F: 200 con tiempo_ciclo: promedio_horas, ordenes_evaluadas y unidad
+        end
+    end
+    F-->>W: Datos de métricas o Error con el mensaje
+    W-->>S: Widget con el tiempo de ciclo (o "sin datos" / mensaje de error)
+    end
+
+    rect rgb(240, 240, 240)
+    Note over S,O: B. Consultar el KPI TIEMPO_CICLO con semáforo (sin filtro de periodo)
+    S->>W: Abre el dashboard
+    W->>G: GET /api/produccion/dashboard/kpis
+    G->>C: GET /dashboard/kpis
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    C->>V: obtenerKpisConSemaforo()
+    V->>V: listarMetas() lee metas_kpi (meta, umbrales y sentido MENOR_ES_MEJOR)
+    loop Por cada KPI, aquí TIEMPO_CICLO
+        V->>V: obtenerValorKpi("TIEMPO_CICLO")
+        V->>O: consultarTiempoCiclo(null, null)
+        O-->>V: ordenes_evaluadas y promedio_horas
+        V->>V: calcularTiempoCiclo(fila).promedio_horas
+        V->>V: calcularSemaforo(valor, meta, umbrales, MENOR_ES_MEJOR)
+        alt promedio_horas null o sin meta
+            Note over V: color null, el KPI sale sin color
+        else valor y meta válidos
+            Note over V: VERDE, AMARILLO o ROJO según desviación respecto a la meta
+        end
+    end
+    V-->>F: 200 con kpis: kpi, valor, meta, unidad, sentido, desviacionPct y color
+    W-->>S: Widget con el color del semáforo
+    end
