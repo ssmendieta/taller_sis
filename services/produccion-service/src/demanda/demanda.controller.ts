@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Param,
   Query,
   SetMetadata,
   UseGuards,
@@ -9,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { PERMISO_PRODUCCION, PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { DemandaService } from './demanda.service';
+import { CumplimientoDemandaDto } from './dto/cumplimiento-demanda.dto';
 import { ListarDemandasDto, PaginatedDemandasDto } from './dto/listar-demandas.dto';
 import { ListarDemandasPlanificablesDto } from './dto/listar-demandas-planificables.dto';
 
@@ -27,6 +29,15 @@ export class DemandaController {
     @Query() query: ListarDemandasPlanificablesDto,
   ): Promise<PaginatedDemandasDto> {
     return this.demandaService.listarPlanificables(query);
+  }
+
+  // ABC-449 (ABC-413): órdenes asociadas a la demanda, cantidad pedida vs producida y porcentaje cumplido.
+  @Get(':id/cumplimiento')
+  @SetMetadata(PERMISO_PRODUCCION, PERMISO_CONSULTAR_DEMANDAS)
+  async obtenerCumplimiento(
+    @Param('id') id: string,
+  ): Promise<CumplimientoDemandaDto> {
+    return this.demandaService.obtenerCumplimiento(id);
   }
 
   @Get()
