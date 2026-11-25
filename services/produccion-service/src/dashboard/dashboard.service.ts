@@ -58,6 +58,7 @@ export class DashboardService {
       observacionesRow,
       fpyRow,
       tiempoCicloRow,
+      cumplimientoFechaRow,
     ] = await Promise.all([
       this.consultarOrdenes(fechaDesde, fechaHasta),
       this.consultarCalidad(fechaDesde, fechaHasta),
@@ -67,6 +68,7 @@ export class DashboardService {
       this.consultarObservaciones(fechaDesde, fechaHasta),
       this.consultarFpy(fechaDesde, fechaHasta),
       this.consultarTiempoCiclo(fechaDesde, fechaHasta),
+      this.consultarCumplimientoFecha(fechaDesde, fechaHasta),
     ]);
 
     const totalOrdenes = Number(ordenesRow?.total ?? 0);
@@ -160,6 +162,7 @@ export class DashboardService {
         total: totalObservacionesEIncidencias,
       },
       tiempo_ciclo: this.calcularTiempoCiclo(tiempoCicloRow),
+      cumplimiento_fecha: this.calcularCumplimientoFecha(cumplimientoFechaRow),
     };
   }
 
@@ -320,6 +323,53 @@ export class DashboardService {
       SELECT
         COUNT(*)::int AS ordenes_evaluadas,
         AVG(EXTRACT(EPOCH FROM (finalizada_en - iniciada_en)) / 3600.0)::numeric AS promedio_horas
+      FROM ordenes_produccion
+      WHERE ${condiciones.join(' AND ')}
+    `;
+
+    const filas = await this.dataSource.query(sql, params);
+    return filas[0] || null;
+  }
+
+  /**
+   * ABC-462: porcentaje de órdenes FINALIZADA que terminaron en o antes de su fecha requerida (fecha_programada).
+   * Si no hay órdenes finalizadas en el periodo, devuelve porcentaje: null ("sin datos").
+   */
+  private calcularCumplimientoFecha(fila: Record<string, unknown> | null) {
+    const totalFinalizadas = Number(fila?.total_finalizadas ?? 0);
+    const aTiempo = Number(fila?.a_tiempo ?? 0);
+    const porcentaje =
+      totalFinalizadas > 0
+        ? Number(((aTiempo / totalFinalizadas) * 100).toFixed(2))
+        : null;
+    return {
+      porcentaje,
+      a_tiempo: aTiempo,
+      total_finalizadas: totalFinalizadas,
+      unidad: '%' as const,
+    };
+  }
+
+  private async consultarCumplimientoFecha(desde: Date | null, hasta: Date | null) {
+    const params: unknown[] = [];
+    const condiciones: string[] = [
+      `estado = '${EstadoOrden.FINALIZADA}'`,
+      'finalizada_en IS NOT NULL',
+      'fecha_programada IS NOT NULL',
+    ];
+    if (desde) {
+      params.push(desde);
+      condiciones.push(`finalizada_en >= $${params.length}`);
+    }
+    if (hasta) {
+      params.push(hasta);
+      condiciones.push(`finalizada_en <= $${params.length}`);
+    }
+
+    const sql = `
+      SELECT
+        COUNT(*)::int AS total_finalizadas,
+        COUNT(*) FILTER (WHERE finalizada_en::date <= fecha_programada)::int AS a_tiempo
       FROM ordenes_produccion
       WHERE ${condiciones.join(' AND ')}
     `;
@@ -521,6 +571,9 @@ export class DashboardService {
     }
     if (kpi === 'TIEMPO_CICLO') {
       return this.calcularTiempoCiclo(await this.consultarTiempoCiclo(null, null)).promedio_horas;
+    }
+    if (kpi === 'CUMPLIMIENTO_FECHA') {
+      return this.calcularCumplimientoFecha(await this.consultarCumplimientoFecha(null, null)).porcentaje;
     }
     return null;
   }
