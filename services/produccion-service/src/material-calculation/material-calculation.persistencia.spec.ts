@@ -9,6 +9,8 @@ import { InventarioMaterial1710000000004 } from '../database/migrations/17100000
 import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710000000007-OrdenesCodigoSecuencia';
 import { ConsumosMaterial1710000000013 } from '../database/migrations/1710000000013-ConsumosMaterial';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { Receta } from '../recetas/entities/receta.entity';
 import { RecetaMaterial } from '../recetas/entities/receta-material.entity';
 import { Material } from '../materiales/entities/material.entity';
@@ -34,7 +36,7 @@ describeReal('ABC-72: requerido y consumo persistido por orden', () => {
 
   beforeAll(async () => {
     source = new DataSource({ ...(AppDataSource.options as PostgresConnectionOptions), schema,
-      entities: [OrdenProduccion, Receta, RecetaMaterial, Material, ConsumoMaterial], migrations: [] });
+      entities: [OrdenProduccion, Demanda, DemandaItem, Receta, RecetaMaterial, Material, ConsumoMaterial], migrations: [] });
     await source.initialize();
     const runner = source.createQueryRunner();
     await runner.startTransaction();

@@ -10,9 +10,11 @@ import { TipoResultadoCalidad1710000000015 } from '../database/migrations/171000
 import { PerdidasMateriaPrima1710000000023 } from '../database/migrations/1710000000023-PerdidasMateriaPrima';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { PerdidaMateriaPrima } from './entities/perdida-materia-prima.entity';
 
-const entities = [PerdidaMateriaPrima, OrdenProduccion, Material, ResultadoConforme];
+const entities = [PerdidaMateriaPrima, OrdenProduccion, Demanda, DemandaItem, Material, ResultadoConforme];
 
 async function sqlDe(paso: 'up' | 'down'): Promise<string> {
   const query = jest.fn(async (_sql: string) => undefined);

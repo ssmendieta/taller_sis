@@ -6,12 +6,14 @@ import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710
 import { ConsumosMaterial1710000000013 } from '../database/migrations/1710000000013-ConsumosMaterial';
 import { Material } from '../materiales/entities/material.entity';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { ConsumoMaterial } from './entities/consumo-material.entity';
 import { Receta } from '../recetas/entities/receta.entity';
 import { RecetaMaterial } from '../recetas/entities/receta-material.entity';
 import { ConsumosMaterialService } from './consumos-material.service';
 
-const entities = [ConsumoMaterial, OrdenProduccion, Material, Receta, RecetaMaterial];
+const entities = [ConsumoMaterial, OrdenProduccion, Demanda, DemandaItem, Material, Receta, RecetaMaterial];
 
 describe('ABC-71: metadatos de ConsumoMaterial', () => {
   it('registra relaciones, campos obligatorios y precision decimal', async () => {

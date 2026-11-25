@@ -23,6 +23,8 @@ import { PUBSUB_CONFIG } from '../integraciones/pubsub/pubsub.config';
 import { PubSubPublisherService } from '../integraciones/pubsub/pubsub-publisher.service';
 import { PRODUCCION_CERRADA_V1 } from '../integraciones/contratos/contabilidad-v1';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { AvancesProduccion } from '../avances_produccion/entities/avances_produccion.entity';
 import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity';
 import { ConsumoMaterial } from '../consumos-material/entities/consumo-material.entity';
@@ -34,7 +36,7 @@ import { CierreProduccion } from './entities/cierre-produccion.entity';
 
 describe('ABC-299: modelo del snapshot de cierre', () => {
   it('registra version unica por orden, decimales, JSONB, fecha y relacion restrictiva', async () => {
-    const source = new DataSource({ type: 'postgres', entities: [CierreProduccion, OrdenProduccion] });
+    const source = new DataSource({ type: 'postgres', entities: [CierreProduccion, OrdenProduccion, Demanda, DemandaItem] });
     await (source as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
     const metadata = source.getMetadata(CierreProduccion);
     expect(metadata.uniques.find((unique) => unique.name === 'uq_cierres_produccion_orden_version')
@@ -63,7 +65,7 @@ describeReal('ABC-299: snapshot inmutable en PostgreSQL', () => {
   const httpFetch = global.fetch;
   const options = (): PostgresConnectionOptions => ({
     ...(AppDataSource.options as PostgresConnectionOptions), schema,
-    entities: [CierreProduccion, OrdenProduccion, AvancesProduccion, ResultadoConforme,
+    entities: [CierreProduccion, OrdenProduccion, Demanda, DemandaItem, AvancesProduccion, ResultadoConforme,
       ConsumoMaterial, Material, Receta, RecetaMaterial, EventoOutbox], migrations: [],
   });
 

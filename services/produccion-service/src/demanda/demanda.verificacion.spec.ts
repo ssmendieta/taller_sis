@@ -17,6 +17,7 @@ import { DemandaService } from './demanda.service';
 import { DemandaItem } from './entities/demanda-item.entity';
 import { DemandaRechazada } from './entities/demanda-rechazada.entity';
 import { Demanda } from './entities/demanda.entity';
+import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { ProcesadorDemandaService } from './procesador-demanda.service';
 import { PubSubDemandaConsumerService } from './pubsub-demanda-consumer.service';
 
@@ -40,7 +41,7 @@ describeReal('ABC-359: demanda de Ventas en PostgreSQL', () => {
       ...(AppDataSource.options as PostgresConnectionOptions),
       schema,
       migrations: [],
-      entities: [Demanda, DemandaItem, DemandaRechazada, EventoInbox],
+      entities: [Demanda, DemandaItem, DemandaRechazada, EventoInbox, OrdenProduccion],
       extra: { options: `-c search_path=${schema}` },
     });
     await source.initialize();

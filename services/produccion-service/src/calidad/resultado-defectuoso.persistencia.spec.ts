@@ -7,6 +7,8 @@ import { OrdenesCodigoSecuencia1710000000007 } from '../database/migrations/1710
 import { ResultadosConformes1710000000014 } from '../database/migrations/1710000000014-ResultadosConformes';
 import { TipoResultadoCalidad1710000000015 } from '../database/migrations/1710000000015-TipoResultadoCalidad';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
+import { Demanda } from '../demanda/entities/demanda.entity';
+import { DemandaItem } from '../demanda/entities/demanda-item.entity';
 import { ResultadoConforme } from './entities/resultado-conforme.entity';
 import { TipoResultadoCalidad } from './entities/tipo-resultado-calidad.enum';
 import { CalidadService } from './calidad.service';
@@ -17,7 +19,7 @@ import { ConsumosMaterial1710000000013 } from '../database/migrations/1710000000
 
 describe('ABC-83: clasificacion de calidad', () => {
   it('registra tipo por defecto, causa nullable y restricciones', async () => {
-    const source = new DataSource({ type: 'postgres', entities: [ResultadoConforme, OrdenProduccion] });
+    const source = new DataSource({ type: 'postgres', entities: [ResultadoConforme, OrdenProduccion, Demanda, DemandaItem] });
     await (source as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
     const metadata = source.getMetadata(ResultadoConforme);
     expect(metadata.findColumnWithPropertyName('tipo')).toMatchObject({ default: 'CONFORME', isNullable: false });
@@ -35,7 +37,7 @@ describeReal('ABC-83: persistencia de defectos separados de conformes', () => {
 
   beforeAll(async () => {
     source = new DataSource({ ...(AppDataSource.options as PostgresConnectionOptions), schema,
-      entities: [ResultadoConforme, OrdenProduccion, AvancesProduccion, ConsumoMaterial, Material], migrations: [] });
+      entities: [ResultadoConforme, OrdenProduccion, Demanda, DemandaItem, AvancesProduccion, ConsumoMaterial, Material], migrations: [] });
     await source.initialize();
     const runner = source.createQueryRunner();
     await runner.startTransaction();

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Demanda, ESTADO_DEMANDA_CONFIRMADA } from './entities/demanda.entity';
@@ -11,6 +11,21 @@ export class DemandaService {
     @InjectRepository(Demanda)
     private readonly demandaRepository: Repository<Demanda>,
   ) {}
+
+  // ABC-444: obtiene una demanda confirmada con sus ítems para crear una orden.
+  async obtenerParaOrden(demandaId: string): Promise<Demanda> {
+    const demanda = await this.demandaRepository.findOne({
+      where: { id: demandaId },
+      relations: { items: true },
+    });
+    if (!demanda) {
+      throw new NotFoundException(`Demanda con id ${demandaId} no encontrada`);
+    }
+    if (demanda.estado !== ESTADO_DEMANDA_CONFIRMADA) {
+      throw new ConflictException('Solo se pueden crear órdenes desde demandas confirmadas');
+    }
+    return demanda;
+  }
 
   async listar(dto: ListarDemandasDto): Promise<PaginatedDemandasDto> {
     return this.consultar(dto);

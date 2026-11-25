@@ -8,6 +8,7 @@ import { Inventario } from '../inventario/entities/inventario.entity';
 import { OrdenesService } from './ordenes.service';
 import { OrdenesController } from './ordenes.controller';
 import { RecetasModule } from '../recetas/recetas.module';
+import { DemandaModule } from '../demanda/demanda.module';
 import { PermisoProduccionGuard } from '../auth/permiso-produccion.guard';
 import { MaterialCalculationModule } from '../material-calculation/material-calculation.module';
 import { ConsultaDisponibilidad } from '../integraciones/disponibilidad/entities/consulta-disponibilidad.entity';
@@ -25,6 +26,7 @@ import { EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.ent
       EventoOutbox,
     ]),
     RecetasModule,
+    DemandaModule,
     MaterialCalculationModule,
   ],
   controllers: [OrdenesController],

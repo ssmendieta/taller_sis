@@ -1,4 +1,14 @@
-﻿import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+﻿import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Index,
+  JoinColumn,
+  ManyToOne,
+} from 'typeorm';
+import { Demanda } from '../../demanda/entities/demanda.entity';
 
 @Entity('ordenes_produccion')
 export class OrdenProduccion {
@@ -25,6 +35,23 @@ export class OrdenProduccion {
 
   @Column({ name: 'responsable_nombre', type: 'varchar', length: 150, nullable: true })
   responsable_nombre: string | null;
+
+  // ABC-443 (ABC-412): demanda origen cuando la orden nace desde planificación de demanda.
+  @Index('ix_ordenes_demanda')
+  @Column({
+    name: 'demanda_id',
+    type: 'bigint',
+    nullable: true,
+    transformer: {
+      to: (value: string | null | undefined) => value,
+      from: (value: string | number | null | undefined) => (value == null ? value : String(value)),
+    },
+  })
+  demanda_id: string | null;
+
+  @ManyToOne(() => Demanda, (demanda) => demanda.ordenes, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'demanda_id', foreignKeyConstraintName: 'fk_orden_demanda' })
+  demanda?: Demanda | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   iniciada_en: Date;
