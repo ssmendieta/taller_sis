@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventoInbox } from '../integraciones/inbox/entities/evento-inbox.entity';
 import { PubSubModule } from '../integraciones/pubsub/pubsub.module';
+import { Lote } from '../lotes/entities/lote.entity';
+import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { DemandaController } from './demanda.controller';
 import { DemandaService } from './demanda.service';
 import { DemandaItem } from './entities/demanda-item.entity';
@@ -13,7 +15,17 @@ import { ProcesadorConfirmacionDemandaService } from './procesador-confirmacion-
 import { PubSubDemandaConfirmacionConsumerService } from './pubsub-demanda-confirmacion-consumer.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Demanda, DemandaItem, DemandaRechazada, EventoInbox]), PubSubModule],
+  imports: [
+    TypeOrmModule.forFeature([
+      Demanda,
+      DemandaItem,
+      DemandaRechazada,
+      EventoInbox,
+      OrdenProduccion,
+      Lote,
+    ]),
+    PubSubModule,
+  ],
   controllers: [DemandaController],
   providers: [
     DemandaService,
