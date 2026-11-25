@@ -1,0 +1,84 @@
+classDiagram
+    class Demanda {
+        +string id
+        +OrigenDemanda origen
+        +string demandaExternaId
+        +string fechaRequerida
+        +EstadoDemanda estado
+        +Date recibidaEn
+        +Date confirmadaEn
+    }
+
+    class DemandaItem {
+        +string id
+        +string demandaId
+        +string productoCodigo
+        +string cantidad
+        +string unidad
+    }
+
+    class OrdenProduccion {
+        +number id
+        +string codigo
+        +number producto_id
+        +number cantidad
+        +string fecha_programada
+        +string estado
+        +string demanda_id
+        +Date iniciada_en
+        +Date finalizada_en
+    }
+
+    class Lote {
+        +string id
+        +string codigo
+        +string ordenId
+        +string cantidad
+        +string responsableUsuarioId
+        +Date fechaHora
+    }
+
+    class DemandaController {
+        +obtenerCumplimiento(id: string) CumplimientoDemandaDto
+        +listar(query: ListarDemandasDto) PaginatedDemandasDto
+        +listarPlanificables(query: ListarDemandasPlanificablesDto) PaginatedDemandasDto
+    }
+
+    class DemandaService {
+        +obtenerCumplimiento(demandaId: string) CumplimientoDemandaDto
+        +obtenerParaOrden(demandaId: string) Demanda
+        +listar(dto: ListarDemandasDto) PaginatedDemandasDto
+    }
+
+    class CumplimientoDemandaDto {
+        +string demandaId
+        +string origen
+        +string demandaExternaId
+        +string estado
+        +string fechaRequerida
+        +number cantidadPedida
+        +number cantidadProducida
+        +number porcentajeCumplido
+        +OrdenCumplimientoDemandaDto[] ordenes
+    }
+
+    class OrdenCumplimientoDemandaDto {
+        +number id
+        +string codigo
+        +number productoId
+        +string estado
+        +number cantidadSolicitada
+        +number cantidadProducida
+        +string fechaProgramada
+        +string creadoEn
+    }
+
+    Demanda "1" *-- "1..*" DemandaItem : contiene
+    Demanda "0..1" <-- "0..*" OrdenProduccion : origina (demanda_id)
+    OrdenProduccion "1" <-- "0..*" Lote : registra (orden_id)
+    DemandaController ..> DemandaService : delega
+    DemandaService ..> Demanda : consulta
+    DemandaService ..> OrdenProduccion : consulta
+    DemandaService ..> Lote : suma producida
+    DemandaService ..> CumplimientoDemandaDto : retorna
+    CumplimientoDemandaDto "1" *-- "0..*" OrdenCumplimientoDemandaDto : incluye
