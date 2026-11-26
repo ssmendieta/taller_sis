@@ -256,3 +256,69 @@ test("ABC-366 muestra un vacío específico cuando no existen confirmadas", asyn
   await act(async () => boton("Planificables").props.onClick());
   assert.match(texto(), /No se encontraron demandas confirmadas disponibles para planificar/);
 });
+
+// ABC-446: acción "Crear orden" sobre demandas planificables.
+async function abrirPlanificables(items) {
+  respuesta = (params, path) => {
+    if (path.includes("/ordenes/desde-demanda/")) return respuestaCrear(path);
+    return json({ items: items(), total: items().length, page: 1, limit: 10, totalPages: 1 });
+  };
+  await montar();
+  await act(async () => boton("Planificables").props.onClick());
+}
+let respuestaCrear;
+const planificable = (orden = null) => demandaPrueba(5, { estado: "CONFIRMADA", items: [
+  { id: 51, productoCodigo: "PROD-PAN", cantidad: "50.0000", unidad: "unidad", orden },
+] });
+const botonesCrear = () => root.root.findAll((n) => n.type === "button" && n.children.includes("Crear orden"));
+
+test("ABC-446 sin permiso ordenes.crear no muestra la acción", async () => {
+  await abrirPlanificables(() => [planificable()]);
+  assert.equal(botonesCrear().length, 0);
+});
+
+test("ABC-446 confirma, crea la orden, enlaza y refresca planificables", async () => {
+  globalThis.__usuarioDemandas = { id: "1", permisos: ["ordenes.consultar", "ordenes.crear"] };
+  let creada = false;
+  respuestaCrear = () => { creada = true; return json({ id: 77, codigo: "ORD-2026-00077" }, 201); };
+  await abrirPlanificables(() => (creada ? [] : [planificable()]));
+  await act(async () => botonesCrear()[0].props.onClick());
+  assert.match(texto(), /Crear orden de producción/);
+  assert.match(texto(), /50.0000 unidad de PROD-PAN/);
+  const confirmar = () => botonesCrear().at(-1);
+  // Doble clic: solo un envío.
+  await act(async () => { confirmar().props.onClick(); confirmar().props.onClick(); });
+  const posts = llamadas.filter((l) => l.path.endsWith("/ordenes/desde-demanda/5"));
+  assert.equal(posts.length, 1);
+  assert.match(texto(), /Se creó la orden ORD-2026-00077/);
+  assert.ok(root.root.findAll((n) => n.props?.to === "/ordenes/77").length >= 1);
+  assert.match(texto(), /No se encontraron demandas confirmadas/);
+});
+
+test("ABC-446 envía el producto elegido y un 409 muestra el error y refresca", async () => {
+  globalThis.__usuarioDemandas = { id: "1", permisos: ["ordenes.consultar", "ordenes.crear"] };
+  let cuerpo;
+  const fetchBase = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => { if (opts.method === "POST") cuerpo = JSON.parse(opts.body); return fetchBase(url, opts); };
+  respuestaCrear = () => json({ message: "La demanda 5 ya tiene la orden ORD-2026-00070 para el producto 'PROD-PAN'" }, 409);
+  await abrirPlanificables(() => [planificable()]);
+  const antes = llamadas.length;
+  await act(async () => botonesCrear()[0].props.onClick());
+  await act(async () => botonesCrear().at(-1).props.onClick());
+  assert.deepEqual(cuerpo, { producto_codigo: "PROD-PAN" });
+  assert.match(texto(), /ya tiene la orden ORD-2026-00070/);
+  assert.ok(llamadas.slice(antes).some((l) => l.path.endsWith("/demandas/planificables")));
+});
+
+test("ABC-446 un producto con orden muestra el enlace en lugar del botón", async () => {
+  globalThis.__usuarioDemandas = { id: "1", permisos: ["ordenes.consultar", "ordenes.crear"] };
+  await abrirPlanificables(() => [planificable({ id: "9", codigo: "ORD-2026-00009" })]);
+  assert.equal(botonesCrear().length, 0);
+  assert.ok(root.root.findAll((n) => n.props?.to === "/ordenes/9").length >= 1);
+});
+
+test("ABC-446 en demandas recibidas no se ofrece crear orden", async () => {
+  globalThis.__usuarioDemandas = { id: "1", permisos: ["ordenes.consultar", "ordenes.crear"] };
+  await montar();
+  assert.equal(botonesCrear().length, 0);
+});

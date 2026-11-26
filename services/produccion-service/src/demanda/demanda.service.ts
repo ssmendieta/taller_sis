@@ -118,6 +118,20 @@ export class DemandaService {
     return demanda;
   }
 
+  // ABC-446: orden vigente (no cancelada) de cada producto de las demandas indicadas.
+  private async ordenesVigentes(demandaIds: string[]): Promise<Map<string, { id: string; codigo: string }>> {
+    if (demandaIds.length === 0) return new Map();
+    const filas = (await this.demandaRepository.query(
+      `SELECT o.id::text AS id, o.codigo, o.demanda_id::text AS demanda_id, r.producto_codigo
+         FROM ordenes_produccion o
+         INNER JOIN recetas r ON r.id = o.receta_id
+        WHERE o.demanda_id = ANY($1::bigint[]) AND o.estado <> 'CANCELADA'
+        ORDER BY o.id`,
+      [demandaIds],
+    )) as Array<{ id: string; codigo: string; demanda_id: string; producto_codigo: string }>;
+    return new Map(filas.map((f) => [`${f.demanda_id}|${f.producto_codigo}`, { id: f.id, codigo: f.codigo }]));
+  }
+
   async listar(dto: ListarDemandasDto): Promise<PaginatedDemandasDto> {
     return this.consultar(dto);
   }
@@ -150,6 +164,17 @@ export class DemandaService {
       qb.andWhere('demanda.estado = :estado', { estado: dto.estado });
     }
 
+    // ABC-446: deja de ser planificable cuando cada producto ya tiene una orden vigente.
+    if (soloPlanificables) {
+      qb.andWhere(`EXISTS (
+        SELECT 1 FROM demandas_items di
+         WHERE di.demanda_id = demanda.id
+           AND NOT EXISTS (
+             SELECT 1 FROM ordenes_produccion o
+              INNER JOIN recetas r ON r.id = o.receta_id
+              WHERE o.demanda_id = demanda.id AND o.estado <> 'CANCELADA' AND r.producto_codigo = di.producto_codigo))`);
+    }
+
     qb.orderBy(
       soloPlanificables ? 'demanda.confirmadaEn' : 'demanda.recibidaEn',
       'DESC',
@@ -159,6 +184,7 @@ export class DemandaService {
       .take(limit);
 
     const [demandas, total] = await qb.getManyAndCount();
+    const ordenes = soloPlanificables ? await this.ordenesVigentes(demandas.map((d) => d.id)) : new Map();
 
     const items = demandas.map((d) => ({
       id: d.id,
@@ -173,6 +199,7 @@ export class DemandaService {
         productoCodigo: it.productoCodigo,
         cantidad: it.cantidad,
         unidad: it.unidad,
+        ...(soloPlanificables ? { orden: ordenes.get(`${d.id}|${it.productoCodigo}`) ?? null } : {}),
       })),
       totalItems: (d.items || []).length,
     }));

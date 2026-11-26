@@ -162,6 +162,7 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
       manager: {
         transaction: async (fn: (m: any) => Promise<unknown>) =>
           fn({
+            query: async () => [],
             create: (_t: unknown, v: object) => v,
             save: async (_t: unknown, v: object) => ({ id: 99, ...v }),
           }),
@@ -210,5 +211,41 @@ describe('ABC-168: creación de órdenes por HTTP', () => {
     await expect(servicio.crearDesdeDemanda('999', undefined, actor)).rejects.toThrow(NotFoundException);
     await expect(servicio.crearDesdeDemanda('10', undefined, actor)).rejects.toThrow(ConflictException);
     expect(recetas.findActivaPorProductoCodigo).not.toHaveBeenCalled();
+  });
+});
+
+describe('ABC-446: una sola orden vigente por producto de la demanda', () => {
+  it('bloquea la demanda y rechaza con 409 si el producto ya tiene orden', async () => {
+    const consultas: string[] = [];
+    const save = jest.fn();
+    const ordenes = {
+      query: async () => [{ n: '1' }],
+      manager: {
+        transaction: async (fn: (m: any) => Promise<unknown>) =>
+          fn({
+            query: async (sql: string) => {
+              consultas.push(sql);
+              return sql.includes('FROM ordenes_produccion') ? [{ id: '5', codigo: 'ORD-2026-00005' }] : [];
+            },
+            create: (_t: unknown, v: object) => v,
+            save,
+          }),
+      },
+    } as unknown as Repository<OrdenProduccion>;
+    const recetas = { findActivaPorProductoCodigo: jest.fn().mockResolvedValue({ id: 7 }) } as any;
+    const demandaService = {
+      obtenerParaOrden: jest.fn().mockResolvedValue({
+        id: '42', estado: 'CONFIRMADA', fechaRequerida: '2099-12-15',
+        items: [{ productoCodigo: 'PAN-001', cantidad: '25.5000', unidad: 'kg' }],
+      }),
+    } as any;
+    const servicio = new OrdenesService(ordenes, {} as any, {} as any, recetas, demandaService);
+
+    const error = await servicio.crearDesdeDemanda('42', undefined, { sub: 7, rolNombre: 'x', nombre: 'Ana' }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error.getResponse()).toMatchObject({ ordenId: '5', message: expect.stringContaining('ORD-2026-00005') });
+    expect(consultas[0]).toContain('FOR UPDATE');
+    expect(save).not.toHaveBeenCalled();
   });
 });

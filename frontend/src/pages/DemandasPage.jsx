@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useSesion } from "../context/SesionContext.jsx";
 import { tienePermiso } from "../services/permisos.js";
 import {
@@ -6,6 +7,9 @@ import {
   listarDemandasPlanificables,
   PERMISO_CONSULTAR_DEMANDAS,
 } from "../services/demandasService.js";
+import { crearOrdenDesdeDemanda } from "../services/ordenesService.js";
+import { puedeCrear } from "../utils/ordenes.js";
+import Confirmar from "../components/ui/Confirmar.jsx";
 import PageHeader from "../components/ui/PageHeader.jsx";
 import Paginacion from "../components/ui/Paginacion.jsx";
 import FiltrosDemandas, {
@@ -32,6 +36,12 @@ export default function DemandasPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const ultimaCarga = useRef(0);
+  // ABC-446: crear orden desde una demanda planificable.
+  const [pendiente, setPendiente] = useState(null);
+  const [creando, setCreando] = useState(false);
+  const [errorCrear, setErrorCrear] = useState("");
+  const [creada, setCreada] = useState(null);
+  const enCurso = useRef(false);
 
   const cargar = useCallback(
     async (aplicados, pagina) => {
@@ -69,8 +79,29 @@ export default function DemandasPage() {
     };
   }, [cargar, vista]);
 
+  async function confirmarCreacion() {
+    // Evita un segundo envío por doble clic antes de que React deshabilite el botón.
+    if (!pendiente || enCurso.current) return;
+    enCurso.current = true;
+    setCreando(true);
+    setErrorCrear("");
+    try {
+      const orden = await crearOrdenDesdeDemanda(pendiente.demanda.id, pendiente.item.productoCodigo);
+      setCreada({ orden, item: pendiente.item, demanda: pendiente.demanda });
+      setPendiente(null);
+      cargar(filtros, resultado.page);
+    } catch (fallo) {
+      if (fallo?.status === 409) cargar(filtros, resultado.page);
+      setErrorCrear(fallo?.status === 403 ? "No tienes permiso para crear órdenes." : fallo?.message || "No se pudo crear la orden.");
+    } finally {
+      enCurso.current = false;
+      setCreando(false);
+    }
+  }
+
   function cambiarVista(nuevaVista) {
     if (nuevaVista === vista) return;
+    setCreada(null);
     setResultado(RESULTADO_VACIO);
     setFiltros(FILTROS_DEMANDAS_INICIALES);
     setVista(nuevaVista);
@@ -97,6 +128,13 @@ export default function DemandasPage() {
         titulo="Demandas de producción"
         descripcion="Consulta separada de demandas recibidas y demandas confirmadas disponibles para planificación."
       />
+
+      {creada && (
+        <p className="ts-success" role="status">
+          {`Se creó la orden ${creada.orden.codigo} para ${creada.item.productoCodigo} de la demanda ${creada.demanda.demandaExternaId}. `}
+          <Link to={`/ordenes/${creada.orden.id}`}>Ver orden</Link>
+        </p>
+      )}
 
       <div className="ts-btn-group" role="tablist" aria-label="Tipo de demandas" style={{ marginBottom: 16 }}>
         <button
@@ -172,7 +210,12 @@ export default function DemandasPage() {
 
         {!cargando && !error && resultado.items.length > 0 && (
           <>
-            <TablaDemandas demandas={resultado.items} />
+            <TablaDemandas
+              demandas={resultado.items}
+              alCrearOrden={vista === "planificables" && puedeCrear(usuario)
+                ? (demanda, item) => { setErrorCrear(""); setCreada(null); setPendiente({ demanda, item }); }
+                : undefined}
+            />
             <div style={{ padding: "12px 20px" }}>
               <Paginacion
                 pagina={resultado.page}
@@ -183,6 +226,21 @@ export default function DemandasPage() {
           </>
         )}
       </div>
+
+      {pendiente && (
+        <Confirmar
+          titulo="Crear orden de producción"
+          mensaje={`Se creará una orden de ${pendiente.item.cantidad} ${pendiente.item.unidad} de ${pendiente.item.productoCodigo} para la demanda ${pendiente.demanda.demandaExternaId}, con fecha ${String(pendiente.demanda.fechaRequerida).slice(0, 10)}.`}
+          verbo="Crear orden"
+          peligro={false}
+          cargando={creando}
+          alCancelar={() => { setPendiente(null); setErrorCrear(""); }}
+          alConfirmar={confirmarCreacion}
+        />
+      )}
+      {errorCrear && (
+        <p className="ts-feedback ts-error" role="alert" style={{ marginTop: 16 }}>{errorCrear}</p>
+      )}
     </div>
   );
 }

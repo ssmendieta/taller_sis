@@ -153,6 +153,24 @@ export async function crearOrden(datos) {
 
 
 
+// ABC-446: crea la orden de un producto de una demanda confirmada (endpoint de ABC-444).
+export async function crearOrdenDesdeDemanda(demandaId, productoCodigo) {
+  const response = await fetch(
+    `${apiConfig.apiUrl}/api/produccion/ordenes/desde-demanda/${encodeURIComponent(demandaId)}`,
+    {
+      method: "POST",
+      headers: encabezados({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ producto_codigo: productoCodigo }),
+    },
+  );
+  await exigirOk(response, "No se pudo crear la orden desde la demanda.");
+  const orden = await response.json().catch(() => null);
+  if (!orden?.id) {
+    throw new Error("El servicio no confirmó la orden. Revisa el listado de órdenes antes de intentarlo otra vez.");
+  }
+  return orden;
+}
+
 // ================================
 // ABC-196 AVANCES
 // ================================

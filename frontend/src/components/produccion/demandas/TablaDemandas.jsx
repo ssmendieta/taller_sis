@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { ESTADOS_DEMANDA } from "../../../services/demandasService.js";
+import Boton from "../../ui/Boton.jsx";
 
 function fechaLegible(valor) {
   if (!valor) return "-";
@@ -25,7 +27,9 @@ export function BadgeEstadoDemanda({ estado }) {
   return <span className={`ts-badge ${info.clase}`}>{info.texto}</span>;
 }
 
-export default function TablaDemandas({ demandas }) {
+// ABC-446: con `alCrearOrden` (planificables y permiso ordenes.crear) cada producto
+// muestra su orden vigente o el botón para crearla.
+export default function TablaDemandas({ demandas, alCrearOrden }) {
   return (
     <div className="ts-table-wrap">
       <table className="ts-table">
@@ -62,6 +66,14 @@ export default function TablaDemandas({ demandas }) {
                     {demanda.items.map((it, idx) => (
                       <li key={it.id || idx}>
                         <code>{it.productoCodigo}</code>: {it.cantidad} {it.unidad}
+                        {it.orden ? (
+                          <> · <Link to={`/ordenes/${it.orden.id}`}>{`Orden ${it.orden.codigo}`}</Link></>
+                        ) : alCrearOrden && (
+                          <> <Boton size="sm" variant="primary" onClick={() => alCrearOrden(demanda, it)}
+                            aria-label={`Crear orden de ${it.productoCodigo} para la demanda ${demanda.demandaExternaId}`}>
+                            Crear orden
+                          </Boton></>
+                        )}
                       </li>
                     ))}
                   </ul>

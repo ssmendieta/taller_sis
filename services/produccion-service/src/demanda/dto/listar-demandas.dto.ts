@@ -35,6 +35,8 @@ export interface DemandaItemResumenDto {
   productoCodigo: string;
   cantidad: string;
   unidad: string;
+  /** ABC-446: solo en planificables; orden vigente del producto o null. */
+  orden?: { id: string; codigo: string } | null;
 }
 
 export interface DemandaResumenDto {

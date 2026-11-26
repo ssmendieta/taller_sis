@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 
 import { OrdenProduccion } from './entities/orden-produccion.entity';
@@ -146,6 +146,25 @@ export class OrdenesService {
       responsableId,
       nombre,
       demandaId: demanda.id,
+      // ABC-446: dos usuarios a la vez no crean dos órdenes para el mismo producto de la demanda.
+      antesDeGuardar: async (manager) => {
+        await manager.query('SELECT id FROM demandas WHERE id = $1 FOR UPDATE', [demanda.id]);
+        const [existente] = (await manager.query(
+          `SELECT o.id::text AS id, o.codigo
+             FROM ordenes_produccion o
+             INNER JOIN recetas r ON r.id = o.receta_id
+            WHERE o.demanda_id = $1 AND o.estado <> 'CANCELADA' AND r.producto_codigo = $2
+            LIMIT 1`,
+          [demanda.id, item.productoCodigo],
+        )) as Array<{ id: string; codigo: string }>;
+        if (existente) {
+          throw new ConflictException({
+            statusCode: 409,
+            message: `La demanda ${demanda.id} ya tiene la orden ${existente.codigo} para el producto '${item.productoCodigo}'`,
+            ordenId: existente.id,
+          });
+        }
+      },
     });
   }
 
@@ -192,11 +211,13 @@ export class OrdenesService {
     responsableId: number;
     nombre: string;
     demandaId: string | null;
+    antesDeGuardar?: (manager: EntityManager) => Promise<void>;
   }): Promise<OrdenProduccion> {
     for (let intento = 0; intento < 2; intento += 1) {
       const codigo = await this.generarCodigo();
       try {
         return await this.ordenRepository.manager.transaction(async (manager) => {
+          await datos.antesDeGuardar?.(manager);
           const orden = await manager.save(
             OrdenProduccion,
             manager.create(OrdenProduccion, {

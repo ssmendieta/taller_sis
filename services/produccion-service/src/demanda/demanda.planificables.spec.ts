@@ -74,7 +74,7 @@ describe('ABC-366: endpoint de demandas planificables', () => {
 describe('ABC-366: consulta exclusiva y sin efectos secundarios', () => {
   it('fuerza CONFIRMADA, aplica origen y paginación, y elimina duplicados del JOIN', async () => {
     const qb = crearQueryBuilder([confirmada], 1);
-    const repositorio = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
+    const repositorio = { createQueryBuilder: jest.fn().mockReturnValue(qb), query: jest.fn().mockResolvedValue([]) };
     const servicio = new DemandaService(repositorio as any);
 
     const resultado = await servicio.listarPlanificables({
@@ -107,6 +107,7 @@ describe('ABC-366: consulta exclusiva y sin efectos secundarios', () => {
     const qb = crearQueryBuilder([confirmada], 1);
     const repositorio = {
       createQueryBuilder: jest.fn().mockReturnValue(qb),
+      query: jest.fn().mockResolvedValue([]),
       save: jest.fn(),
       insert: jest.fn(),
       update: jest.fn(),
@@ -118,5 +119,32 @@ describe('ABC-366: consulta exclusiva y sin efectos secundarios', () => {
     expect(repositorio.save).not.toHaveBeenCalled();
     expect(repositorio.insert).not.toHaveBeenCalled();
     expect(repositorio.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ABC-446: planificables con órdenes ya creadas', () => {
+  it('excluye las demandas con todos sus productos cubiertos e informa la orden de cada producto', async () => {
+    const qb = crearQueryBuilder([confirmada], 1);
+    const query = jest.fn().mockResolvedValue([{ id: '5', codigo: 'ORD-2026-00005', demanda_id: '21', producto_codigo: 'PROD-1' }]);
+    const servicio = new DemandaService({ createQueryBuilder: jest.fn().mockReturnValue(qb), query } as any);
+
+    const resultado = await servicio.listarPlanificables({ page: 1, limit: 10 });
+
+    const filtro = qb.andWhere.mock.calls.map(([sql]: [string]) => sql).find((sql: string) => sql.includes('NOT EXISTS'));
+    expect(filtro).toContain("o.estado <> 'CANCELADA'");
+    expect(query.mock.calls[0][1]).toEqual([['21']]);
+    expect(resultado.items[0].items).toEqual([
+      expect.objectContaining({ productoCodigo: 'PROD-1', orden: { id: '5', codigo: 'ORD-2026-00005' } }),
+      expect.objectContaining({ productoCodigo: 'PROD-2', orden: null }),
+    ]);
+  });
+
+  it('la lista general de demandas no cambia ni consulta órdenes', async () => {
+    const qb = crearQueryBuilder([confirmada], 1);
+    const query = jest.fn();
+    const servicio = new DemandaService({ createQueryBuilder: jest.fn().mockReturnValue(qb), query } as any);
+    const resultado = await servicio.listar({ page: 1, limit: 10 } as any);
+    expect(query).not.toHaveBeenCalled();
+    expect(resultado.items[0].items[0]).not.toHaveProperty('orden');
   });
 });
