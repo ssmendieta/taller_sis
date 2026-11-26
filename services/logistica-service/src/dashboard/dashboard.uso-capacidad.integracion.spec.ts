@@ -7,6 +7,8 @@ import { CrearBoletasEnvio1710000000002 } from '../database/migrations/171000000
 import { CrearRutas1710000000005 } from '../database/migrations/1710000000005-CrearRutas';
 import { EstadosDespachoEntrega1710000000006 } from '../database/migrations/1710000000006-EstadosDespachoEntrega';
 import { CrearRespaldoRecursosLogisticos1710000000007 } from '../database/migrations/1710000000007-CrearRespaldoRecursosLogisticos';
+import { ObservacionesDespachoEntrega1710000000008 } from '../database/migrations/1710000000008-ObservacionesDespachoEntrega';
+import { CrearIncidenciasTransporte1710000000009 } from '../database/migrations/1710000000009-CrearIncidenciasTransporte';
 import { ProductoUnidadBoleta1710000000013 } from '../database/migrations/1710000000013-ProductoUnidadBoleta';
 import { HoraRealEntregaParada1710000000016 } from '../database/migrations/1710000000016-HoraRealEntregaParada';
 import { DashboardService } from './dashboard.service';
@@ -40,7 +42,8 @@ describeConPostgres('ABC-490: uso de capacidad con PostgreSQL real', () => {
       entities: [],
       migrations: [
         CrearSolicitudesSalida1710000000001, CrearBoletasEnvio1710000000002, CrearRutas1710000000005,
-        EstadosDespachoEntrega1710000000006, CrearRespaldoRecursosLogisticos1710000000007, ProductoUnidadBoleta1710000000013,
+        EstadosDespachoEntrega1710000000006, CrearRespaldoRecursosLogisticos1710000000007, ObservacionesDespachoEntrega1710000000008,
+        CrearIncidenciasTransporte1710000000009, ProductoUnidadBoleta1710000000013,
         HoraRealEntregaParada1710000000016,
       ],
       migrationsTableName: 'migrations_abc490',

@@ -242,7 +242,7 @@ describe('DashboardService Logística (ABC-328)', () => {
         hasta: '2026-10-31',
       });
 
-      expect(queryMock).toHaveBeenCalledTimes(6);
+      expect(queryMock).toHaveBeenCalledTimes(8);
       queryMock.mock.calls.forEach((llamada) => {
         const sql = llamada[0] as string;
         const params = llamada[1] as unknown[];
@@ -619,10 +619,17 @@ describe('DashboardService: detalle de KPI (ABC-512)', () => {
     expect(await crear([]).service.obtenerDetalleKpi('USO_CAPACIDAD')).toMatchObject({ disponible: true, valor: null, registros: [] });
   });
 
-  it('KPI sin cálculo todavía: no disponible y sin consultar', async () => {
-    const { service, query } = crear([]);
-    expect(await service.obtenerDetalleKpi('ENTREGAS_A_TIEMPO')).toMatchObject({ disponible: false, valor: null, registros: [] });
-    expect(query).not.toHaveBeenCalled();
+  it('los cuatro KPIs de Logística tienen detalle (ABC-420 y ABC-422 incluidos)', async () => {
+    const { service } = crear([]);
+    for (const kpi of ['TIEMPO_ATENCION', 'ENTREGAS_A_TIEMPO', 'INCIDENCIAS_RUTA', 'USO_CAPACIDAD']) {
+      expect(await service.obtenerDetalleKpi(kpi)).toMatchObject({ disponible: true, valor: null, registros: [] });
+    }
+  });
+
+  it('filtrar por chofer o vehículo solo se admite en los KPIs del ranking', async () => {
+    const { service } = crear([]);
+    await expect(service.obtenerDetalleKpi('TIEMPO_ATENCION', { chofer: 'CHO-1' })).rejects.toThrow(BadRequestException);
+    expect(await service.obtenerDetalleKpi('USO_CAPACIDAD', { vehiculo: 'VEH-01' })).toMatchObject({ recurso: { chofer: null, vehiculo: 'VEH-01' } });
   });
 
   it('KPI inválido da 404 y rango invertido da 400', async () => {

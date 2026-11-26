@@ -17,9 +17,9 @@ import {
 import { PermisoLogisticaGuard, PERMISO_LOGISTICA } from '../auth/permiso-logistica.guard';
 import { PERMISO_CONSULTAR_RUTAS } from '../rutas/rutas.controller';
 import { DashboardService } from './dashboard.service';
-import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
+import { FiltroDashboardDto, FiltroRankingDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
-import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, RankingKpisResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardLogisticaResponse } from './dashboard.interface';
 
 // ABC-328: Métricas e indicadores del dashboard de logística (ABC-107).
@@ -92,6 +92,13 @@ export class DashboardController {
   @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
   marcarAvisoLeido(@Param('id', ParseIntPipe) id: number): Promise<AvisoKpiResponse> {
     return this.dashboardService.marcarAvisoLeido(id);
+  }
+
+  // ABC-520: KPIs de Logística por chofer o vehículo.
+  @Get('kpis/ranking')
+  @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
+  obtenerRanking(@Query() query: FiltroRankingDto): Promise<RankingKpisResponse> {
+    return this.dashboardService.obtenerRanking(query);
   }
 
   // ABC-512: registros detrás de un KPI, con el mismo criterio de su cálculo.

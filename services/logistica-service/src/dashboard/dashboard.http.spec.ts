@@ -246,6 +246,8 @@ describe('Dashboard HTTP (ABC-495): metas de KPI y semáforo', () => {
   });
 
   it('GET /dashboard/kpis devuelve los KPIs sin color si no hay valor', async () => {
+    // Solo hay metas: los cálculos no encuentran datos (ABC-420/422 ya tienen consulta propia).
+    queryMock.mockImplementation(async (sql: string) => (sql.includes('FROM metas_kpi') ? [fila()] : []));
     const res = await llamar('GET', '/dashboard/kpis', 'soloConsulta');
     expect(res.status).toBe(200);
     expect(res.body.kpis[0]).toMatchObject({ kpi: 'ENTREGAS_A_TIEMPO', valor: null, color: null });

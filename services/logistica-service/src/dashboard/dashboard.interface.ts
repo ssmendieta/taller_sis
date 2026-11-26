@@ -47,6 +47,10 @@ export interface MetricasDashboardLogisticaResponse {
   };
   uso_capacidad: UsoCapacidadResponse;
   tiempo_atencion: TiempoAtencionResponse;
+  /** ABC-420: entregas hechas el día programado de la ruta o antes. */
+  entregas_a_tiempo: EntregasATiempoResponse;
+  /** ABC-422: incidencias registradas por cada 100 entregas. */
+  incidencias_ruta: IncidenciasRutaResponse;
 }
 
 // ABC-478: cada solicitud completamente entregada aporta una observación.
@@ -65,6 +69,7 @@ export interface UsoCapacidadRuta {
   fecha: string;
   estado: string;
   vehiculo_externo_id: string;
+  chofer_externo_id?: string;
   placa: string | null;
   carga: CapacidadV1 | null;
   capacidad: CapacidadV1 | null;
@@ -146,7 +151,9 @@ export interface DetalleKpiResponse {
   /** Mismo valor que el KPI en ese periodo; null = sin datos. */
   valor: number | null;
   unidad: string | null;
-  registros: Array<RegistroKpi | RegistroKpiSolicitud>;
+  /** ABC-531: chofer o vehículo filtrado desde el ranking. */
+  recurso?: { chofer: string | null; vehiculo: string | null };
+  registros: Array<RegistroKpi | RegistroKpiSolicitud | RegistroKpiEntrega | RegistroKpiIncidencias>;
 }
 
 export interface RegistroKpi {
@@ -178,4 +185,74 @@ export interface RegistroKpiSolicitud {
   ruta_id: string | null;
   creado_en: string;
   entregada_en: string;
+}
+
+export interface EntregasATiempoResponse {
+  /** null = sin entregas en el periodo. */
+  porcentaje: number | null;
+  a_tiempo: number;
+  entregadas: number;
+  unidad: '%';
+}
+
+export interface IncidenciasRutaResponse {
+  /** null = sin entregas en el periodo. */
+  por_100: number | null;
+  incidencias: number;
+  entregas: number;
+  unidad: 'por 100';
+}
+
+// ENTREGAS_A_TIEMPO: una parada entregada.
+export interface RegistroKpiEntrega {
+  tipo: 'ENTREGA';
+  id: string;
+  codigo: string;
+  estado: 'ENTREGADA';
+  /** 100 si fue a tiempo, 0 si no. */
+  valor: number;
+  a_tiempo: boolean;
+  ruta_id: string;
+  fecha_programada: string;
+  entregada_en: string;
+  chofer_externo_id: string;
+  vehiculo_externo_id: string;
+}
+
+// INCIDENCIAS_RUTA: una ruta con sus entregas e incidencias.
+export interface RegistroKpiIncidencias {
+  tipo: 'RUTA_INCIDENCIAS';
+  id: string;
+  codigo: string;
+  estado: string;
+  /** Incidencias por 100 entregas de la ruta; null = sin entregas. */
+  valor: number | null;
+  fecha: string;
+  entregas: number;
+  incidencias: number;
+  chofer_externo_id: string;
+  vehiculo_externo_id: string;
+}
+
+// ABC-520: KPIs de Logística por chofer o vehículo.
+export interface KpisDeRecurso {
+  entregas_a_tiempo: EntregasATiempoResponse;
+  incidencias_ruta: IncidenciasRutaResponse;
+  uso_capacidad: { porcentaje: number | null; rutas_calculables: number; rutas_no_calculables: number };
+}
+
+export interface RankingKpisFila extends KpisDeRecurso {
+  id: string;
+  /** Nombre del chofer o placa del vehículo según la copia del ERP; null si no se conoce. */
+  nombre: string | null;
+  /** Sin entregas ni rutas calculables en el periodo. */
+  sin_datos: boolean;
+}
+
+export interface RankingKpisResponse {
+  dimension: 'CHOFER' | 'VEHICULO';
+  periodo: { desde: string | null; hasta: string | null };
+  filas: RankingKpisFila[];
+  /** Iguales a los KPIs generales del periodo. */
+  totales: KpisDeRecurso;
 }

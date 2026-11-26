@@ -8,6 +8,8 @@ describe('DashboardController Logística (ABC-328)', () => {
 
   const mockRespuesta: MetricasDashboardLogisticaResponse = {
     tiempo_atencion: { promedio_horas: null, solicitudes_entregadas: 0, unidad: 'horas' },
+    entregas_a_tiempo: { porcentaje: null, a_tiempo: 0, entregadas: 0, unidad: '%' },
+    incidencias_ruta: { por_100: null, incidencias: 0, entregas: 0, unidad: 'por 100' },
     periodo: { desde: '2026-10-01', hasta: '2026-10-31' },
     resumen: {
       total_boletas: 10,

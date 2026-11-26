@@ -13,6 +13,8 @@ export interface FilaUsoCapacidad {
   fecha: string;
   estado: string;
   vehiculo_externo_id: string;
+  /** ABC-520: chofer de la ruta, para agrupar el ranking. */
+  chofer_externo_id?: string;
   placa: string | null;
   capacidad_valor: string | null;
   capacidad_unidad: string | null;
@@ -34,6 +36,7 @@ function evaluarRuta(filas: FilaUsoCapacidad[]): UsoCapacidadRuta {
     fecha: f.fecha,
     estado: f.estado,
     vehiculo_externo_id: f.vehiculo_externo_id,
+    ...(f.chofer_externo_id !== undefined ? { chofer_externo_id: f.chofer_externo_id } : {}),
     placa: f.placa,
   };
   const capacidad = f.capacidad_valor !== null && f.capacidad_unidad !== null && diezmilesimas(f.capacidad_valor) > BigInt(0)

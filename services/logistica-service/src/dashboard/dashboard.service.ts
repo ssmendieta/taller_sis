@@ -4,7 +4,12 @@ import { FiltroDashboardDto } from './dto/filtro-dashboard.dto';
 import { GuardarMetaKpiDto } from './dto/guardar-meta-kpi.dto';
 import { calcularSemaforo } from './semaforo';
 import { calcularUsoCapacidad, FilaUsoCapacidad } from './uso-capacidad';
-import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
+import {
+  agruparPorRecurso, calcularEntregasATiempo, calcularIncidenciasRuta, deRecurso,
+  FilaEntrega, FilaIncidenciasRuta, ZONA_HORARIA_NEGOCIO,
+} from './kpis-recurso';
+import { FiltroRankingDto } from './dto/filtro-dashboard.dto';
+import { AvisoKpiResponse, AvisosSinLeerResponse, DetalleKpiResponse, RankingKpisResponse, KpisSemaforoResponse, MetaKpiResponse } from './dashboard.interface';
 import { MetricasDashboardLogisticaResponse, TiempoAtencionResponse } from './dashboard.interface';
 
 /** KPIs que este servicio administra (ABC-495). */
@@ -55,13 +60,15 @@ export class DashboardService {
   async obtenerMetricas(filtro: FiltroDashboardDto = {}): Promise<MetricasDashboardLogisticaResponse> {
     const { fechaDesde, fechaHasta, strDesde, strHasta } = this.parsearFechas(filtro);
 
-    const [boletasRow, rutasRow, entregasRow, cargaRow, usoCapacidadFilas, tiempoAtencion] = await Promise.all([
+    const [boletasRow, rutasRow, entregasRow, cargaRow, usoCapacidadFilas, tiempoAtencion, entregasFilas, incidenciasFilas] = await Promise.all([
       this.consultarBoletas(fechaDesde, fechaHasta),
       this.consultarRutas(strDesde, strHasta),
       this.consultarEntregas(strDesde, strHasta),
       this.consultarCarga(fechaDesde, fechaHasta),
       this.consultarUsoCapacidad(strDesde, strHasta),
       this.consultarTiempoAtencion(fechaDesde, fechaHasta),
+      this.consultarEntregasRealizadas(fechaDesde, fechaHasta),
+      this.consultarIncidenciasPorRuta(strDesde, strHasta),
     ]);
 
     const totalBoletas = Number(boletasRow?.total ?? 0);
@@ -132,7 +139,73 @@ export class DashboardService {
       },
       uso_capacidad: calcularUsoCapacidad(usoCapacidadFilas),
       tiempo_atencion: tiempoAtencion,
+      entregas_a_tiempo: calcularEntregasATiempo(entregasFilas),
+      incidencias_ruta: calcularIncidenciasRuta(incidenciasFilas),
     };
+  }
+
+  /**
+   * ABC-420: paradas ENTREGADAS con hora real, de rutas que salieron. A tiempo = entregada
+   * el día programado de la ruta o antes (hora de Bolivia); no existe hora programada por
+   * parada. El periodo filtra por la hora real de entrega, igual que el tiempo de atención.
+   */
+  private async consultarEntregasRealizadas(desde: Date | null, hasta: Date | null): Promise<FilaEntrega[]> {
+    return (await this.dataSource.query(`
+      SELECT p.id::text AS parada_id, r.id::text AS ruta_id, TO_CHAR(r.fecha_programada, 'YYYY-MM-DD') AS fecha_programada,
+             p.entregada_en, p.destino, r.chofer_externo_id, r.vehiculo_externo_id,
+             ((p.entregada_en AT TIME ZONE '${ZONA_HORARIA_NEGOCIO}')::date <= r.fecha_programada) AS a_tiempo
+        FROM rutas_paradas p
+        INNER JOIN rutas r ON r.id = p.ruta_id
+       WHERE p.estado_entrega = 'ENTREGADA' AND p.entregada_en IS NOT NULL
+         AND r.estado IN ('DESPACHADA','COMPLETADA')
+         AND ($1::timestamptz IS NULL OR p.entregada_en >= $1::timestamptz)
+         AND ($2::timestamptz IS NULL OR p.entregada_en <= $2::timestamptz)
+       ORDER BY p.entregada_en, p.id
+    `, [desde, hasta])) || [];
+  }
+
+  /**
+   * ABC-422: por cada ruta que salió en el periodo (fecha programada, igual que el uso de
+   * capacidad): sus entregas (paradas no anuladas) y las incidencias registradas en ella.
+   */
+  private async consultarIncidenciasPorRuta(desdeStr: string | null, hastaStr: string | null): Promise<FilaIncidenciasRuta[]> {
+    return (await this.dataSource.query(`
+      SELECT r.id::text AS ruta_id, TO_CHAR(r.fecha_programada, 'YYYY-MM-DD') AS fecha_programada, r.estado,
+             r.chofer_externo_id, r.vehiculo_externo_id,
+             (SELECT COUNT(*) FROM rutas_paradas p WHERE p.ruta_id = r.id AND p.estado_entrega <> 'ANULADA')::int AS entregas,
+             (SELECT COUNT(*) FROM incidencias_transporte i WHERE i.ruta_id = r.id)::int AS incidencias
+        FROM rutas r
+       WHERE r.estado IN ('DESPACHADA','COMPLETADA')
+         AND ($1::date IS NULL OR r.fecha_programada >= $1::date)
+         AND ($2::date IS NULL OR r.fecha_programada <= $2::date)
+       ORDER BY r.fecha_programada, r.id
+    `, [desdeStr, hastaStr])) || [];
+  }
+
+  /** ABC-520: KPIs de Logística por chofer o vehículo, con las mismas fórmulas del general. */
+  async obtenerRanking(filtro: FiltroRankingDto): Promise<RankingKpisResponse> {
+    const { fechaDesde, fechaHasta, strDesde, strHasta } = this.parsearFechas(filtro);
+    const [entregas, incidencias, uso, conocidos] = await Promise.all([
+      this.consultarEntregasRealizadas(fechaDesde, fechaHasta),
+      this.consultarIncidenciasPorRuta(strDesde, strHasta),
+      this.consultarUsoCapacidad(strDesde, strHasta),
+      this.consultarRecursosConocidos(filtro.dimension),
+    ]);
+    return {
+      dimension: filtro.dimension,
+      periodo: { desde: filtro.desde || null, hasta: filtro.hasta || null },
+      ...agruparPorRecurso(filtro.dimension, { entregas, incidencias, uso, conocidos }),
+    };
+  }
+
+  // Choferes o vehículos de la copia del ERP, con su nombre o placa más reciente.
+  private async consultarRecursosConocidos(dimension: 'CHOFER' | 'VEHICULO') {
+    const [tabla, nombre] = dimension === 'CHOFER' ? ['recursos_externos_choferes', 'nombre'] : ['recursos_externos_vehiculos', 'placa'];
+    return ((await this.dataSource.query(`
+      SELECT DISTINCT ON (id_externo) id_externo AS id, ${nombre} AS nombre
+        FROM ${tabla}
+       ORDER BY id_externo, fecha DESC, id DESC
+    `)) || []) as Array<{ id: string; nombre: string | null }>;
   }
 
   /**
@@ -323,6 +396,7 @@ export class DashboardService {
         TO_CHAR(r.fecha_programada, 'YYYY-MM-DD') AS fecha,
         r.estado,
         r.vehiculo_externo_id,
+        r.chofer_externo_id,
         v.placa,
         v.capacidad_valor::text AS capacidad_valor,
         v.capacidad_unidad,
@@ -427,6 +501,12 @@ export class DashboardService {
     if (kpi === 'USO_CAPACIDAD') {
       return calcularUsoCapacidad(await this.consultarUsoCapacidad(null, null)).porcentaje;
     }
+    if (kpi === 'ENTREGAS_A_TIEMPO') {
+      return calcularEntregasATiempo(await this.consultarEntregasRealizadas(null, null)).porcentaje;
+    }
+    if (kpi === 'INCIDENCIAS_RUTA') {
+      return calcularIncidenciasRuta(await this.consultarIncidenciasPorRuta(null, null)).por_100;
+    }
     return null;
   }
 
@@ -471,6 +551,52 @@ export class DashboardService {
       unidad: '%',
       registros: [],
     };
+    const recurso = { chofer: filtro.chofer?.trim() || undefined, vehiculo: filtro.vehiculo?.trim() || undefined };
+    const conRecurso = Boolean(recurso.chofer || recurso.vehiculo);
+    if (conRecurso && !['ENTREGAS_A_TIEMPO', 'INCIDENCIAS_RUTA', 'USO_CAPACIDAD'].includes(kpi)) {
+      throw new BadRequestException(`El KPI "${kpi}" no se puede filtrar por chofer o vehículo.`);
+    }
+    if (conRecurso) Object.assign(base, { recurso: { chofer: recurso.chofer ?? null, vehiculo: recurso.vehiculo ?? null } });
+    if (kpi === 'ENTREGAS_A_TIEMPO') {
+      const filas = deRecurso(await this.consultarEntregasRealizadas(fechaDesde, fechaHasta), recurso);
+      return {
+        ...base,
+        valor: calcularEntregasATiempo(filas).porcentaje,
+        registros: filas.map((f) => ({
+          tipo: 'ENTREGA' as const,
+          id: f.parada_id,
+          codigo: `${f.destino} (ruta ${f.ruta_id})`,
+          estado: 'ENTREGADA' as const,
+          valor: f.a_tiempo ? 100 : 0,
+          a_tiempo: Boolean(f.a_tiempo),
+          ruta_id: f.ruta_id,
+          fecha_programada: f.fecha_programada,
+          entregada_en: new Date(f.entregada_en).toISOString(),
+          chofer_externo_id: f.chofer_externo_id,
+          vehiculo_externo_id: f.vehiculo_externo_id,
+        })),
+      };
+    }
+    if (kpi === 'INCIDENCIAS_RUTA') {
+      const filas = deRecurso(await this.consultarIncidenciasPorRuta(strDesde, strHasta), recurso);
+      return {
+        ...base,
+        unidad: 'por 100',
+        valor: calcularIncidenciasRuta(filas).por_100,
+        registros: filas.map((f) => ({
+          tipo: 'RUTA_INCIDENCIAS' as const,
+          id: f.ruta_id,
+          codigo: `Ruta ${f.ruta_id}`,
+          estado: f.estado,
+          valor: calcularIncidenciasRuta([f]).por_100,
+          fecha: f.fecha_programada,
+          entregas: Number(f.entregas),
+          incidencias: Number(f.incidencias),
+          chofer_externo_id: f.chofer_externo_id,
+          vehiculo_externo_id: f.vehiculo_externo_id,
+        })),
+      };
+    }
     if (kpi === 'TIEMPO_ATENCION') {
       const [filas, resumen] = await Promise.all([
         this.dataSource.query(`
@@ -503,7 +629,7 @@ export class DashboardService {
     // Los demás KPIs conectan aquí su detalle cuando tengan cálculo.
     if (kpi !== 'USO_CAPACIDAD') return { ...base, disponible: false, unidad: null };
 
-    const uso = calcularUsoCapacidad(await this.consultarUsoCapacidad(strDesde, strHasta));
+    const uso = calcularUsoCapacidad(deRecurso(await this.consultarUsoCapacidad(strDesde, strHasta), recurso));
     return {
       ...base,
       valor: uso.porcentaje,
