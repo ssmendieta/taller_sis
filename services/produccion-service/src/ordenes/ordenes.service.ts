@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
+import { registrarDemandaAtendidaSiCorresponde } from '../demanda/demanda-atendida';
 import { randomUUID } from 'crypto';
 
 import { OrdenProduccion } from './entities/orden-produccion.entity';
@@ -713,6 +714,11 @@ export class OrdenesService {
         }
 
         await manager.save(OrdenProduccion, ordenVigente);
+
+        // ABC-432: al terminar la orden, la demanda puede quedar atendida (mismo commit).
+        if (dto.nuevoEstado === EstadoOrden.FINALIZADA) {
+          await registrarDemandaAtendidaSiCorresponde(manager, ordenVigente.demanda_id);
+        }
 
         await manager.save(
           HistorialEstadoOrden,

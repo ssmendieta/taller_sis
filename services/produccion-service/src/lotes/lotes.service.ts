@@ -4,6 +4,7 @@ import { ResultadoConforme } from '../calidad/entities/resultado-conforme.entity
 import { TipoResultadoCalidad } from '../calidad/entities/tipo-resultado-calidad.enum';
 import { OrdenProduccion } from '../ordenes/entities/orden-produccion.entity';
 import { Lote } from './entities/lote.entity';
+import { registrarDemandaAtendidaSiCorresponde } from '../demanda/demanda-atendida';
 import { crearEventoProductoTerminadoIngresado } from '../integraciones/outbox/crear-evento-producto-terminado-ingresado';
 import { ESTADO_OUTBOX_PENDIENTE, EventoOutbox } from '../integraciones/outbox/entities/evento-outbox.entity';
 
@@ -96,6 +97,10 @@ export class LotesService {
           payload: evento,
           estado: ESTADO_OUTBOX_PENDIENTE,
         });
+        // ABC-432: un lote de una orden ya terminada puede completar su demanda.
+        if (orden.estado === 'FINALIZADA') {
+          await registrarDemandaAtendidaSiCorresponde(manager, orden.demanda_id);
+        }
         return lote;
       });
     } catch (error) {
