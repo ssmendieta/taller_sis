@@ -16,6 +16,8 @@ export interface DetalleParadaRutaDto {
   destino: string;
   estadoEntrega: EstadoEntrega;
   entregaActualizadaEn: string | null;
+  // ABC-454: hora real de entrega; null si la parada no está entregada.
+  entregadaEn: string | null;
   entregaObservacion: string | null;
   boletas: DetalleBoletaRutaDto[];
 }

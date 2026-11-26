@@ -30,7 +30,7 @@ describe('ABC-376: DespachoService (despacho y entrega)', () => {
   }
 
   function parada(id: string, rutaId: string, secuencia: number, estado = 'PENDIENTE'): FilaParada {
-    return { id, ruta_id: rutaId, secuencia, estado_entrega: estado, entregaActualizadaEn: null, entregaUsuarioId: null, entregaObservacion: null };
+    return { id, ruta_id: rutaId, secuencia, estado_entrega: estado, entregaActualizadaEn: null, entregadaEn: null, entregaUsuarioId: null, entregaObservacion: null };
   }
 
   beforeEach(() => {
@@ -185,7 +185,11 @@ describe('ABC-376: DespachoService (despacho y entrega)', () => {
       const respuesta = await service.entregar('9', '10', '42', 'Recibió Ana');
       expect(paradas[0]).toMatchObject({ estado_entrega: 'ENTREGADA', entregaUsuarioId: '42', entregaObservacion: 'Recibió Ana' });
       expect(paradas[0].entregaActualizadaEn.getTime()).toBeGreaterThanOrEqual(antes);
+      // ABC-454: la hora real de entrega es la del servidor.
+      expect(paradas[0].entregadaEn).toBeInstanceOf(Date);
+      expect(paradas[0].entregadaEn.getTime()).toBeGreaterThanOrEqual(antes);
       expect(paradas[1].estado_entrega).toBe('PENDIENTE');
+      expect(paradas[1].entregadaEn).toBeNull();
       expect(rutas[9]).toMatchObject({ estado: 'DESPACHADA', completadaEn: null });
       expect(respuesta.estado).toBe('DESPACHADA');
     });
@@ -212,6 +216,8 @@ describe('ABC-376: DespachoService (despacho y entrega)', () => {
       const original = { ...paradas[0] };
       await rechazo(service.entregar('9', '10', '43', 'segunda'), ConflictException, 'La entrega ya está en estado ENTREGADA');
       expect(paradas[0]).toEqual(original);
+      // ABC-454: la segunda entrega no cambia la hora real.
+      expect(paradas[0].entregadaEn).toEqual(original.entregadaEn);
     });
 
     it('rechaza entregar en una ruta que no fue despachada', async () => {

@@ -119,6 +119,9 @@ export class DespachoService {
       const ahora = new Date();
       await manager.update(RutaParada, { id: paradaId }, {
         estadoEntrega: EstadoEntrega.ENTREGADA,
+        // ABC-454: hora real del servidor. No se reescribe: una parada ENTREGADA
+        // no vuelve a pasar por aquí (validarTransicionEntrega responde 409).
+        entregadaEn: ahora,
         entregaActualizadaEn: ahora,
         entregaUsuarioId: usuarioId,
         entregaObservacion: observacion,

@@ -100,7 +100,7 @@ export class HistorialService {
     if (!ruta) throw new NotFoundException('Ruta no encontrada');
 
     const paradas = await manager.query(
-      `SELECT id::text AS id, secuencia, destino, estado_entrega, entrega_actualizada_en, entrega_observacion
+      `SELECT id::text AS id, secuencia, destino, estado_entrega, entrega_actualizada_en, entregada_en, entrega_observacion
          FROM rutas_paradas
         WHERE ruta_id = $1
         ORDER BY secuencia, id`,
@@ -177,6 +177,7 @@ export class HistorialService {
         destino: parada.destino,
         estadoEntrega: parada.estado_entrega as EstadoEntrega,
         entregaActualizadaEn: fecha(parada.entrega_actualizada_en),
+        entregadaEn: fecha(parada.entregada_en),
         entregaObservacion: parada.entrega_observacion ?? null,
         boletas: [...(boletasPorParada.get(parada.id)?.values() ?? [])],
       })),

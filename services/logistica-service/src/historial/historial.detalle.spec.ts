@@ -12,6 +12,7 @@ import { CrearRutas1710000000005 } from '../database/migrations/1710000000005-Cr
 import { EstadosDespachoEntrega1710000000006 } from '../database/migrations/1710000000006-EstadosDespachoEntrega';
 import { ObservacionesDespachoEntrega1710000000008 } from '../database/migrations/1710000000008-ObservacionesDespachoEntrega';
 import { CrearIncidenciasTransporte1710000000009 } from '../database/migrations/1710000000009-CrearIncidenciasTransporte';
+import { HoraRealEntregaParada1710000000016 } from '../database/migrations/1710000000016-HoraRealEntregaParada';
 import { HistorialController } from './historial.controller';
 import { HistorialService, resumirLotes } from './historial.service';
 
@@ -41,6 +42,23 @@ describe('ABC-393: detalle de ruta (unitario)', () => {
       expect(sql).toMatch(/ruta_id = \$1|ruta\.id = \$1/);
       expect(params).toEqual(['9']);
     }
+  });
+
+  it('ABC-454: expone la hora real de entrega y null en paradas sin entregar', async () => {
+    const query = jest.fn(async (sql: string) => {
+      if (sql.includes('FROM rutas ruta')) return [{
+        id: '9', fecha_programada: '2026-11-12', estado: 'DESPACHADA', vehiculo_externo_id: 'V', chofer_externo_id: 'C',
+        despachada_en: null, completada_en: null, fecha_original: '2026-11-12',
+      }];
+      if (sql.includes('entregada_en')) return [
+        { id: '10', secuencia: 1, destino: 'A', estado_entrega: 'ENTREGADA', entrega_actualizada_en: '2026-11-12T15:05:00Z', entregada_en: '2026-11-12T15:05:00Z', entrega_observacion: null },
+        { id: '11', secuencia: 2, destino: 'B', estado_entrega: 'PENDIENTE', entrega_actualizada_en: null, entregada_en: null, entrega_observacion: null },
+      ];
+      return [];
+    });
+    const transaction = jest.fn(async (_nivel: string, trabajo: any) => trabajo({ query }));
+    const detalle = await new HistorialService({ transaction } as any).detalleRuta('9');
+    expect(detalle.paradas.map((p) => p.entregadaEn)).toEqual(['2026-11-12T15:05:00.000Z', null]);
   });
 
   it('suma lotes solo de boletas no anuladas, sin perder decimales', () => {
@@ -83,6 +101,7 @@ describeReal('ABC-393: detalle de ruta en PostgreSQL', () => {
         new ReglaConcurrenciaDocumental1710000000003(), new HistorialBoletasEnvio1710000000004(),
         new CrearRutas1710000000005(), new EstadosDespachoEntrega1710000000006(),
         new ObservacionesDespachoEntrega1710000000008(), new CrearIncidenciasTransporte1710000000009(),
+        new HoraRealEntregaParada1710000000016(),
       ]) {
         await migracion.up(runner);
       }
