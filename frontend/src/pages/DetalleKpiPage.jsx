@@ -10,25 +10,44 @@ import "../styles/dashboard-logistica.css";
 
 const formato = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 4 });
 const cantidad = (c) => (c ? `${formato.format(Number(c.valor))} ${c.unidad}` : "—");
+const fechaHora = (iso) => (iso ? new Date(iso).toLocaleString("es-BO", { dateStyle: "short", timeStyle: "short" }) : "—");
+const fecha = (iso) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
+const enlaceOrden = (r) => <Link to={`/ordenes/${r.id}`}>{r.codigo}</Link>;
 
-function TablaOrdenes({ registros, unidad }) {
+// Columnas propias de cada KPI de órdenes; la primera columna siempre enlaza a la orden.
+const COLUMNAS_ORDEN = {
+  FPY: [
+    { titulo: "Conformes a la primera", num: true, celda: (r) => formato.format(r.conformes_primera) },
+    { titulo: "Evaluadas", num: true, celda: (r) => formato.format(r.evaluadas) },
+  ],
+  CUMPLIMIENTO_FECHA: [
+    { titulo: "Fecha requerida", celda: (r) => fecha(r.fecha_programada) },
+    { titulo: "Finalizada", celda: (r) => fechaHora(r.finalizada_en) },
+    { titulo: "Resultado", celda: (r) => (r.a_tiempo ? "A tiempo" : "Tarde") },
+  ],
+  TIEMPO_CICLO: [
+    { titulo: "Iniciada", celda: (r) => fechaHora(r.iniciada_en) },
+    { titulo: "Finalizada", celda: (r) => fechaHora(r.finalizada_en) },
+  ],
+};
+
+function TablaOrdenes({ registros, unidad, kpi }) {
+  const columnas = COLUMNAS_ORDEN[kpi] ?? [];
   return (
     <table className="ts-table">
       <thead>
         <tr>
           <th scope="col">Orden</th><th scope="col">Estado</th>
-          <th scope="col" className="ts-num">Conformes a la primera</th>
-          <th scope="col" className="ts-num">Evaluadas</th>
+          {columnas.map((c) => <th key={c.titulo} scope="col" className={c.num ? "ts-num" : undefined}>{c.titulo}</th>)}
           <th scope="col" className="ts-num">Valor</th>
         </tr>
       </thead>
       <tbody>
         {registros.map((r) => (
           <tr key={r.id}>
-            <td><Link to={`/ordenes/${r.id}`}>{r.codigo}</Link></td>
+            <td>{enlaceOrden(r)}</td>
             <td><BadgeEstadoOrden estado={r.estado} /></td>
-            <td className="ts-num">{formato.format(r.conformes_primera)}</td>
-            <td className="ts-num">{formato.format(r.evaluadas)}</td>
+            {columnas.map((c) => <td key={c.titulo} className={c.num ? "ts-num" : undefined}>{c.celda(r)}</td>)}
             <td className="ts-num">{formatearKpi(r.valor, unidad)}</td>
           </tr>
         ))}
@@ -58,6 +77,31 @@ function TablaRutas({ registros, unidad }) {
             <td className="ts-num">{cantidad(r.carga)}</td>
             <td className="ts-num">{cantidad(r.capacidad)}</td>
             <td className="ts-num">{r.valor === null ? <>No calculable<br /><small>{r.detalle}</small></> : formatearKpi(r.valor, unidad)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// TIEMPO_ATENCION: cada solicitud enlaza a su trazabilidad y a la ruta que la completó.
+function TablaSolicitudes({ registros, unidad }) {
+  return (
+    <table className="ts-table">
+      <thead>
+        <tr>
+          <th scope="col">Solicitud</th><th scope="col">Creada</th><th scope="col">Entregada</th>
+          <th scope="col">Ruta</th><th scope="col" className="ts-num">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {registros.map((r) => (
+          <tr key={r.id}>
+            <td><Link to={`/logistica/trazabilidad?ordenId=${encodeURIComponent(r.orden_id)}`}>{r.codigo}</Link></td>
+            <td>{fechaHora(r.creado_en)}</td>
+            <td>{fechaHora(r.entregada_en)}</td>
+            <td>{r.ruta_id ? <Link to={`/logistica/rutas/${r.ruta_id}`}>{`Ruta ${r.ruta_id}`}</Link> : "—"}</td>
+            <td className="ts-num">{formatearKpi(r.valor, unidad)}</td>
           </tr>
         ))}
       </tbody>
@@ -121,7 +165,7 @@ export default function DetalleKpiPage({ area }) {
     setParams(Object.fromEntries(Object.entries(p).filter(([, v]) => v)));
   }
 
-  const Tabla = area === "produccion" ? TablaOrdenes : TablaRutas;
+  const Tabla = area === "produccion" ? TablaOrdenes : kpi === "TIEMPO_ATENCION" ? TablaSolicitudes : TablaRutas;
   return (
     <section className="ts-page dash-detalle" aria-label={`Detalle de ${nombre}`} aria-busy={cargando}>
       <Link to={tablero}>← Volver al tablero</Link>
@@ -143,7 +187,7 @@ export default function DetalleKpiPage({ area }) {
           </div>
           {datos.registros.length === 0
             ? <p className="ts-empty">Sin registros en el período.</p>
-            : <div className="ts-table-wrap"><Tabla registros={datos.registros} unidad={datos.unidad} /></div>}
+            : <div className="ts-table-wrap"><Tabla registros={datos.registros} unidad={datos.unidad} kpi={kpi} /></div>}
           {datos.causas_defecto && <CausasDefecto causas={datos.causas_defecto} total={datos.unidades_defectuosas} />}
         </>
       )}

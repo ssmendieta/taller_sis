@@ -148,3 +148,31 @@ test('detalle: sin permiso no consulta', async () => {
   await abrir('/logistica/kpis/USO_CAPACIDAD');
   assert.equal(llamadas.filter((u) => u.pathname.includes('/kpis')).length, 0);
 });
+
+test('detalle de cumplimiento de fecha y tiempo de ciclo: columnas propias y enlace a la orden', async () => {
+  const orden = (extra) => ({ tipo: 'ORDEN', id: '4', codigo: 'OP-4', estado: 'FINALIZADA', ...extra });
+  respuestas[`${P}/CUMPLIMIENTO_FECHA/detalle`] = () => Response.json(detalle({ kpi: 'CUMPLIMIENTO_FECHA', valor: 50,
+    registros: [orden({ valor: 100, a_tiempo: true, fecha_programada: '2026-11-05', finalizada_en: '2026-11-05T10:00:00Z' }),
+      orden({ id: '5', codigo: 'OP-5', valor: 0, a_tiempo: false, fecha_programada: '2026-11-05', finalizada_en: '2026-11-06T10:00:00Z' })] }));
+  await abrir('/produccion/kpis/CUMPLIMIENTO_FECHA');
+  assert.ok(enlaces().includes('/ordenes/4'));
+  assert.match(texto(), /A tiempo/);
+  assert.match(texto(), /Tarde/);
+  assert.match(texto(), /05\/11\/2026/);
+  await act(async () => raiz.unmount());
+  respuestas[`${P}/TIEMPO_CICLO/detalle`] = () => Response.json(detalle({ kpi: 'TIEMPO_CICLO', valor: 26.5, unidad: 'horas',
+    registros: [orden({ valor: 26.5, iniciada_en: '2026-11-04T08:00:00Z', finalizada_en: '2026-11-05T10:30:00Z' })] }));
+  await abrir('/produccion/kpis/TIEMPO_CICLO');
+  assert.match(texto(), /Iniciada/);
+  assert.match(texto(), /26,5 horas/);
+});
+
+test('detalle de tiempo de atención: enlaza a la trazabilidad y a la ruta', async () => {
+  respuestas[`${L}/TIEMPO_ATENCION/detalle`] = () => Response.json(detalle({ kpi: 'TIEMPO_ATENCION', valor: 26, unidad: 'horas',
+    registros: [{ tipo: 'SOLICITUD', id: '1', codigo: 'Solicitud 1', estado: 'ENTREGADA', valor: 26, orden_id: '9', ruta_id: '2',
+      creado_en: '2026-11-01T00:00:00Z', entregada_en: '2026-11-02T02:00:00Z' }] }));
+  await abrir('/logistica/kpis/TIEMPO_ATENCION');
+  assert.ok(enlaces().includes('/logistica/trazabilidad?ordenId=9'));
+  assert.ok(enlaces().includes('/logistica/rutas/2'));
+  assert.match(texto(), /26 horas/);
+});
