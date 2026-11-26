@@ -6,7 +6,7 @@ Diagrama de secuencia del uso de capacidad del vehículo por ruta, incluida la r
 
 - **Incluido:** `GET /dashboard/metricas` con filtro de periodo (`uso_capacidad`) y el valor de `USO_CAPACIDAD` en `GET /dashboard/kpis`.
 - **No incluido:** configuración de metas y umbrales (ver `meta-y-semaforo.md`, ABC-498).
-- **Frontend:** el servicio `obtenerMetricasDashboardLogistica` ya existe. El widget aún no muestra este KPI; su participación en el diagrama es la prevista y debe revisarse cuando se implemente.
+- **Frontend:** el widget `WidgetUsoCapacidad` del tablero logístico muestra el valor general, las barras por vehículo y las rutas no calculables, y enlaza al detalle con el mismo periodo (ABC-423, CA-03).
 
 ## 2. Regla del cálculo (ABC-490)
 

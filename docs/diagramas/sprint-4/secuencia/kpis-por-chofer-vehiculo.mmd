@@ -1,0 +1,55 @@
+sequenceDiagram
+    autonumber
+    actor E as Encargado de Logística
+    participant T as RankingRecursos (tabla)
+    participant F as dashboardLogisticaService.js
+    participant G as API Gateway
+    participant C as DashboardController
+    participant A as auth-service
+    participant V as DashboardService
+    participant K as agruparPorRecurso
+    participant R as Rutas, entregas e incidencias
+    participant X as Recursos logísticos (copia del ERP)
+    Note over R,X: Ambos están en logistica_db
+
+    E->>T: Abre el tablero, elige periodo y Por chofer o Por vehículo
+    T->>F: obtenerRankingLogistica({ dimension, desde, hasta })
+    F->>G: GET /api/logistica/dashboard/kpis/ranking?dimension&desde&hasta
+    G->>C: GET /dashboard/kpis/ranking
+    C->>A: GET /me con el token Bearer
+    A-->>C: Identidad y permisos
+    alt Sin sesión, sin logistica.rutas.consultar o Auth caído
+        C-->>F: 401, 403 o 503
+    else Dimensión distinta de CHOFER o VEHICULO, o fechas inválidas
+        C-->>F: 400 Bad Request
+    else Solicitud válida
+        C->>V: obtenerRanking(filtro)
+        par Mismas consultas que los KPIs generales
+            V->>R: Entregas realizadas en el periodo (hora real) y si fueron el día programado
+        and
+            V->>R: Rutas que salieron en el periodo con entregas e incidencias
+        and
+            V->>R: Carga de cada ruta y capacidad del vehículo esa fecha
+            R->>X: LEFT JOIN por vehículo y fecha
+        and
+            V->>X: Choferes o vehículos conocidos con su nombre o placa
+        end
+        V->>K: agruparPorRecurso(dimension, datos)
+        loop Por cada chofer o vehículo
+            K->>K: Entregas a tiempo, incidencias por 100 y uso de capacidad con las mismas fórmulas
+            alt Sin entregas ni rutas calculables
+                Note over K: sin_datos = true
+            end
+        end
+        K->>K: Totales con todas las filas, iguales a los KPIs generales
+        K-->>V: filas y totales
+        V-->>F: 200 con dimension, periodo, filas y totales
+    end
+    F-->>T: Ranking o Error con el mensaje
+    T->>T: Ordena por la columna elegida y marca Mejor y Peor según el sentido de cada KPI
+    T-->>E: Tabla con fila Total, "Sin datos" o error con Reintentar
+    opt Ver entregas de una fila
+        E->>T: Pulsa Ver entregas
+        T->>G: Abre /logistica/kpis/ENTREGAS_A_TIEMPO?chofer o vehiculo, con el mismo periodo
+        Note over T,G: Detalle de KPI (ABC-428) filtrado por el chofer o vehículo
+    end

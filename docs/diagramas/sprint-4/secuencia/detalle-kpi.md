@@ -4,7 +4,8 @@ Apertura del detalle de un KPI y navegación hacia la orden o ruta. Subtarea **A
 
 ## Alcance
 
-- Con detalle hoy: **FPY**, **CUMPLIMIENTO_FECHA** y **TIEMPO_CICLO** (Producción); **USO_CAPACIDAD** y **TIEMPO_ATENCION** (Logística). **MERMA**, **ENTREGAS_A_TIEMPO** e **INCIDENCIAS_RUTA** responden `disponible: false` hasta que exista su cálculo; cada uno se conecta en `obtenerDetalleKpi`.
+- Con detalle hoy: **FPY**, **CUMPLIMIENTO_FECHA** y **TIEMPO_CICLO** (Producción); **USO_CAPACIDAD**, **TIEMPO_ATENCION**, **ENTREGAS_A_TIEMPO** e **INCIDENCIAS_RUTA** (Logística). Solo **MERMA** responde `disponible: false` hasta que exista su cálculo (ABC-474).
+- Desde el ranking de ABC-430, el detalle de Logística admite `?chofer=` o `?vehiculo=` (ABC-531).
 - Las tarjetas muestran el valor de todo el historial, igual que el semáforo, y abren el detalle sin periodo. El detalle admite `?desde&hasta` en la dirección.
 - El detalle usa el mismo criterio que el KPI (`COLUMNAS_FPY`, `filtroCumplimientoFecha`, `filtroTiempoCiclo`, `calcularUsoCapacidad` y `CTE_SOLICITUDES_ENTREGADAS`), por eso el valor coincide.
 
