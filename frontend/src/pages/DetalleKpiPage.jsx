@@ -109,6 +109,56 @@ function TablaSolicitudes({ registros, unidad }) {
   );
 }
 
+// ENTREGAS_A_TIEMPO: cada entrega con su ruta, el día programado y la hora real.
+function TablaEntregas({ registros }) {
+  return (
+    <table className="ts-table">
+      <thead>
+        <tr><th scope="col">Entrega</th><th scope="col">Ruta</th><th scope="col">Chofer</th><th scope="col">Vehículo</th>
+          <th scope="col">Día programado</th><th scope="col">Entregada</th><th scope="col">Resultado</th></tr>
+      </thead>
+      <tbody>
+        {registros.map((r) => (
+          <tr key={r.id}>
+            <td>{r.codigo}</td>
+            <td><Link to={`/logistica/rutas/${r.ruta_id}`}>{`Ruta ${r.ruta_id}`}</Link></td>
+            <td>{r.chofer_externo_id}</td>
+            <td>{r.vehiculo_externo_id}</td>
+            <td>{fecha(r.fecha_programada)}</td>
+            <td>{fechaHora(r.entregada_en)}</td>
+            <td>{r.a_tiempo ? "A tiempo" : "Tarde"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// INCIDENCIAS_RUTA: cada ruta con sus entregas e incidencias.
+function TablaIncidencias({ registros, unidad }) {
+  return (
+    <table className="ts-table">
+      <thead>
+        <tr><th scope="col">Ruta</th><th scope="col">Fecha</th><th scope="col">Chofer</th><th scope="col">Vehículo</th>
+          <th scope="col" className="ts-num">Entregas</th><th scope="col" className="ts-num">Incidencias</th><th scope="col" className="ts-num">Valor</th></tr>
+      </thead>
+      <tbody>
+        {registros.map((r) => (
+          <tr key={r.id}>
+            <td><Link to={`/logistica/rutas/${r.id}`}>{r.codigo}</Link></td>
+            <td>{fecha(r.fecha)}</td>
+            <td>{r.chofer_externo_id}</td>
+            <td>{r.vehiculo_externo_id}</td>
+            <td className="ts-num">{r.entregas}</td>
+            <td className="ts-num">{r.incidencias}</td>
+            <td className="ts-num">{r.valor === null ? "Sin entregas" : formatearKpi(r.valor, unidad)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function CausasDefecto({ causas, total }) {
   return (
     <section aria-label="Causas de defecto">
@@ -133,6 +183,9 @@ export default function DetalleKpiPage({ area }) {
   const [params, setParams] = useSearchParams();
   const desde = params.get("desde") ?? "";
   const hasta = params.get("hasta") ?? "";
+  // ABC-531: desde el ranking llega el chofer o vehículo elegido.
+  const chofer = params.get("chofer") ?? "";
+  const vehiculo = params.get("vehiculo") ?? "";
   const { detalle, tablero } = AREAS_KPI[area];
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState("");
@@ -146,14 +199,14 @@ export default function DetalleKpiPage({ area }) {
     setError("");
     setDatos(null);
     try {
-      const respuesta = await detalle(kpi, { desde, hasta });
+      const respuesta = await detalle(kpi, { desde, hasta, chofer, vehiculo });
       if (consulta === ultima.current) setDatos(respuesta);
     } catch (fallo) {
       if (consulta === ultima.current) setError(mensajeErrorKpi(fallo));
     } finally {
       if (consulta === ultima.current) setCargando(false);
     }
-  }, [detalle, kpi, desde, hasta]);
+  }, [detalle, kpi, desde, hasta, chofer, vehiculo]);
 
   useEffect(() => {
     document.title = FORMATO_TITULO(`Detalle: ${nombre}`);
@@ -162,14 +215,16 @@ export default function DetalleKpiPage({ area }) {
   }, [cargar, nombre]);
 
   function cambiarPeriodo(p) {
-    setParams(Object.fromEntries(Object.entries(p).filter(([, v]) => v)));
+    setParams(Object.fromEntries(Object.entries({ ...p, chofer, vehiculo }).filter(([, v]) => v)));
   }
 
-  const Tabla = area === "produccion" ? TablaOrdenes : kpi === "TIEMPO_ATENCION" ? TablaSolicitudes : TablaRutas;
+  const TABLAS_LOGISTICA = { TIEMPO_ATENCION: TablaSolicitudes, ENTREGAS_A_TIEMPO: TablaEntregas, INCIDENCIAS_RUTA: TablaIncidencias };
+  const Tabla = area === "produccion" ? TablaOrdenes : TABLAS_LOGISTICA[kpi] ?? TablaRutas;
+  const filtroRecurso = chofer ? `Chofer ${chofer}` : vehiculo ? `Vehículo ${vehiculo}` : "";
   return (
     <section className="ts-page dash-detalle" aria-label={`Detalle de ${nombre}`} aria-busy={cargando}>
       <Link to={tablero}>← Volver al tablero</Link>
-      <PageHeader titulo={nombre} descripcion="Registros que componen el valor del KPI en el período." />
+      <PageHeader titulo={filtroRecurso ? `${nombre}: ${filtroRecurso}` : nombre} descripcion="Registros que componen el valor del KPI en el período." />
       <SelectorPeriodo key={`${desde}|${hasta}`} periodo={{ desde, hasta }} alCambiar={cambiarPeriodo} deshabilitado={cargando} />
       {error && (
         <div className="ts-feedback ts-error" role="alert">

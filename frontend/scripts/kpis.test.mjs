@@ -176,3 +176,26 @@ test('detalle de tiempo de atención: enlaza a la trazabilidad y a la ruta', asy
   assert.ok(enlaces().includes('/logistica/rutas/2'));
   assert.match(texto(), /26 horas/);
 });
+
+test('detalle desde el ranking: filtra por chofer, lo muestra y lo conserva al cambiar el período', async () => {
+  respuestas[`${L}/ENTREGAS_A_TIEMPO/detalle`] = () => Response.json(detalle({ kpi: 'ENTREGAS_A_TIEMPO', valor: 50,
+    recurso: { chofer: 'CHO-1', vehiculo: null },
+    registros: [{ tipo: 'ENTREGA', id: '3', codigo: 'Destino A (ruta 8)', estado: 'ENTREGADA', valor: 0, a_tiempo: false, ruta_id: '8',
+      fecha_programada: '2026-11-10', entregada_en: '2026-11-11T15:00:00Z', chofer_externo_id: 'CHO-1', vehiculo_externo_id: 'VEH-1' }] }));
+  await abrir('/logistica/kpis/ENTREGAS_A_TIEMPO?chofer=CHO-1&desde=2026-11-01&hasta=2026-11-30');
+  assert.deepEqual(Object.fromEntries(llamadas.at(-1).searchParams), { desde: '2026-11-01', hasta: '2026-11-30', chofer: 'CHO-1' });
+  assert.match(texto(), /Chofer CHO-1/);
+  assert.match(texto(), /Tarde/);
+  assert.ok(enlaces().includes('/logistica/rutas/8'));
+  await act(async () => raiz.root.find((n) => n.type === 'button' && n.children.includes('Todo')).props.onClick());
+  assert.deepEqual(Object.fromEntries(llamadas.at(-1).searchParams), { chofer: 'CHO-1' });
+});
+
+test('detalle de incidencias: una fila por ruta con entregas e incidencias', async () => {
+  respuestas[`${L}/INCIDENCIAS_RUTA/detalle`] = () => Response.json(detalle({ kpi: 'INCIDENCIAS_RUTA', valor: 150, unidad: 'por 100',
+    registros: [{ tipo: 'RUTA_INCIDENCIAS', id: '8', codigo: 'Ruta 8', estado: 'DESPACHADA', valor: 150, fecha: '2026-11-10',
+      entregas: 2, incidencias: 3, chofer_externo_id: 'CHO-2', vehiculo_externo_id: 'VEH-2' }] }));
+  await abrir('/logistica/kpis/INCIDENCIAS_RUTA');
+  assert.ok(enlaces().includes('/logistica/rutas/8'));
+  assert.match(texto(), /150 por 100/);
+});
