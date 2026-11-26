@@ -1,0 +1,67 @@
+%% ABC-456 · ABC-414 — Hora real de entrega (ABC-453/454): registro al entregar y consulta en el historial
+sequenceDiagram
+    autonumber
+    actor L as Encargado de Logística
+    participant P as RutaDetallePage (frontend)
+    participant G as API Gateway
+    participant A as auth-service
+    participant DC as DespachoController
+    participant DS as DespachoService
+    participant HC as HistorialController
+    participant HS as HistorialService
+    participant DB as logistica_db
+
+    rect rgb(240, 240, 240)
+    Note over L,DB: A. Registrar la entrega de una parada
+    L->>P: Registrar entrega (observación opcional)
+    P->>G: POST /api/logistica/rutas/:id/paradas/:paradaId/entrega
+    G->>DC: POST /rutas/:id/paradas/:paradaId/entrega
+    DC->>A: GET /me con el token Bearer
+    A-->>DC: Identidad y permisos
+    alt Sin sesión / sin logistica.rutas.gestionar / campos extra en el cuerpo
+        DC-->>P: 401 / 403 / 400
+    else Permiso válido
+        DC->>DS: entregar(rutaId, paradaId, usuarioId, observacion)
+        DS->>DB: BEGIN · ruta FOR UPDATE · paradas de la ruta FOR UPDATE
+        alt Ruta o parada inexistente / parada de otra ruta
+            DS-->>P: 404 / 409
+        else Parada ya ENTREGADA o ruta no DESPACHADA
+            Note over DS: validarTransicionEntrega rechaza: la hora real ya guardada no cambia
+            DS->>DB: ROLLBACK
+            DS-->>P: 409
+        else Parada PENDIENTE de ruta DESPACHADA
+            DS->>DB: boletas de la parada FOR UPDATE OF boleta
+            alt Sin boletas o alguna no EMITIDA
+                DS->>DB: ROLLBACK
+                DS-->>P: 409
+            else Boletas válidas
+                DS->>DS: ahora = new Date() (hora del servidor)
+                DS->>DB: UPDATE rutas_paradas SET estado ENTREGADA, entregada_en = ahora, autor y observación
+                opt Todas las entregas válidas quedan ENTREGADAS
+                    DS->>DB: UPDATE rutas SET estado COMPLETADA, completada_en = ahora
+                end
+                DS->>DB: COMMIT
+                DS-->>P: 201 ruta con paradas (entregadaEn incluida)
+            end
+        end
+    end
+    end
+
+    rect rgb(240, 240, 240)
+    Note over L,DB: B. Consultar la hora real en el historial
+    P->>G: GET /api/logistica/historial/rutas/:id
+    G->>HC: GET /historial/rutas/:id
+    HC->>A: GET /me con el token Bearer
+    A-->>HC: Identidad y permisos
+    alt Sin logistica.rutas.consultar
+        HC-->>P: 401 / 403
+    else Permiso válido
+        HC->>HS: detalleRuta(id)
+        HS->>DB: BEGIN REPEATABLE READ
+        HS->>DB: SELECT ... entregada_en FROM rutas_paradas WHERE ruta_id = $1
+        DB-->>HS: Paradas con su hora real (NULL si no están entregadas)
+        HS->>DB: COMMIT
+        HS-->>P: 200 paradas[].entregadaEn (ISO 8601 o null)
+        Note over P: Mostrar la hora y la diferencia con la programada es ABC-455
+    end
+    end
