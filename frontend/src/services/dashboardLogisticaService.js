@@ -79,13 +79,24 @@ export async function guardarMetaKpiLogistica(kpi, datos) {
 // ABC-513: registros que componen un KPI, con filtro opcional de período.
 export async function obtenerDetalleKpiLogistica(kpi, filtros = {}) {
   const params = new URLSearchParams();
-  if (filtros?.desde) params.append("desde", filtros.desde);
-  if (filtros?.hasta) params.append("hasta", filtros.hasta);
+  for (const campo of ["desde", "hasta", "chofer", "vehiculo"]) {
+    if (filtros?.[campo]) params.append(campo, filtros[campo]);
+  }
   const consulta = params.toString();
   const response = await fetch(
     `${apiConfig.apiUrl}/api/logistica/dashboard/kpis/${encodeURIComponent(kpi)}/detalle${consulta ? `?${consulta}` : ""}`,
     { headers: encabezados() },
   );
   await exigirOk(response, "Error al obtener el detalle del KPI.");
+  return await response.json();
+}
+
+// ABC-520: KPIs de Logística por chofer o vehículo (dimension CHOFER o VEHICULO).
+export async function obtenerRankingLogistica({ dimension, desde, hasta } = {}) {
+  const params = new URLSearchParams({ dimension });
+  if (desde) params.append("desde", desde);
+  if (hasta) params.append("hasta", hasta);
+  const response = await fetch(`${apiConfig.apiUrl}/api/logistica/dashboard/kpis/ranking?${params}`, { headers: encabezados() });
+  await exigirOk(response, "Error al obtener el ranking de choferes y vehículos.");
   return await response.json();
 }

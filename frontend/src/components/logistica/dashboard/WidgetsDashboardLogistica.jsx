@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { obtenerMetricasDashboardLogistica } from "../../../services/dashboardLogisticaService.js";
 import GraficoBarrasEstado from "./GraficoBarrasEstado.jsx";
+import WidgetUsoCapacidad from "./WidgetUsoCapacidad.jsx";
+import RankingRecursos from "./RankingRecursos.jsx";
 import SelectorPeriodo, { periodoUltimosDias } from "./SelectorPeriodo.jsx";
 import "../../../styles/dashboard-logistica.css";
 
@@ -98,7 +100,9 @@ export default function WidgetsDashboardLogistica() {
             <GraficoBarrasEstado id="dash-boletas" titulo="Boletas por estado" unidad="boletas" {...series.boletas} />
             <GraficoBarrasEstado id="dash-rutas" titulo="Rutas por estado" unidad="rutas" {...series.rutas} />
             <GraficoBarrasEstado id="dash-entregas" titulo="Entregas por estado" unidad="entregas" {...series.entregas} />
+            {metricas.uso_capacidad && <WidgetUsoCapacidad uso={metricas.uso_capacidad} periodo={periodo} />}
           </div>
+          <RankingRecursos periodo={periodo} />
         </>
       )}
     </section>
