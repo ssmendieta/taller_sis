@@ -10,7 +10,7 @@ sequenceDiagram
     participant V as DashboardService
     participant R as Registros de origen
     participant O as Orden o ruta (página)
-    Note over C,R: Producción (FPY) o Logística (USO_CAPACIDAD), cada uno con su base
+    Note over C,R: Producción (FPY, CUMPLIMIENTO_FECHA, TIEMPO_CICLO) o Logística (USO_CAPACIDAD, TIEMPO_ATENCION)
 
     S->>W: Pulsa Ver detalle en un KPI
     W->>D: Navega a /produccion/kpis/:kpi o /logistica/kpis/:kpi
@@ -42,6 +42,12 @@ sequenceDiagram
             R-->>V: Filas de carga
             V->>V: calcularUsoCapacidad, la misma función del KPI
             V-->>F: 200 con valor y rutas (incluye las no calculables)
+        else CUMPLIMIENTO_FECHA, TIEMPO_CICLO o TIEMPO_ATENCION
+            V->>R: Órdenes finalizadas o solicitudes entregadas, con el mismo filtro del KPI
+            R-->>V: Un registro por orden o solicitud
+            V->>R: Consulta agregada del KPI con el mismo filtro
+            R-->>V: Valor del KPI
+            V-->>F: 200 con valor y registros (a tiempo o tarde, u horas)
         end
     end
     F-->>D: Detalle o Error con el mensaje
@@ -52,7 +58,7 @@ sequenceDiagram
     end
     opt Abre un registro
         S->>D: Pulsa una orden o ruta
-        D->>O: Navega a /ordenes/:id o /logistica/rutas/:id
+        D->>O: Navega a /ordenes/:id, /logistica/rutas/:id o a la trazabilidad de la solicitud
         O-->>S: Detalle del registro
         S->>D: Vuelve con Atrás y conserva el periodo
     end

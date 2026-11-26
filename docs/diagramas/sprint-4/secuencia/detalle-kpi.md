@@ -4,9 +4,9 @@ Apertura del detalle de un KPI y navegación hacia la orden o ruta. Subtarea **A
 
 ## Alcance
 
-- Con detalle hoy: **FPY** y **USO_CAPACIDAD**, los únicos KPIs con cálculo. Los otros seis responden `disponible: false` hasta que exista su cálculo; cada uno se conecta en `obtenerDetalleKpi`.
+- Con detalle hoy: **FPY**, **CUMPLIMIENTO_FECHA** y **TIEMPO_CICLO** (Producción); **USO_CAPACIDAD** y **TIEMPO_ATENCION** (Logística). **MERMA**, **ENTREGAS_A_TIEMPO** e **INCIDENCIAS_RUTA** responden `disponible: false` hasta que exista su cálculo; cada uno se conecta en `obtenerDetalleKpi`.
 - Las tarjetas muestran el valor de todo el historial, igual que el semáforo, y abren el detalle sin periodo. El detalle admite `?desde&hasta` en la dirección.
-- El detalle usa el mismo criterio que el KPI (`COLUMNAS_FPY` y `calcularUsoCapacidad`), por eso el valor coincide.
+- El detalle usa el mismo criterio que el KPI (`COLUMNAS_FPY`, `filtroCumplimientoFecha`, `filtroTiempoCiclo`, `calcularUsoCapacidad` y `CTE_SOLICITUDES_ENTREGADAS`), por eso el valor coincide.
 
 ## Diagrama
 
@@ -23,7 +23,7 @@ sequenceDiagram
     participant V as DashboardService
     participant R as Registros de origen
     participant O as Orden o ruta (página)
-    Note over C,R: Producción (FPY) o Logística (USO_CAPACIDAD), cada uno con su base
+    Note over C,R: Producción (FPY, CUMPLIMIENTO_FECHA, TIEMPO_CICLO) o Logística (USO_CAPACIDAD, TIEMPO_ATENCION)
 
     S->>W: Pulsa Ver detalle en un KPI
     W->>D: Navega a /produccion/kpis/:kpi o /logistica/kpis/:kpi
@@ -55,6 +55,12 @@ sequenceDiagram
             R-->>V: Filas de carga
             V->>V: calcularUsoCapacidad, la misma función del KPI
             V-->>F: 200 con valor y rutas (incluye las no calculables)
+        else CUMPLIMIENTO_FECHA, TIEMPO_CICLO o TIEMPO_ATENCION
+            V->>R: Órdenes finalizadas o solicitudes entregadas, con el mismo filtro del KPI
+            R-->>V: Un registro por orden o solicitud
+            V->>R: Consulta agregada del KPI con el mismo filtro
+            R-->>V: Valor del KPI
+            V-->>F: 200 con valor y registros (a tiempo o tarde, u horas)
         end
     end
     F-->>D: Detalle o Error con el mensaje
@@ -65,7 +71,7 @@ sequenceDiagram
     end
     opt Abre un registro
         S->>D: Pulsa una orden o ruta
-        D->>O: Navega a /ordenes/:id o /logistica/rutas/:id
+        D->>O: Navega a /ordenes/:id, /logistica/rutas/:id o a la trazabilidad de la solicitud
         O-->>S: Detalle del registro
         S->>D: Vuelve con Atrás y conserva el periodo
     end
