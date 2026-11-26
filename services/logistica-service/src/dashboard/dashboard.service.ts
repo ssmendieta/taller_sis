@@ -140,15 +140,21 @@ export class DashboardService {
    * completa la solicitud. Una solicitud cuenta una vez, aunque tenga varias
    * boletas o intentos de reparto. El periodo se aplica después de completarla.
    */
-  private async consultarTiempoAtencion(desde: Date | null, hasta: Date | null): Promise<TiempoAtencionResponse> {
-    const filas = await this.dataSource.query(`
+  // Criterio único del tiempo de atención: lo usan el KPI y su detalle (ABC-512).
+  // La ruta y la orden solo identifican el registro; no cambian el cálculo.
+  private static readonly CTE_SOLICITUDES_ENTREGADAS = `
       WITH entregas_por_boleta AS (
         SELECT b.id AS boleta_id, b.solicitud_salida_id,
                MIN(p.entregada_en) FILTER (
                  WHERE b.estado = 'EMITIDA' AND p.estado_entrega = 'ENTREGADA'
                    AND r.estado IN ('DESPACHADA', 'COMPLETADA')
                    AND p.entregada_en >= s.creado_en
-               ) AS entregada_en
+               ) AS entregada_en,
+               (ARRAY_AGG(r.id ORDER BY p.entregada_en) FILTER (
+                 WHERE b.estado = 'EMITIDA' AND p.estado_entrega = 'ENTREGADA'
+                   AND r.estado IN ('DESPACHADA', 'COMPLETADA')
+                   AND p.entregada_en >= s.creado_en
+               ))[1] AS ruta_id
           FROM boletas_envio b
           INNER JOIN solicitudes_salida s ON s.id = b.solicitud_salida_id
           LEFT JOIN rutas_paradas_boletas pb ON pb.boleta_id = b.id
@@ -157,17 +163,25 @@ export class DashboardService {
          WHERE b.estado <> 'ANULADA'
          GROUP BY b.id, b.solicitud_salida_id
       ), solicitudes_entregadas AS (
-        SELECT s.id, s.creado_en, MAX(e.entregada_en) AS entregada_en
+        SELECT s.id, s.creado_en, s.orden_id, MAX(e.entregada_en) AS entregada_en,
+               (ARRAY_AGG(e.ruta_id ORDER BY e.entregada_en DESC))[1] AS ruta_id
           FROM solicitudes_salida s
           INNER JOIN entregas_por_boleta e ON e.solicitud_salida_id = s.id
-         GROUP BY s.id, s.creado_en
+         GROUP BY s.id, s.creado_en, s.orden_id
         HAVING BOOL_AND(e.entregada_en IS NOT NULL)
-      )
+      )`;
+
+  private static readonly FILTRO_ENTREGA_EN_PERIODO = `
+       WHERE ($1::timestamptz IS NULL OR entregada_en >= $1::timestamptz)
+         AND ($2::timestamptz IS NULL OR entregada_en <= $2::timestamptz)`;
+
+  private async consultarTiempoAtencion(desde: Date | null, hasta: Date | null): Promise<TiempoAtencionResponse> {
+    const filas = await this.dataSource.query(`
+      ${DashboardService.CTE_SOLICITUDES_ENTREGADAS}
       SELECT COUNT(*)::int AS solicitudes_entregadas,
              ROUND(AVG(EXTRACT(EPOCH FROM (entregada_en - creado_en)) / 3600), 2) AS promedio_horas
         FROM solicitudes_entregadas
-       WHERE ($1::timestamptz IS NULL OR entregada_en >= $1::timestamptz)
-         AND ($2::timestamptz IS NULL OR entregada_en <= $2::timestamptz)
+      ${DashboardService.FILTRO_ENTREGA_EN_PERIODO}
     `, [desde, hasta]);
     const fila = filas?.[0];
     return {
@@ -448,7 +462,7 @@ export class DashboardService {
     if (!KPIS_DEL_SERVICIO.includes(kpi)) {
       throw new NotFoundException(`El KPI "${kpi}" no existe.`);
     }
-    const { strDesde, strHasta } = this.parsearFechas(filtro);
+    const { fechaDesde, fechaHasta, strDesde, strHasta } = this.parsearFechas(filtro);
     const base = {
       kpi,
       periodo: { desde: filtro.desde || null, hasta: filtro.hasta || null },
@@ -457,6 +471,35 @@ export class DashboardService {
       unidad: '%',
       registros: [],
     };
+    if (kpi === 'TIEMPO_ATENCION') {
+      const [filas, resumen] = await Promise.all([
+        this.dataSource.query(`
+          ${DashboardService.CTE_SOLICITUDES_ENTREGADAS}
+          SELECT id::text AS id, orden_id::text AS orden_id, ruta_id::text AS ruta_id, creado_en, entregada_en,
+                 (EXTRACT(EPOCH FROM (entregada_en - creado_en)) / 3600)::numeric AS horas
+            FROM solicitudes_entregadas
+          ${DashboardService.FILTRO_ENTREGA_EN_PERIODO}
+           ORDER BY entregada_en, id
+        `, [fechaDesde, fechaHasta]) as Promise<Record<string, unknown>[]>,
+        this.consultarTiempoAtencion(fechaDesde, fechaHasta),
+      ]);
+      return {
+        ...base,
+        unidad: 'horas',
+        valor: resumen.promedio_horas,
+        registros: filas.map((f) => ({
+          tipo: 'SOLICITUD' as const,
+          id: String(f.id),
+          codigo: `Solicitud ${f.id}`,
+          estado: 'ENTREGADA',
+          valor: Number(Number(f.horas).toFixed(2)),
+          orden_id: String(f.orden_id),
+          ruta_id: f.ruta_id == null ? null : String(f.ruta_id),
+          creado_en: new Date(f.creado_en as string).toISOString(),
+          entregada_en: new Date(f.entregada_en as string).toISOString(),
+        })),
+      };
+    }
     // Los demás KPIs conectan aquí su detalle cuando tengan cálculo.
     if (kpi !== 'USO_CAPACIDAD') return { ...base, disponible: false, unidad: null };
 

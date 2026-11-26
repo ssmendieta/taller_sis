@@ -608,7 +608,7 @@ describe('DashboardService: detalle de KPI (ABC-512)', () => {
     const res = await service.obtenerDetalleKpi('USO_CAPACIDAD', filtro);
     expect(res.valor).toBe((await service.obtenerMetricas(filtro)).uso_capacidad.porcentaje);
     expect(res).toMatchObject({ disponible: true, valor: 50, periodo: filtro });
-    expect(res.registros.map((r) => [r.tipo, r.id, r.estado, r.valor, r.motivo])).toEqual([
+    expect(res.registros.map((r) => [r.tipo, r.id, r.estado, r.valor, 'motivo' in r ? r.motivo : undefined])).toEqual([
       ['RUTA', '1', 'DESPACHADA', 30, null],
       ['RUTA', '2', 'DESPACHADA', 70, null],
       ['RUTA', '3', 'DESPACHADA', null, 'UNIDAD_INCOMPATIBLE'],

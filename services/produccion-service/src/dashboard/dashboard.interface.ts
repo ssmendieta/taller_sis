@@ -136,11 +136,17 @@ export interface RegistroKpi {
   id: string;
   codigo: string;
   estado: string;
-  /** FPY de la orden, en %. */
+  /** Aporte de la orden al KPI, en la unidad del detalle. */
   valor: number | null;
-  /** Aporte al KPI: conformes a la primera sobre evaluadas. */
-  conformes_primera: number;
-  evaluadas: number;
+  /** FPY: conformes a la primera sobre evaluadas. */
+  conformes_primera?: number;
+  evaluadas?: number;
+  /** TIEMPO_CICLO y CUMPLIMIENTO_FECHA (ISO 8601). */
+  iniciada_en?: string;
+  finalizada_en?: string;
+  /** CUMPLIMIENTO_FECHA: fecha requerida y si terminó a tiempo. */
+  fecha_programada?: string;
+  a_tiempo?: boolean;
 }
 
 export interface CausaDefecto {

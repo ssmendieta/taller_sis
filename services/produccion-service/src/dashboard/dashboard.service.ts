@@ -302,14 +302,19 @@ export class DashboardService {
     };
   }
 
-  private async consultarTiempoCiclo(desde: Date | null, hasta: Date | null) {
-    const params: unknown[] = [];
-    const condiciones: string[] = [
-      `estado = '${EstadoOrden.FINALIZADA}'`,
+  // Criterio único del tiempo de ciclo: lo usan el KPI y su detalle (ABC-512).
+  private filtroTiempoCiclo(desde: Date | null, hasta: Date | null) {
+    return this.filtroFinalizadas(desde, hasta, [
       'iniciada_en IS NOT NULL',
       'finalizada_en IS NOT NULL',
       'finalizada_en >= iniciada_en',
-    ];
+    ]);
+  }
+
+  // Órdenes FINALIZADA cuyo fin cae en el periodo, más las condiciones propias de cada KPI.
+  private filtroFinalizadas(desde: Date | null, hasta: Date | null, extra: string[]) {
+    const params: unknown[] = [];
+    const condiciones: string[] = [`estado = '${EstadoOrden.FINALIZADA}'`, ...extra];
     if (desde) {
       params.push(desde);
       condiciones.push(`finalizada_en >= $${params.length}`);
@@ -318,6 +323,11 @@ export class DashboardService {
       params.push(hasta);
       condiciones.push(`finalizada_en <= $${params.length}`);
     }
+    return { params, condiciones };
+  }
+
+  private async consultarTiempoCiclo(desde: Date | null, hasta: Date | null) {
+    const { params, condiciones } = this.filtroTiempoCiclo(desde, hasta);
 
     const sql = `
       SELECT
@@ -350,21 +360,13 @@ export class DashboardService {
     };
   }
 
+  // Criterio único del cumplimiento de fecha: lo usan el KPI y su detalle (ABC-512).
+  private filtroCumplimientoFecha(desde: Date | null, hasta: Date | null) {
+    return this.filtroFinalizadas(desde, hasta, ['finalizada_en IS NOT NULL', 'fecha_programada IS NOT NULL']);
+  }
+
   private async consultarCumplimientoFecha(desde: Date | null, hasta: Date | null) {
-    const params: unknown[] = [];
-    const condiciones: string[] = [
-      `estado = '${EstadoOrden.FINALIZADA}'`,
-      'finalizada_en IS NOT NULL',
-      'fecha_programada IS NOT NULL',
-    ];
-    if (desde) {
-      params.push(desde);
-      condiciones.push(`finalizada_en >= $${params.length}`);
-    }
-    if (hasta) {
-      params.push(hasta);
-      condiciones.push(`finalizada_en <= $${params.length}`);
-    }
+    const { params, condiciones } = this.filtroCumplimientoFecha(desde, hasta);
 
     const sql = `
       SELECT
@@ -619,6 +621,8 @@ export class DashboardService {
       unidad: '%',
       registros: [],
     };
+    if (kpi === 'TIEMPO_CICLO') return this.detalleTiempoCiclo(base, fechaDesde, fechaHasta);
+    if (kpi === 'CUMPLIMIENTO_FECHA') return this.detalleCumplimientoFecha(base, fechaDesde, fechaHasta);
     // Los demás KPIs conectan aquí su detalle cuando tengan cálculo.
     if (kpi !== 'FPY') return { ...base, disponible: false, unidad: null };
 
@@ -663,6 +667,68 @@ export class DashboardService {
       causas_defecto: causas.map((f) => ({ causa: String(f.causa), cantidad: Number(f.cantidad) })),
       unidades_defectuosas: sumar(causas, 'cantidad'),
     };
+  }
+
+  private async detalleTiempoCiclo(
+    base: DetalleKpiResponse, desde: Date | null, hasta: Date | null,
+  ): Promise<DetalleKpiResponse> {
+    const { params, condiciones } = this.filtroTiempoCiclo(desde, hasta);
+    const [filas, resumen] = await Promise.all([
+      this.dataSource.query(
+        `SELECT id::text AS id, codigo, estado, iniciada_en, finalizada_en,
+                (EXTRACT(EPOCH FROM (finalizada_en - iniciada_en)) / 3600.0)::numeric AS horas
+           FROM ordenes_produccion
+          WHERE ${condiciones.join(' AND ')}
+          ORDER BY finalizada_en, id`,
+        params,
+      ) as Promise<Record<string, unknown>[]>,
+      this.consultarTiempoCiclo(desde, hasta),
+    ]);
+    return {
+      ...base,
+      unidad: 'horas',
+      valor: this.calcularTiempoCiclo(resumen).promedio_horas,
+      registros: filas.map((f) => ({
+        ...this.registroOrden(f),
+        valor: Number(Number(f.horas).toFixed(2)),
+        iniciada_en: new Date(f.iniciada_en as string).toISOString(),
+        finalizada_en: new Date(f.finalizada_en as string).toISOString(),
+      })),
+    };
+  }
+
+  private async detalleCumplimientoFecha(
+    base: DetalleKpiResponse, desde: Date | null, hasta: Date | null,
+  ): Promise<DetalleKpiResponse> {
+    const { params, condiciones } = this.filtroCumplimientoFecha(desde, hasta);
+    const [filas, resumen] = await Promise.all([
+      this.dataSource.query(
+        `SELECT id::text AS id, codigo, estado, finalizada_en,
+                TO_CHAR(fecha_programada, 'YYYY-MM-DD') AS fecha_programada,
+                (finalizada_en::date <= fecha_programada) AS a_tiempo
+           FROM ordenes_produccion
+          WHERE ${condiciones.join(' AND ')}
+          ORDER BY finalizada_en, id`,
+        params,
+      ) as Promise<Record<string, unknown>[]>,
+      this.consultarCumplimientoFecha(desde, hasta),
+    ]);
+    return {
+      ...base,
+      valor: this.calcularCumplimientoFecha(resumen).porcentaje,
+      registros: filas.map((f) => ({
+        ...this.registroOrden(f),
+        // Aporte de la orden: 100 % si terminó a tiempo, 0 % si no.
+        valor: f.a_tiempo ? 100 : 0,
+        a_tiempo: Boolean(f.a_tiempo),
+        fecha_programada: String(f.fecha_programada),
+        finalizada_en: new Date(f.finalizada_en as string).toISOString(),
+      })),
+    };
+  }
+
+  private registroOrden(f: Record<string, unknown>) {
+    return { tipo: 'ORDEN' as const, id: String(f.id), codigo: String(f.codigo), estado: String(f.estado) };
   }
 
   // ===== ABC-500: avisos de KPI en rojo =====

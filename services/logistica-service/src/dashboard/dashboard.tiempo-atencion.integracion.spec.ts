@@ -147,4 +147,25 @@ conPostgres('ABC-478: tiempo de atención con PostgreSQL real', () => {
     await parada([await boleta(await solicitud())], '2026-11-01T00:00:00Z');
     expect(await valor()).toMatchObject({ promedio_horas: 0, solicitudes_entregadas: 1 });
   });
+
+  // ABC-512: el detalle usa el mismo criterio que el KPI y su promedio coincide.
+  it('detalle: una fila por solicitud entregada, con la ruta que la completó', async () => {
+    const s = await solicitud();
+    await parada([await boleta(s)], '2026-11-01T02:00:00Z');
+    await parada([await boleta(s)], '2026-11-02T02:00:00Z');
+    await parada([await boleta(await solicitud())], '2026-11-02T03:00:00Z');
+    await parada([await boleta(await solicitud())], null);
+    for (const filtro of [{}, { desde: '2026-11-02', hasta: '2026-11-02' }, { desde: '2026-12-01' }]) {
+      const detalle = await service.obtenerDetalleKpi('TIEMPO_ATENCION', filtro);
+      expect(detalle.valor).toBe((await valor(filtro)).promedio_horas);
+      const horas = detalle.registros.map((r) => r.valor as number);
+      const media = horas.length ? Number((horas.reduce((a, b) => a + b, 0) / horas.length).toFixed(2)) : null;
+      expect(detalle.valor).toBe(media);
+    }
+    const detalle = await service.obtenerDetalleKpi('TIEMPO_ATENCION');
+    expect(detalle.registros).toEqual([
+      expect.objectContaining({ tipo: 'SOLICITUD', id: '1', valor: 26, ruta_id: '2', orden_id: '1' }),
+      expect.objectContaining({ tipo: 'SOLICITUD', id: '2', valor: 27, ruta_id: '3' }),
+    ]);
+  });
 });

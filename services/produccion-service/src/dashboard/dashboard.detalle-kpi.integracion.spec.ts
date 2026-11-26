@@ -38,7 +38,8 @@ describeConPostgres('ABC-512: detalle del FPY con PostgreSQL real', () => {
     });
     await ds.initialize();
     // Solo las columnas de la orden que intervienen en el detalle.
-    await ds.query('CREATE TABLE ordenes_produccion (id BIGINT PRIMARY KEY, codigo VARCHAR(40) NOT NULL, estado VARCHAR(20) NOT NULL)');
+    await ds.query(`CREATE TABLE ordenes_produccion (id BIGINT PRIMARY KEY, codigo VARCHAR(40) NOT NULL, estado VARCHAR(20) NOT NULL,
+      fecha_programada DATE, iniciada_en TIMESTAMPTZ, finalizada_en TIMESTAMPTZ)`);
     await ds.runMigrations();
     await ds.query("INSERT INTO ordenes_produccion VALUES (1,'OP-1','FINALIZADA'), (2,'OP-2','EN_PRODUCCION')");
     await ds.query(`INSERT INTO resultados_conformes (orden_id, cantidad, tipo, causa_defecto, responsable_usuario_id, fecha_hora) VALUES
@@ -82,5 +83,40 @@ describeConPostgres('ABC-512: detalle del FPY con PostgreSQL real', () => {
 
   it('un periodo sin registros queda vacío', async () => {
     expect(await service.obtenerDetalleKpi('FPY', { desde: '2030-01-01' })).toMatchObject({ valor: null, registros: [], causas_defecto: [] });
+  });
+
+  describe('ABC-512: cumplimiento de fecha y tiempo de ciclo', () => {
+    const kpi = (nombre: string) => (service as unknown as { obtenerValorKpi(k: string): Promise<number | null> }).obtenerValorKpi(nombre);
+    beforeAll(async () => {
+      await ds.query(`INSERT INTO ordenes_produccion VALUES
+        (10, 'OP-10', 'FINALIZADA', '2026-11-05', '2026-11-04T08:00Z', '2026-11-05T10:30Z'),
+        (11, 'OP-11', 'FINALIZADA', '2026-11-05', '2026-11-05T08:00Z', '2026-11-06T09:00Z'),
+        (12, 'OP-12', 'FINALIZADA', '2026-11-10', '2026-11-09T08:00Z', '2026-11-09T09:20Z'),
+        (13, 'OP-13', 'EN_PRODUCCION', '2026-11-10', '2026-11-09T08:00Z', NULL),
+        (14, 'OP-14', 'FINALIZADA', '2026-11-10', NULL, '2026-11-09T12:00Z')`);
+    });
+
+    it('cumplimiento: una fila por orden finalizada, a tiempo o tarde, y el valor coincide', async () => {
+      const res = await service.obtenerDetalleKpi('CUMPLIMIENTO_FECHA');
+      expect(res.registros.map((r) => [r.codigo, r.a_tiempo, r.valor])).toEqual([
+        ['OP-10', true, 100], ['OP-11', false, 0], ['OP-12', true, 100], ['OP-14', true, 100],
+      ]);
+      expect(res.valor).toBe(75);
+      expect(res.valor).toBe(await kpi('CUMPLIMIENTO_FECHA'));
+    });
+
+    it('tiempo de ciclo: horas por orden y el promedio coincide con el KPI', async () => {
+      const res = await service.obtenerDetalleKpi('TIEMPO_CICLO');
+      expect(res.unidad).toBe('horas');
+      expect(res.registros.map((r) => [r.codigo, r.valor])).toEqual([['OP-10', 26.5], ['OP-11', 25], ['OP-12', 1.33]]);
+      expect(res.valor).toBe(await kpi('TIEMPO_CICLO'));
+      expect(res.valor).toBe(17.61);
+    });
+
+    it('respetan el periodo por fecha de fin', async () => {
+      const filtro = { desde: '2026-11-06', hasta: '2026-11-06' };
+      expect((await service.obtenerDetalleKpi('CUMPLIMIENTO_FECHA', filtro)).registros.map((r) => r.codigo)).toEqual(['OP-11']);
+      expect((await service.obtenerDetalleKpi('TIEMPO_CICLO', filtro))).toMatchObject({ valor: 25, registros: [expect.objectContaining({ codigo: 'OP-11' })] });
+    });
   });
 });

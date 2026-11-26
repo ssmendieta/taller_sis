@@ -146,7 +146,7 @@ export interface DetalleKpiResponse {
   /** Mismo valor que el KPI en ese periodo; null = sin datos. */
   valor: number | null;
   unidad: string | null;
-  registros: RegistroKpi[];
+  registros: Array<RegistroKpi | RegistroKpiSolicitud>;
 }
 
 export interface RegistroKpi {
@@ -163,4 +163,19 @@ export interface RegistroKpi {
   capacidad: CapacidadV1 | null;
   motivo: MotivoUsoNoCalculable | null;
   detalle: string | null;
+}
+
+// TIEMPO_ATENCION: una solicitud de salida completamente entregada.
+export interface RegistroKpiSolicitud {
+  tipo: 'SOLICITUD';
+  id: string;
+  codigo: string;
+  estado: 'ENTREGADA';
+  /** Horas desde la solicitud hasta la entrega que la completó. */
+  valor: number;
+  orden_id: string;
+  /** Ruta de la entrega que completó la solicitud. */
+  ruta_id: string | null;
+  creado_en: string;
+  entregada_en: string;
 }
