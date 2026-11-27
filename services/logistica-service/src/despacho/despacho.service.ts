@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { EstadoBoleta } from '../boletas/entities/estado-boleta.enum';
 import { EstadoRuta } from '../rutas/entities/estado-ruta.enum';
@@ -6,6 +6,7 @@ import { RutaParada } from '../rutas/entities/ruta-parada.entity';
 import { Ruta } from '../rutas/entities/ruta.entity';
 import { EstadoEntrega } from './estado-entrega.enum';
 import { EVENTOS_DESPACHO, EventosDespacho } from './eventos-despacho';
+import { diferenciaMinutos, umbralRetraso } from './retraso-entrega';
 import { estadoRutaSegunEntregas, validarDespacho, validarTransicionEntrega } from './transiciones';
 
 const MAX_BIGINT = BigInt('9223372036854775807');
@@ -86,7 +87,7 @@ export class DespachoService {
     });
   }
 
-  entregar(rutaId: string, paradaId: string, usuarioId: string, observacion: string | null): Promise<Ruta> {
+  entregar(rutaId: string, paradaId: string, usuarioId: string, observacion: string | null, motivoRetraso: string | null = null): Promise<Ruta> {
     if (!idValido(rutaId)) throw new NotFoundException('Ruta no encontrada');
     if (!idValido(paradaId)) throw new NotFoundException('Parada no encontrada');
     return this.dataSource.transaction(async (manager) => {
@@ -117,6 +118,14 @@ export class DespachoService {
       if (invalidas) throw new ConflictException(`No se pueden entregar boletas anuladas o no emitidas: ${invalidas}`);
 
       const ahora = new Date();
+      // ABC-524: con retraso mayor al umbral se exige el motivo.
+      const diferencia = diferenciaMinutos(ahora, ruta.fecha_programada);
+      const umbral = umbralRetraso();
+      if (diferencia > umbral && !motivoRetraso) {
+        throw new BadRequestException(
+          `La entrega tiene ${diferencia} min de retraso (umbral ${umbral} min): indica el motivo del retraso`,
+        );
+      }
       await manager.update(RutaParada, { id: paradaId }, {
         estadoEntrega: EstadoEntrega.ENTREGADA,
         // ABC-454: hora real del servidor. No se reescribe: una parada ENTREGADA
@@ -125,6 +134,8 @@ export class DespachoService {
         entregaActualizadaEn: ahora,
         entregaUsuarioId: usuarioId,
         entregaObservacion: observacion,
+        diferenciaMinutos: diferencia,
+        motivoRetraso,
       });
       // La ruta se cierra solo cuando todas sus entregas válidas están entregadas.
       const estados = paradas.map((fila) => fila.id === paradaId ? EstadoEntrega.ENTREGADA : fila.estado_entrega);

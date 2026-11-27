@@ -19,9 +19,9 @@ describe('ABC-376: DespachoController', () => {
     const service = { despachar: jest.fn().mockResolvedValue({}), entregar: jest.fn().mockResolvedValue({}) };
     const controller = new DespachoController(service as any);
     await controller.despachar('9', { observacion: 'ok' }, { usuarioId: '42' });
-    await controller.entregar('9', '10', { observacion: null }, { usuarioId: '42' });
+    await controller.entregar('9', '10', { observacion: null, motivoRetraso: 'Tráfico' }, { usuarioId: '42' });
     expect(service.despachar).toHaveBeenCalledWith('9', '42', 'ok');
-    expect(service.entregar).toHaveBeenCalledWith('9', '10', '42', null);
+    expect(service.entregar).toHaveBeenCalledWith('9', '10', '42', null, 'Tráfico');
   });
 });
 

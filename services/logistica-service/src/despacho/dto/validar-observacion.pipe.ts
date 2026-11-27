@@ -27,3 +27,22 @@ export class ValidarObservacionPipe implements PipeTransform<unknown, RegistrarO
     return { observacion: observacion.trim() || null };
   }
 }
+
+export interface RegistrarEntregaDto extends RegistrarObservacionDto {
+  motivoRetraso: string | null;
+}
+
+// ABC-524: la entrega acepta además el motivo del retraso.
+@Injectable()
+export class ValidarEntregaPipe implements PipeTransform<unknown, RegistrarEntregaDto> {
+  transform(value: unknown): RegistrarEntregaDto {
+    const cuerpo = value && typeof value === 'object' && !Array.isArray(value) ? { ...(value as Record<string, unknown>) } : value;
+    const motivo = cuerpo && typeof cuerpo === 'object' ? (cuerpo as Record<string, unknown>).motivoRetraso ?? null : null;
+    if (cuerpo && typeof cuerpo === 'object') delete (cuerpo as Record<string, unknown>).motivoRetraso;
+    const { observacion } = new ValidarObservacionPipe().transform(cuerpo);
+    if (motivo !== null && (typeof motivo !== 'string' || motivo.trim().length > MAX_OBSERVACION)) {
+      throw new BadRequestException(`motivoRetraso debe ser texto de hasta ${MAX_OBSERVACION} caracteres`);
+    }
+    return { observacion, motivoRetraso: (motivo as string | null)?.trim() || null };
+  }
+}

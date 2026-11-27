@@ -22,6 +22,8 @@ import { RutaParadaBoleta } from './ruta-parada-boleta.entity';
 @Check('ck_ruta_parada_entrega_autor', "estado_entrega = 'PENDIENTE' OR (entrega_actualizada_en IS NOT NULL AND entrega_usuario_id > 0)")
 @Check('ck_ruta_parada_entrega_observacion', "entrega_observacion IS NULL OR (estado_entrega <> 'PENDIENTE' AND LENGTH(BTRIM(entrega_observacion)) > 0)")
 @Check('ck_ruta_parada_entregada_en', "entregada_en IS NULL OR estado_entrega = 'ENTREGADA'")
+@Check('ck_ruta_parada_diferencia_minutos', "diferencia_minutos IS NULL OR estado_entrega = 'ENTREGADA'")
+@Check('ck_ruta_parada_motivo_retraso', "motivo_retraso IS NULL OR (estado_entrega = 'ENTREGADA' AND LENGTH(BTRIM(motivo_retraso)) > 0)")
 export class RutaParada {
   @PrimaryGeneratedColumn('identity', { type: 'bigint', generatedIdentity: 'ALWAYS' })
   id!: string;
@@ -54,6 +56,13 @@ export class RutaParada {
   // ABC-453: hora real de entrega; solo existe en paradas ENTREGADA.
   @Column({ name: 'entregada_en', type: 'timestamptz', nullable: true })
   entregadaEn!: Date | null;
+
+  // ABC-524: minutos respecto de la hora programada (positivo = retraso) y su motivo.
+  @Column({ name: 'diferencia_minutos', type: 'integer', nullable: true })
+  diferenciaMinutos!: number | null;
+
+  @Column({ name: 'motivo_retraso', type: 'varchar', length: 500, nullable: true })
+  motivoRetraso!: string | null;
 
   @OneToMany(() => RutaParadaBoleta, (documento) => documento.parada, { cascade: false })
   boletas!: RutaParadaBoleta[];

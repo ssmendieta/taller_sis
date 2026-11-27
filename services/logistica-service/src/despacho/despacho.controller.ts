@@ -1,7 +1,7 @@
 import { Body, Controller, Param, Post, Req, SetMetadata, UseGuards } from '@nestjs/common';
 import { PermisoLogisticaGuard, PERMISO_LOGISTICA } from '../auth/permiso-logistica.guard';
 import { PERMISO_GESTIONAR_RUTAS } from '../rutas/rutas.controller';
-import { RegistrarObservacionDto, ValidarObservacionPipe } from './dto/validar-observacion.pipe';
+import { RegistrarEntregaDto, RegistrarObservacionDto, ValidarEntregaPipe, ValidarObservacionPipe } from './dto/validar-observacion.pipe';
 import { DespachoService } from './despacho.service';
 
 // ABC-376: despacho y entrega. El autor es el usuario de la sesión.
@@ -25,9 +25,9 @@ export class DespachoController {
   entregar(
     @Param('id') id: string,
     @Param('paradaId') paradaId: string,
-    @Body(new ValidarObservacionPipe()) dto: RegistrarObservacionDto,
+    @Body(new ValidarEntregaPipe()) dto: RegistrarEntregaDto,
     @Req() request: { usuarioId: string },
   ) {
-    return this.service.entregar(id, paradaId, request.usuarioId, dto.observacion);
+    return this.service.entregar(id, paradaId, request.usuarioId, dto.observacion, dto.motivoRetraso);
   }
 }

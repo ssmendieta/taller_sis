@@ -36,7 +36,8 @@ describe('ABC-378: Regresión y Criterios de Aceptación (ABC-374: Despacho y En
     return {
       id,
       estado: EstadoRuta.PLANIFICADA,
-      fecha_programada: '2026-11-15',
+      // ABC-524: fecha futura para que las entregas sean a tiempo y no exijan motivo.
+      fecha_programada: '2099-12-31',
       vehiculo_externo_id: 'VEH-101',
       chofer_externo_id: 'CHO-505',
       despachadaEn: null,
@@ -396,7 +397,7 @@ describe('ABC-378: Regresión y Criterios de Aceptación (ABC-374: Despacho y En
         manager,
         expect.objectContaining({
           rutaId: '1',
-          fechaProgramada: '2026-11-15',
+          fechaProgramada: '2099-12-31',
           vehiculoExternoId: 'VEH-101',
           choferExternoId: 'CHO-505',
           despachadaPorUsuarioId: 'usr-despachador',

@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { RutaParada } from '../rutas/entities/ruta-parada.entity';
 import { Ruta } from '../rutas/entities/ruta.entity';
@@ -11,6 +11,9 @@ import { EventosDespacho } from './eventos-despacho';
 type FilaRuta = Record<string, any>;
 type FilaParada = Record<string, any>;
 
+
+// Fecha programada lejana: las entregas de estas pruebas siempre son a tiempo.
+const FUTURA = '2099-12-31';
 describe('ABC-376: DespachoService (despacho y entrega)', () => {
   let rutas: Record<string, FilaRuta>;
   let paradas: FilaParada[];
@@ -24,13 +27,13 @@ describe('ABC-376: DespachoService (despacho y entrega)', () => {
 
   function ruta(id: string, estado = 'PLANIFICADA'): FilaRuta {
     return {
-      id, estado, fecha_programada: '2026-11-10', vehiculo_externo_id: 'VEH-01', chofer_externo_id: 'CHO-12',
+      id, estado, fecha_programada: FUTURA, vehiculo_externo_id: 'VEH-01', chofer_externo_id: 'CHO-12',
       despachadaEn: null, despachadaPorUsuarioId: null, despachoObservacion: null, completadaEn: null,
     };
   }
 
   function parada(id: string, rutaId: string, secuencia: number, estado = 'PENDIENTE'): FilaParada {
-    return { id, ruta_id: rutaId, secuencia, estado_entrega: estado, entregaActualizadaEn: null, entregadaEn: null, entregaUsuarioId: null, entregaObservacion: null };
+    return { id, ruta_id: rutaId, secuencia, estado_entrega: estado, entregaActualizadaEn: null, entregadaEn: null, diferenciaMinutos: null, motivoRetraso: null, entregaUsuarioId: null, entregaObservacion: null };
   }
 
   beforeEach(() => {
@@ -120,7 +123,7 @@ describe('ABC-376: DespachoService (despacho y entrega)', () => {
       await service.despachar('9', '42', null);
       expect(eventos.registrarDespacho).toHaveBeenCalledTimes(1);
       expect(eventos.registrarDespacho).toHaveBeenCalledWith(manager, {
-        rutaId: '9', fechaProgramada: '2026-11-10', vehiculoExternoId: 'VEH-01', choferExternoId: 'CHO-12',
+        rutaId: '9', fechaProgramada: FUTURA, vehiculoExternoId: 'VEH-01', choferExternoId: 'CHO-12',
         despachadaEn: rutas[9].despachadaEn, despachadaPorUsuarioId: '42', boletaIds: ['1', '2', '3'],
       });
     });
@@ -247,6 +250,28 @@ describe('ABC-376: DespachoService (despacho y entrega)', () => {
       expect(consultas[0]).toMatch(/FROM rutas WHERE id = \$1 FOR UPDATE/);
       expect(consultas[1]).toMatch(/FROM rutas_paradas WHERE ruta_id = \$1 ORDER BY secuencia FOR UPDATE/);
       expect(consultas[2]).toMatch(/FOR UPDATE OF boleta/);
+    });
+
+    it('ABC-524: a tiempo guarda la diferencia (≤ 0) y no exige motivo', async () => {
+      await despachada();
+      await service.entregar('9', '10', '42', null);
+      expect(paradas[0].diferenciaMinutos).toBeLessThanOrEqual(0);
+      expect(paradas[0].motivoRetraso).toBeNull();
+    });
+
+    it('ABC-524: con retraso sobre el umbral y sin motivo se rechaza y la parada sigue PENDIENTE', async () => {
+      await despachada();
+      rutas[9].fecha_programada = '2020-01-01';
+      await rechazo(service.entregar('9', '10', '42', null), BadRequestException, 'indica el motivo del retraso');
+      expect(paradas[0]).toMatchObject({ estado_entrega: 'PENDIENTE', entregadaEn: null });
+    });
+
+    it('ABC-524: con retraso y motivo guarda la diferencia y el motivo junto a la entrega', async () => {
+      await despachada();
+      rutas[9].fecha_programada = '2020-01-01';
+      await service.entregar('9', '10', '42', null, 'Tráfico en el puente');
+      expect(paradas[0]).toMatchObject({ estado_entrega: 'ENTREGADA', motivoRetraso: 'Tráfico en el puente' });
+      expect(paradas[0].diferenciaMinutos).toBeGreaterThan(30);
     });
 
     it('ids inválidos responden 404 sin abrir transacción', () => {
