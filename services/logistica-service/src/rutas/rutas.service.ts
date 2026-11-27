@@ -4,6 +4,9 @@ import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { GrupoSalida } from '../agrupacion/entities/grupo-salida.entity';
 import { EstadoBoleta } from '../boletas/entities/estado-boleta.enum';
 import { GuardarRutaDto } from './dto/guardar-ruta.dto';
+import { FiltroParadasRiesgo, ParadaEnRiesgoDto, ParadasEnRiesgoResponse } from './dto/parada-en-riesgo.dto';
+import { EstadoEntrega } from '../despacho/estado-entrega.enum';
+import { describirRiesgo, evaluarRiesgo, fechaMaximaEnRiesgo, margenRiesgoHoras } from './riesgo-entrega';
 import { EstadoRuta } from './entities/estado-ruta.enum';
 import { RutaParadaBoleta } from './entities/ruta-parada-boleta.entity';
 import { RutaParada } from './entities/ruta-parada.entity';
@@ -115,6 +118,50 @@ export class RutasService {
         ORDER BY boleta.id DESC`,
       [EstadoBoleta.EMITIDA, ESTADOS_RUTA_ACTIVOS, rutaId],
     );
+  }
+
+  // ABC-458: paradas no entregadas de rutas activas cuya fecha programada venció o
+  // vence dentro del margen configurado. Filtro opcional por fecha programada.
+  async findParadasEnRiesgo(filtro: FiltroParadasRiesgo, ahora = new Date()): Promise<ParadasEnRiesgoResponse> {
+    const margenHoras = margenRiesgoHoras();
+    const filas = await this.dataSource.query(
+      `SELECT ruta.id::text AS ruta_id, ruta.estado AS ruta_estado, ruta.fecha_programada::text AS fecha_programada,
+              ruta.vehiculo_externo_id, ruta.chofer_externo_id,
+              parada.id::text AS parada_id, parada.secuencia, parada.destino, parada.estado_entrega
+         FROM rutas_paradas parada
+         INNER JOIN rutas ruta ON ruta.id = parada.ruta_id
+        WHERE parada.estado_entrega = $1
+          AND parada.entregada_en IS NULL
+          AND ruta.estado = ANY($2::varchar[])
+          AND ruta.fecha_programada <= $3::date
+          AND ($4::date IS NULL OR ruta.fecha_programada >= $4::date)
+          AND ($5::date IS NULL OR ruta.fecha_programada <= $5::date)
+        ORDER BY ruta.fecha_programada ASC, ruta.id ASC, parada.secuencia ASC`,
+      [EstadoEntrega.PENDIENTE, ESTADOS_RUTA_ACTIVOS, fechaMaximaEnRiesgo(ahora, margenHoras), filtro.desde, filtro.hasta],
+    ) as Array<Record<string, string | number>>;
+
+    const paradas: ParadaEnRiesgoDto[] = [];
+    for (const fila of filas) {
+      const fechaProgramada = String(fila.fecha_programada);
+      const riesgo = evaluarRiesgo({ estadoEntrega: String(fila.estado_entrega), fechaProgramada }, ahora, margenHoras);
+      if (!riesgo) continue;
+      paradas.push({
+        rutaId: String(fila.ruta_id),
+        rutaEstado: fila.ruta_estado as EstadoRuta,
+        reprogramable: fila.ruta_estado === EstadoRuta.PLANIFICADA,
+        fechaProgramada,
+        vehiculoExternoId: String(fila.vehiculo_externo_id),
+        choferExternoId: String(fila.chofer_externo_id),
+        paradaId: String(fila.parada_id),
+        secuencia: Number(fila.secuencia),
+        destino: String(fila.destino),
+        limiteEntrega: riesgo.limite.toISOString(),
+        minutosRestantes: riesgo.minutosRestantes,
+        motivo: riesgo.motivo,
+        motivoDetalle: describirRiesgo(riesgo),
+      });
+    }
+    return { margenHoras, calculadoEn: ahora.toISOString(), total: paradas.length, paradas };
   }
 
   async findOne(id: string): Promise<Ruta> {

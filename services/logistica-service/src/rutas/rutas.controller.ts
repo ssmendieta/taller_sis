@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { PermisoLogisticaGuard, PERMISO_LOGISTICA } from '../auth/permiso-logistica.guard';
 import { GuardarRutaDto } from './dto/guardar-ruta.dto';
+import { validarFiltroParadasRiesgo } from './dto/parada-en-riesgo.dto';
 import { ValidarGuardarRutaPipe } from './dto/validar-guardar-ruta.pipe';
 import { RutasService } from './rutas.service';
 
@@ -54,6 +55,13 @@ export class RutasController {
   @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
   findBoletasDisponibles(@Query('rutaId') rutaId?: string) {
     return this.service.findBoletasDisponibles(rutaId ? rutaId : null);
+  }
+
+  // ABC-458: paradas en riesgo de llegar tarde. También antes de `:id`.
+  @Get('paradas-en-riesgo')
+  @SetMetadata(PERMISO_LOGISTICA, PERMISO_CONSULTAR_RUTAS)
+  findParadasEnRiesgo(@Query() query: Record<string, unknown>) {
+    return this.service.findParadasEnRiesgo(validarFiltroParadasRiesgo(query));
   }
 
   @Get(':id')
