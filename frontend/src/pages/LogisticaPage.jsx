@@ -13,6 +13,9 @@ import { datosSolicitudSalida, mensajeErrorSalida } from "../services/solicitude
 import { FORMATO_TITULO } from "../constants/marca.js";
 import AgrupacionSolicitudes from "../components/logistica/AgrupacionSolicitudes.jsx";
 import CrearBoletaDesdeSolicitud from "../components/logistica/CrearBoletaDesdeSolicitud.jsx";
+import EntregasEnRiesgo from "../components/logistica/rutas/EntregasEnRiesgo.jsx";
+import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
+import { PERMISO_GESTIONAR_RUTAS } from "../services/logisticaService.js";
 import "../styles/solicitudes-salida.css";
 
 export default function LogisticaPage() {
@@ -22,6 +25,8 @@ export default function LogisticaPage() {
   const puedeOrdenes = tienePermiso(usuario, "ordenes.consultar");
   const puedeBoleta = tienePermiso(usuario, "logistica.boletas.gestionar");
   const puedeDisponibilidad = tienePermiso(usuario, PERMISO_CONSULTAR_BOLETAS);
+  const puedeVerRiesgo = tienePermiso(usuario, PERMISO_CONSULTAR_RUTAS);
+  const puedeReprogramar = tienePermiso(usuario, PERMISO_GESTIONAR_RUTAS);
   const [solicitudes, setSolicitudes] = useState([]);
   const [ordenes, setOrdenes] = useState([]);
   const [ordenId, setOrdenId] = useState("");
@@ -150,6 +155,8 @@ export default function LogisticaPage() {
         Solicitud #{confirmada.id} registrada en el servidor. Estado: {confirmada.estado}.
         {puedeBoleta && puedeConsultar && puedeOrdenes && <> <Link to="/logistica/boletas/nueva">Crear boleta</Link></>}
       </div>}
+      {/* ABC-459: entregas en riesgo de llegar tarde, con acceso a reprogramar la ruta. */}
+      {puedeVerRiesgo && <EntregasEnRiesgo puedeReprogramar={puedeReprogramar} />}
       {error && <p className="ts-feedback ts-error" role="alert">{error}</p>}
       {!puedeCrear && <p>Para registrar una solicitud necesitas el permiso {PERMISO_GESTIONAR_SOLICITUDES}.</p>}
       {puedeCrear && !puedeOrdenes && <p role="alert">Necesitas el permiso ordenes.consultar para seleccionar órdenes y lotes reales.</p>}

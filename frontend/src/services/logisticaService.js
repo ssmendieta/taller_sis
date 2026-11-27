@@ -262,3 +262,16 @@ export async function listarRutas({ signal } = {}) {
   if (!Array.isArray(rutas)) throw new Error("El servidor devolvió un listado de rutas inválido.");
   return rutas.map(rutaConfirmada);
 }
+
+// ABC-459: paradas en riesgo de llegar tarde (endpoint de ABC-458).
+export async function listarParadasEnRiesgo(filtros = {}) {
+  const consulta = new URLSearchParams(Object.entries(filtros).filter(([, valor]) => valor)).toString();
+  const response = await fetch(
+    `${apiConfig.gatewayUrl}/api/logistica/rutas/paradas-en-riesgo${consulta ? `?${consulta}` : ""}`,
+    { headers: encabezados() }
+  );
+  await exigirOk(response, "No se pudieron cargar las entregas en riesgo.");
+  const datos = await response.json();
+  if (!Array.isArray(datos?.paradas)) throw new Error("El servidor no devolvió un listado válido de entregas en riesgo.");
+  return datos;
+}
