@@ -110,3 +110,15 @@ export async function marcarAvisoLeidoProduccion(id) {
   await exigirOk(response, "No se pudo marcar el aviso como leído.");
   return await response.json();
 }
+
+// ABC-471: FPY del período (cálculo de ABC-470, dentro de las métricas). fpy null = sin datos.
+export async function obtenerFpyProduccion(filtros = {}) {
+  const { calidad } = await obtenerMetricasDashboard(filtros);
+  return {
+    fpy: calidad.fpy,
+    evaluadas: calidad.total_evaluado,
+    conformesPrimera: calidad.unidades_conformes_primera,
+    recuperadas: calidad.unidades_recuperadas,
+    porcentajeConformes: calidad.porcentaje_conformes,
+  };
+}

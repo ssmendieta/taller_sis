@@ -36,6 +36,8 @@ beforeEach(() => {
   globalThis.__sesionKpis = { id: 7, permisos: [{ codigo: 'logistica.rutas.consultar' }, { codigo: 'ordenes.consultar' }] };
   globalThis.fetch = async (url) => {
     const u = new URL(url);
+    // ABC-471: el widget del FPY consulta las métricas; no cuentan para estas pruebas.
+    if (u.pathname === '/api/produccion/dashboard/metricas') return Response.json({ calidad: { fpy: null, total_evaluado: 0 } });
     llamadas.push(u);
     const r = respuestas[u.pathname];
     return r ? r() : Response.json({ message: 'sin simular' }, { status: 500 });
