@@ -52,6 +52,8 @@ beforeEach(() => {
   globalThis.sessionStorage = { getItem: (key) => key === 'accessToken' ? 'token-cronologia' : null };
   globalThis.localStorage = { getItem: () => null };
   globalThis.fetch = async (url, opciones = {}) => {
+    // ABC-501: el layout consulta los avisos de KPI; no cuentan para estas pruebas.
+    if (String(url).includes('/kpis/avisos')) return Response.json(String(url).endsWith('/sin-leer') ? { total: 0 } : []);
     const ruta = new URL(url).pathname;
     llamadas.push({ ruta, authorization: opciones.headers?.Authorization, signal: opciones.signal });
     return responder(ruta);

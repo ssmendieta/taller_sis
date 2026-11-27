@@ -89,3 +89,24 @@ export async function obtenerDetalleKpiProduccion(kpi, filtros = {}) {
   await exigirOk(response, "Error al obtener el detalle del KPI.");
   return await response.json();
 }
+
+// ABC-501: avisos de KPI en rojo (endpoints de ABC-500 y ABC-526).
+export async function listarAvisosProduccion() {
+  const response = await fetch(`${apiConfig.apiUrl}/api/produccion/dashboard/kpis/avisos`, { headers: encabezados() });
+  await exigirOk(response, "No se pudieron cargar los avisos.");
+  return await response.json();
+}
+
+export async function contarAvisosSinLeerProduccion() {
+  const response = await fetch(`${apiConfig.apiUrl}/api/produccion/dashboard/kpis/avisos/sin-leer`, { headers: encabezados() });
+  await exigirOk(response, "No se pudo contar los avisos.");
+  return (await response.json()).total;
+}
+
+export async function marcarAvisoLeidoProduccion(id) {
+  const response = await fetch(`${apiConfig.apiUrl}/api/produccion/dashboard/kpis/avisos/${encodeURIComponent(id)}/leido`, {
+    method: "PATCH", headers: encabezados(),
+  });
+  await exigirOk(response, "No se pudo marcar el aviso como leído.");
+  return await response.json();
+}

@@ -100,3 +100,24 @@ export async function obtenerRankingLogistica({ dimension, desde, hasta } = {}) 
   await exigirOk(response, "Error al obtener el ranking de choferes y vehículos.");
   return await response.json();
 }
+
+// ABC-501: avisos de KPI en rojo (endpoints de ABC-500 y ABC-526).
+export async function listarAvisosLogistica() {
+  const response = await fetch(`${apiConfig.apiUrl}/api/logistica/dashboard/kpis/avisos`, { headers: encabezados() });
+  await exigirOk(response, "No se pudieron cargar los avisos.");
+  return await response.json();
+}
+
+export async function contarAvisosSinLeerLogistica() {
+  const response = await fetch(`${apiConfig.apiUrl}/api/logistica/dashboard/kpis/avisos/sin-leer`, { headers: encabezados() });
+  await exigirOk(response, "No se pudo contar los avisos.");
+  return (await response.json()).total;
+}
+
+export async function marcarAvisoLeidoLogistica(id) {
+  const response = await fetch(`${apiConfig.apiUrl}/api/logistica/dashboard/kpis/avisos/${encodeURIComponent(id)}/leido`, {
+    method: "PATCH", headers: encabezados(),
+  });
+  await exigirOk(response, "No se pudo marcar el aviso como leído.");
+  return await response.json();
+}

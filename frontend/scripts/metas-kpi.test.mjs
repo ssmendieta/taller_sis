@@ -31,6 +31,8 @@ beforeEach(() => {
   globalThis.__sesionMetas = { id: 7, permisos };
   globalThis.fetch = async (url, options = {}) => {
     const path = new URL(url).pathname;
+    // ABC-501: el layout consulta los avisos de KPI; no cuentan para estas pruebas.
+    if (path.includes('/kpis/avisos')) return Response.json(path.endsWith('/sin-leer') ? { total: 0 } : []);
     llamadas.push({ path, ...options });
     if ((options.method ?? 'GET') === 'GET') {
       if (falloGet) return Response.json({ message: 'Error de consulta' }, { status: falloGet });

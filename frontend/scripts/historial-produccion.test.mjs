@@ -75,6 +75,8 @@ beforeEach(() => {
   globalThis.__usuarioHistorialProd = { id: '3', permisos: ['ordenes.consultar'] };
 
   globalThis.fetch = async (url, opts = {}) => {
+    // ABC-501: el layout consulta los avisos de KPI; no cuentan para estas pruebas.
+    if (String(url).includes('/kpis/avisos')) return Response.json(String(url).endsWith('/sin-leer') ? { total: 0 } : []);
     const u = new URL(url);
     llamadas.push({
       path: u.pathname,

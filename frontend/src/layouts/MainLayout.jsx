@@ -10,6 +10,8 @@ import { PERMISO_INTEGRACIONES } from "../services/integracionesService.js";
 import { PERMISO_CONSULTAR_RUTAS } from "../services/historialLogisticoService.js";
 import { PERMISO_CONSULTAR_BOLETAS, PERMISO_CONSULTAR_SOLICITUDES, PERMISO_GESTIONAR_SOLICITUDES } from "../services/boletasService.js";
 import { PERMISO_CONSULTAR_RECURSOS, PERMISO_GESTIONAR_RUTAS } from "../services/logisticaService.js";
+import AvisosKpi from "../components/ui/AvisosKpi.jsx";
+import { puedeVerAvisos } from "../services/avisosKpiService.js";
 import "../styles/layout.css";
 
 const iconos = {
@@ -90,6 +92,8 @@ export default function MainLayout({ children }) {
           {puedeRecursos && <Link className={activo("/logistica/recursos")} to="/logistica/recursos" onClick={() => setAbierto(false)}><IconoNavegacion nombre="recursos" />Recursos logísticos</Link>}
           {puedeIntegraciones && <Link className={activo("/integraciones")} to="/integraciones" onClick={() => setAbierto(false)}><IconoNavegacion nombre="integraciones" />Integraciones</Link>}
         </nav>
+        {/* ABC-501: avisos de KPI en rojo para quien consulta Producción o Logística. */}
+        {usuario && puedeVerAvisos(usuario) && <AvisosKpi usuario={usuario} onNavegar={() => setAbierto(false)} />}
         {usuario && (
           <div className="nav-user">
             <p className="nav-user-name">{nombre}</p>

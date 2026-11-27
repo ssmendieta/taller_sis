@@ -54,6 +54,8 @@ beforeEach(() => {
   globalThis.localStorage = { getItem: () => null };
   globalThis.__sesionReporteLogistico = { id: 7, permisos: [{ codigo: 'logistica.rutas.consultar' }] };
   globalThis.fetch = async (url, opciones) => {
+    // ABC-501: el layout consulta los avisos de KPI; no cuentan para estas pruebas.
+    if (String(url).includes('/kpis/avisos')) return Response.json(String(url).endsWith('/sin-leer') ? { total: 0 } : []);
     const destino = new URL(url);
     llamadas.push({ destino, opciones });
     return responder(destino.searchParams);

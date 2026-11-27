@@ -1,0 +1,14 @@
+/* ABC-501: avisos de KPI en rojo en la barra lateral. */
+.avisos-kpi { padding: 8px 12px; }
+.avisos-kpi-boton { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 8px 10px; border: 1px solid var(--ts-border); border-radius: var(--ts-radius-control); background: var(--ts-surface); color: var(--ts-text); font: inherit; font-size: 0.82rem; cursor: pointer; }
+.avisos-kpi-contador { min-width: 20px; padding: 1px 6px; border-radius: 10px; background: var(--ts-danger); color: #fff; font-size: 0.72rem; font-weight: 700; text-align: center; }
+.avisos-kpi-panel { margin-top: 8px; max-height: 320px; overflow-y: auto; border: 1px solid var(--ts-border); border-radius: var(--ts-radius-control); background: var(--ts-surface); }
+.avisos-kpi-estado { margin: 0; padding: 10px; font-size: 0.78rem; color: var(--ts-secondary); }
+.avisos-kpi-estado p { margin: 0 0 6px; }
+.avisos-kpi-error { color: var(--ts-danger); }
+.avisos-kpi-lista { list-style: none; margin: 0; padding: 0; }
+.avisos-kpi-item { display: flex; flex-direction: column; gap: 3px; padding: 10px; border-bottom: 1px solid var(--ts-border); font-size: 0.78rem; }
+.avisos-kpi-item:last-child { border-bottom: 0; }
+.avisos-kpi-item[data-leido] { opacity: 0.65; }
+.avisos-kpi-fecha { color: var(--ts-secondary); font-size: 0.72rem; }
+.avisos-kpi-acciones { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
