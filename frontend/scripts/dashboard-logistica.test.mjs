@@ -169,6 +169,36 @@ test('uso de capacidad: el enlace al detalle conserva el período', async () => 
   assert.match(enlace.props.href, /desde=\d{4}-\d{2}-\d{2}&hasta=\d{4}-\d{2}-\d{2}/);
 });
 
+// ABC-491: un 0 % es un valor calculado; no se confunde con "No calculable" ni con "Sin datos".
+const conUso = (uso) => () => { const m = metricas(1); m.uso_capacidad = uso; return json(m); };
+const widgetUso = () => root.root.find((n) => n.props?.['aria-labelledby'] === 'dash-uso-titulo');
+const filasUso = () => widgetUso().findAll((n) => n.type === 'li' && n.props.className === 'dash-barra-fila').map((fila) => ({
+  vehiculo: fila.findByProps({ className: 'dash-barra-etiqueta' }).children.join(''),
+  valor: fila.findByProps({ className: 'dash-barra-valor' }).children.join(''),
+  barras: fila.findAll((n) => n.props?.className === 'dash-barra').length,
+}));
+
+test('uso de capacidad: 0 % se muestra como 0 % y no como "No calculable"', async () => {
+  responder = conUso({ porcentaje: 0, rutas_calculables: 1, rutas_no_calculables: 1, por_ruta: [], por_vehiculo: [
+    { vehiculo_externo_id: 'VEH-0', placa: 'CERO-1', porcentaje: 0, rutas_calculables: 1, rutas_no_calculables: 0 },
+    { vehiculo_externo_id: 'VEH-X', placa: 'NOCALC-1', porcentaje: null, rutas_calculables: 0, rutas_no_calculables: 1 },
+  ] });
+  await montar();
+  assert.equal(widgetUso().findByProps({ className: 'dash-grafico-total' }).children.join(''), '0%');
+  assert.deepEqual(filasUso(), [
+    { vehiculo: 'CERO-1', valor: '0%', barras: 0 },
+    { vehiculo: 'NOCALC-1', valor: 'No calculable', barras: 0 },
+  ]);
+});
+
+test('uso de capacidad: sin rutas en el período muestra "Sin datos", no 0 %', async () => {
+  responder = conUso({ porcentaje: null, rutas_calculables: 0, rutas_no_calculables: 0, por_ruta: [], por_vehiculo: [] });
+  await montar();
+  assert.equal(widgetUso().findByProps({ className: 'dash-grafico-total' }).children.join(''), 'Sin datos');
+  assert.match(JSON.stringify(widgetUso().findByProps({ className: 'ts-empty' }).children), /Sin rutas despachadas en el período/);
+  assert.equal(filasUso().length, 0);
+});
+
 // ABC-430 / ABC-531: ranking de choferes y vehículos.
 const celdas = () => root.root.findAll((n) => n.type === 'tr' && n.parent?.type === 'tbody' && n.findAll((x) => x.type === 'th').length === 1
   && n.findAll((x) => x.type === 'a' && String(x.props.href).includes('ENTREGAS_A_TIEMPO')).length === 1);
