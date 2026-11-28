@@ -272,3 +272,23 @@ test('ranking: lista vacía muestra mensaje informativo (ABC-521)', async () => 
   await montar();
   assert.match(texto(), /No hay choferes ni vehículos registrados/);
 });
+
+test('ranking: sin valores distintos no resalta mejor ni peor (ABC-530)', async () => {
+  responderRanking = () => json({
+    dimension: 'CHOFER',
+    periodo: { desde: null, hasta: null },
+    filas: [{
+      id: 'CHO-1', nombre: 'Ana', sin_datos: false,
+      entregas_a_tiempo: { porcentaje: 100, a_tiempo: 2, entregadas: 2 },
+      incidencias_ruta: { por_100: 0, incidencias: 0, entregas: 2 },
+      uso_capacidad: { porcentaje: 80, rutables: 1 },
+    }],
+    totales: {
+      entregas_a_tiempo: { porcentaje: 100, a_tiempo: 2, entregadas: 2 },
+      incidencias_ruta: { por_100: 0, incidencias: 0, entregas: 2 },
+      uso_capacidad: { porcentaje: 80, rutables: 1 },
+    },
+  });
+  await montar();
+  assert.equal(root.root.findAll((n) => n.type === 'td' && n.props['data-marca']).length, 0);
+});

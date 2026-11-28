@@ -60,3 +60,5 @@
 .dash-marca { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: .68rem; font-weight: 600; border: 1px solid; }
 .dash-marca--mejor { color: var(--ts-success); background: var(--ts-success-bg); border-color: var(--ts-success-border); }
 .dash-marca--peor { color: var(--ts-danger); background: var(--ts-danger-bg); border-color: var(--ts-danger-border); }
+.dash-tabla td[data-marca="Mejor"] { background: color-mix(in srgb, var(--ts-success-bg) 55%, transparent); }
+.dash-tabla td[data-marca="Peor"] { background: color-mix(in srgb, var(--ts-danger-bg) 55%, transparent); }
