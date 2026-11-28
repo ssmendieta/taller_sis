@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { obtenerRankingLogistica } from "../../../services/dashboardLogisticaService.js";
 
@@ -121,11 +121,7 @@ export default function RankingRecursos({ periodo }) {
             <thead>
               <tr>
                 {encabezado("nombre", dim.columna)}
-                {COLUMNAS.map((c) => <th key={c.clave} scope="col" aria-sort={ariaSort(c.clave)} className="ts-num">
-                  <button type="button" className="dash-orden" onClick={() => ordenarPor(c.clave)}>
-                    {c.titulo}{orden.columna === c.clave ? (orden.ascendente ? " ▲" : " ▼") : ""}
-                  </button>
-                </th>)}
+                {COLUMNAS.map((c) => <Fragment key={c.clave}>{encabezado(c.clave, c.titulo, true)}</Fragment>)}
                 <th scope="col"><span className="sr-solo">Detalle</span></th>
               </tr>
             </thead>

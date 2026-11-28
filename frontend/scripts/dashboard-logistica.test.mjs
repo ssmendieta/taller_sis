@@ -257,3 +257,18 @@ test('ranking: un error se informa sin ocultar los widgets', async () => {
   assert.match(texto(), /Ranking caído/);
   assert.match(texto(), /Boletas por estado/);
 });
+
+test('ranking: lista vacía muestra mensaje informativo (ABC-521)', async () => {
+  responderRanking = () => json({
+    dimension: 'CHOFER',
+    periodo: { desde: null, hasta: null },
+    filas: [],
+    totales: {
+      entregas_a_tiempo: { porcentaje: null, a_tiempo: 0, entregadas: 0, unidad: '%' },
+      incidencias_ruta: { por_100: null, incidencias: 0, entregas: 0, unidad: 'por 100' },
+      uso_capacidad: { porcentaje: null, rutas_calculables: 0, rutas_no_calculables: 0 },
+    },
+  });
+  await montar();
+  assert.match(texto(), /No hay choferes ni vehículos registrados/);
+});
